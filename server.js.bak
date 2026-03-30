@@ -1,0 +1,345 @@
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const db = require('./database');
+const path = require('path');
+const auth = require('./auth');
+const usersController = require('./usersController');
+
+const app = express();
+const PORT = 3000;
+
+// 中间件
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// ==================== 认证路由（不需要token） ====================
+const authRouter = express.Router();
+authRouter.post('/login', usersController.login);
+authRouter.post('/logout', usersController.logout);
+authRouter.get('/me', auth.verifyToken, usersController.getCurrentUser);
+
+// ==================== 用户管理路由（需要认证） ====================
+const usersRouter = express.Router();
+usersRouter.use(auth.verifyToken);
+usersRouter.get('/', auth.checkPermission('users', 'manage'), usersController.getAllUsers);
+usersRouter.post('/', auth.checkPermission('users', 'manage'), usersController.createUser);
+usersRouter.put('/:userId/permissions', auth.checkPermission('users', 'manage'), usersController.updatePermissions);
+usersRouter.delete('/:userId', auth.checkPermission('users', 'manage'), usersController.deleteUser);
+
+// ==================== 受保护的API路由 ====================
+const membersRouter = express.Router();
+const devicesRouter = express.Router();
+const gamesRouter = express.Router();
+const testsRouter = express.Router();
+const bugsRouter = express.Router();
+
+// 应用认证中间件
+membersRouter.use(auth.verifyToken);
+devicesRouter.use(auth.verifyToken);
+gamesRouter.use(auth.verifyToken);
+testsRouter.use(auth.verifyToken);
+bugsRouter.use(auth.verifyToken);
+
+// ==================== 成员管理 API ====================
+membersRouter.get('/', auth.checkPermission('members', 'view'), (req, res) => {
+  const sql = 'SELECT * FROM members ORDER BY created_at DESC';
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, data: rows });
+  });
+});
+
+membersRouter.post('/', auth.checkPermission('members', 'edit'), (req, res) => {
+  const { name, wechat_id, role, duty, status } = req.body;
+  const sql = `INSERT INTO members (name, wechat_id, role, duty, status)
+               VALUES (?, ?, ?, ?, ?)`;
+  db.run(sql, [name, wechat_id, role, duty, status], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+membersRouter.put('/:id', auth.checkPermission('members', 'edit'), (req, res) => {
+  const { name, wechat_id, role, duty, status } = req.body;
+  const sql = `UPDATE members SET name = ?, wechat_id = ?, role = ?, duty = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [name, wechat_id, role, duty, status, req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+membersRouter.delete('/:id', auth.checkPermission('members', 'delete'), (req, res) => {
+  const sql = 'DELETE FROM members WHERE id = ?';
+  db.run(sql, [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+// ==================== 设备管理 API ====================
+devicesRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
+  const sql = `SELECT d.*, m.name as assigned_to_name
+               FROM devices d
+               LEFT JOIN members m ON d.assigned_to = m.id
+               ORDER BY d.created_at DESC`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, data: rows });
+  });
+});
+
+devicesRouter.post('/', (req, res) => {
+  const { manufacturer, device_type, name, requirements, quantity, keeper,
+          notes, adapter_completion_rate, total_bugs, completed_adaptations,
+          total_games, status, assigned_to } = req.body;
+  const sql = `INSERT INTO devices (manufacturer, device_type, name, requirements, quantity,
+                                   keeper, notes, adapter_completion_rate, total_bugs,
+                                   completed_adaptations, total_games, status, assigned_to)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [manufacturer, device_type, name, requirements, quantity, keeper,
+               notes, adapter_completion_rate, total_bugs, completed_adaptations,
+               total_games, status, assigned_to], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+devicesRouter.put('/:id', (req, res) => {
+  const { manufacturer, device_type, name, requirements, quantity, keeper,
+          notes, adapter_completion_rate, total_bugs, completed_adaptations,
+          total_games, status, assigned_to } = req.body;
+  const sql = `UPDATE devices SET manufacturer = ?, device_type = ?, name = ?, requirements = ?, quantity = ?,
+                                 keeper = ?, notes = ?, adapter_completion_rate = ?, total_bugs = ?,
+                                 completed_adaptations = ?, total_games = ?, status = ?, assigned_to = ?,
+                                 updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [manufacturer, device_type, name, requirements, quantity, keeper,
+               notes, adapter_completion_rate, total_bugs, completed_adaptations,
+               total_games, status, assigned_to, req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+devicesRouter.delete('/:id', (req, res) => {
+  const sql = 'DELETE FROM devices WHERE id = ?';
+  db.run(sql, [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+// ==================== 游戏管理 API ====================
+gamesRouter.get('/', (req, res) => {
+  const sql = 'SELECT * FROM games ORDER BY created_at DESC';
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, data: rows });
+  });
+});
+
+gamesRouter.post('/', (req, res) => {
+  const { name, english_name, platform, game_id, game_type, description,
+          developer, operator, release_date, config_path, adapter_progress,
+          version, package_size, adaptation_status, adaptation_notes } = req.body;
+  const sql = `INSERT INTO games (name, english_name, platform, game_id, game_type, description,
+                                  developer, operator, release_date, config_path, adapter_progress,
+                                  version, package_size, adaptation_status, adaptation_notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [name, english_name, platform, game_id, game_type, description,
+               developer, operator, release_date, config_path, adapter_progress,
+               version, package_size, adaptation_status, adaptation_notes], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+gamesRouter.put('/:id', (req, res) => {
+  const { name, english_name, platform, game_id, game_type, description,
+          developer, operator, release_date, config_path, adapter_progress,
+          version, package_size, adaptation_status, adaptation_notes } = req.body;
+  const sql = `UPDATE games SET name = ?, english_name = ?, platform = ?, game_id = ?, game_type = ?,
+                              description = ?, developer = ?, operator = ?, release_date = ?, config_path = ?,
+                              adapter_progress = ?, version = ?, package_size = ?, adaptation_status = ?,
+                              adaptation_notes = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [name, english_name, platform, game_id, game_type, description,
+               developer, operator, release_date, config_path, adapter_progress,
+               version, package_size, adaptation_status, adaptation_notes, req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+gamesRouter.delete('/:id', (req, res) => {
+  const sql = 'DELETE FROM games WHERE id = ?';
+  db.run(sql, [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+// ==================== 测试管理 API ====================
+testsRouter.get('/', (req, res) => {
+  const sql = `SELECT t.*, g.name as game_name, d.name as device_name, m.name as tester_name
+               FROM tests t
+               LEFT JOIN games g ON t.game_id = g.id
+               LEFT JOIN devices d ON t.device_id = d.id
+               LEFT JOIN members m ON t.tester_id = m.id
+               ORDER BY t.created_at DESC`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, data: rows });
+  });
+});
+
+testsRouter.post('/', (req, res) => {
+  const { name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description } = req.body;
+  const sql = `INSERT INTO tests (name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+testsRouter.put('/:id', (req, res) => {
+  const { name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description } = req.body;
+  const sql = `UPDATE tests SET name = ?, game_id = ?, device_id = ?, tester_id = ?, test_date = ?, status = ?, priority = ?, result = ?, bugs_count = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description, req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+testsRouter.delete('/:id', (req, res) => {
+  const sql = 'DELETE FROM tests WHERE id = ?';
+  db.run(sql, [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+// ==================== 缺陷管理 API ====================
+bugsRouter.get('/', (req, res) => {
+  const sql = `SELECT b.*, t.name as test_name, m.name as assignee_name
+               FROM bugs b
+               LEFT JOIN tests t ON b.test_id = t.id
+               LEFT JOIN members m ON b.assignee_id = m.id
+               ORDER BY b.created_at DESC`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, data: rows });
+  });
+});
+
+bugsRouter.post('/', (req, res) => {
+  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+          owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
+  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+                                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+               owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+bugsRouter.put('/:id', (req, res) => {
+  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+          owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
+  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?,
+                            discovery_time = ?, owner = ?, bug_status = ?, priority = ?, problem_type = ?,
+                            description = ?, steps = ?, test_id = ?, assignee_id = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+               owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id, req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+bugsRouter.delete('/:id', (req, res) => {
+  const sql = 'DELETE FROM bugs WHERE id = ?';
+  db.run(sql, [req.params.id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ success: true });
+  });
+});
+
+// 注册路由
+app.use('/api/members', membersRouter);
+app.use('/api/devices', devicesRouter);
+app.use('/api/games', gamesRouter);
+app.use('/api/tests', testsRouter);
+app.use('/api/bugs', bugsRouter);
+
+// 启动服务器
+app.listen(PORT, () => {
+  console.log(`服务器运行在 http://localhost:${PORT}`);
+});

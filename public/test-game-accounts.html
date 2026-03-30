@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试游戏账号加载</title>
+</head>
+<body>
+    <h1>游戏账号加载测试</h1>
+    <div id="result"></div>
+
+    <script src="gameAccountsData.js"></script>
+    <script>
+        const resultDiv = document.getElementById('result');
+
+        try {
+            // 检查是否能够访问gameAccountsData变量
+            if (typeof gameAccountsData !== 'undefined') {
+                const count = Object.keys(gameAccountsData).length;
+                resultDiv.innerHTML = `
+                    <p style="color: green; font-size: 18px;">
+                        ✅ 游戏账号数据加载成功! 共 ${count} 条记录
+                    </p>
+                    <h3>前5条记录:</h3>
+                    <ul>
+                        ${Object.entries(gameAccountsData).slice(0, 5).map(([key, value]) =>
+                            `<li><strong>${escapeHtml(key)}</strong>: ${escapeHtml(value)}</li>`
+                        ).join('')}
+                    </ul>
+                    <h3>测试模糊匹配:</h3>
+                    <ul>
+                        <li>刺客信条: ${escapeHtml(findGameAccount('刺客信条'))}</li>
+                        <li>艾尔登法环: ${escapeHtml(findGameAccount('艾尔登法环'))}</li>
+                        <li>黑神话: ${escapeHtml(findGameAccount('黑神话'))}</li>
+                    </ul>
+                `;
+            } else {
+                resultDiv.innerHTML = '<p style="color: red;">❌ gameAccountsData变量未定义</p>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color: red;">❌ 错误: ${escapeHtml(error.message)}</p>`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function findGameAccount(gameName) {
+            if (gameAccountsData[gameName]) {
+                return gameAccountsData[gameName];
+            }
+
+            const gameKey = Object.keys(gameAccountsData).find(key =>
+                key.toLowerCase().includes(gameName.toLowerCase()) ||
+                gameName.toLowerCase().includes(key.toLowerCase())
+            );
+
+            return gameKey ? gameAccountsData[gameKey] : '未找到';
+        }
+    </script>
+</body>
+</html>

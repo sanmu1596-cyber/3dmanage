@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Database
+*.sqlite
+*.sqlite3
+*.sqlite.bak*
+
+# Environment
+.env
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Deploy artifacts
+*.zip
+*.msi
+
+# WorkBuddy internal
+.workbuddy/

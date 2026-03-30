@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>裸眼3D游戏适配项目管理</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- ===== 顶部标题栏 ===== -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <button class="icon-btn sidebar-toggle" onclick="toggleSidebar()" title="切换侧边栏">☰</button>
+                <span class="app-title">裸眼3D游戏适配项目管理</span>
+            </div>
+            <div class="top-bar-right" id="user-info">
+                <span class="user-avatar">👤</span>
+                <span class="user-name">管理员</span>
+            </div>
+        </header>
+
+        <!-- ===== 主体区域 ===== -->
+        <div class="main-body">
+            <!-- 左侧边栏 -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">总览</div>
+                    <div class="sidebar-nav">
+                        <a class="sidebar-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+                            <span class="sidebar-icon">📊</span>项目概览
+                        </a>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">数据视图</div>
+                    <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="games" onclick="switchTab('games')">
+                            <span class="sidebar-icon">🎮</span>游戏列表
+                        </a>
+                        <a class="sidebar-item" data-tab="devices" onclick="switchTab('devices')">
+                            <span class="sidebar-icon">📱</span>设备列表
+                        </a>
+                        <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
+                            <span class="sidebar-icon">👥</span>项目成员列表
+                        </a>
+                        <a class="sidebar-item" data-tab="progress" onclick="switchTab('progress')">
+                            <span class="sidebar-icon">📊</span>适配进展
+                        </a>
+                        <a class="sidebar-item" data-tab="matrix" onclick="switchTab('matrix')">
+                            <span class="sidebar-icon">🔲</span>适配矩阵
+                        </a>
+                        <a class="sidebar-item" data-tab="tests" onclick="switchTab('tests')">
+                            <span class="sidebar-icon">🧪</span>测试列表
+                        </a>
+                        <a class="sidebar-item" data-tab="bugs" onclick="switchTab('bugs')">
+                            <span class="sidebar-icon">🐛</span>缺陷列表
+                        </a>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">项目管理</div>
+                    <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
+                            <span class="sidebar-icon">📋</span>配置计划
+                        </a>
+                        <a class="sidebar-item" data-tab="field-settings" onclick="switchTab('field-settings')">
+                            <span class="sidebar-icon">⚙️</span>字段设置
+                        </a>
+                    </div>
+                </div>
+                <div class="sidebar-section sidebar-stats">
+                    <div class="sidebar-section-title">数据统计</div>
+                    <div class="sidebar-stat-grid">
+                        <div class="sidebar-stat"><span class="stat-val" id="stat-members">0</span><span class="stat-lbl">成员</span></div>
+                        <div class="sidebar-stat"><span class="stat-val" id="stat-devices">0</span><span class="stat-lbl">设备</span></div>
+                        <div class="sidebar-stat"><span class="stat-val" id="stat-games">0</span><span class="stat-lbl">游戏</span></div>
+                        <div class="sidebar-stat"><span class="stat-val" id="stat-tests">0</span><span class="stat-lbl">测试</span></div>
+                        <div class="sidebar-stat"><span class="stat-val" id="stat-bugs">0</span><span class="stat-lbl">缺陷</span></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 右侧内容区域 -->
+            <main class="content-area">
+
+                <!-- ========== 项目概览 Dashboard ========== -->
+                <section id="dashboard" class="tab-content active">
+                    <div class="dashboard-container">
+                        <div class="dashboard-cards">
+                            <div class="dash-card dash-card-primary" onclick="switchTab('games')">
+                                <div class="dash-card-icon">🎮</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-games">0</div>
+                                    <div class="dash-card-label">游戏总数</div>
+                                </div>
+                            </div>
+                            <div class="dash-card dash-card-info" onclick="switchTab('devices')">
+                                <div class="dash-card-icon">📱</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-devices">0</div>
+                                    <div class="dash-card-label">设备总数</div>
+                                </div>
+                            </div>
+                            <div class="dash-card dash-card-success">
+                                <div class="dash-card-icon">✅</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-adaptation-rate">0%</div>
+                                    <div class="dash-card-label">已上线率</div>
+                                </div>
+                            </div>
+                            <div class="dash-card dash-card-danger" onclick="switchTab('bugs')">
+                                <div class="dash-card-icon">🐛</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-bugs-open">0</div>
+                                    <div class="dash-card-label">待处理缺陷</div>
+                                </div>
+                            </div>
+                            <div class="dash-card" onclick="switchTab('members')">
+                                <div class="dash-card-icon">👥</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-members">0</div>
+                                    <div class="dash-card-label">项目成员</div>
+                                </div>
+                            </div>
+                            <div class="dash-card" onclick="switchTab('tests')">
+                                <div class="dash-card-icon">🧪</div>
+                                <div class="dash-card-info">
+                                    <div class="dash-card-num" id="dash-tests">0</div>
+                                    <div class="dash-card-label">测试总数</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dashboard-charts">
+                            <div class="chart-card">
+                                <div class="chart-card-header">各平台游戏分布</div>
+                                <canvas id="chart-platform" height="260"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-card-header">上线状态分布</div>
+                                <canvas id="chart-online-status" height="260"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-card-header">缺陷状态分布</div>
+                                <canvas id="chart-bug-status" height="260"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-card-header">近期添加游戏</div>
+                                <div id="recent-games-list" class="recent-list"></div>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-card-header">📋 最近活动</div>
+                                <div id="recent-activity-list" class="activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ========== 游戏列表 ========== -->
+                <section id="games" class="tab-content">
+                    <!-- 工具栏 -->
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>添加一行</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="toggleColumnSettings()"><span class="tool-icon">⚙</span>字段设置</button>
+                            <button class="tool-btn" onclick="document.getElementById('filter-panel').classList.toggle('show')"><span class="tool-icon">🔍</span>筛选</button>
+                            <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
+                            <button class="tool-btn" onclick="document.getElementById('excel-upload').click()"><span class="tool-icon">📥</span>导入</button>
+                            <button class="tool-btn" onclick="exportToExcel('games')"><span class="tool-icon">📤</span>导出</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="pagination-compact">
+                                <select id="page-size" onchange="changePageSize()" class="compact-select">
+                                    <option value="10">10条/页</option>
+                                    <option value="20" selected>20条/页</option>
+                                    <option value="-1">全部</option>
+                                </select>
+                                <button class="tool-btn" id="prev-btn" onclick="prevPage()">‹</button>
+                                <span id="page-numbers" class="page-numbers"></span>
+                                <button class="tool-btn" id="next-btn" onclick="nextPage()">›</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选面板（可折叠） -->
+                    <div id="filter-panel" class="filter-panel">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="search-input" placeholder="游戏名称或ID..." class="filter-input" onkeyup="filterGames()">
+                            </div>
+                            <div class="filter-group">
+                                <label>平台</label>
+                                <select id="platform-filter" class="filter-select" onchange="filterGames()">
+                                    <option value="">全部</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="type-filter" class="filter-select" onchange="filterGames()">
+                                    <option value="">全部</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="status-filter" class="filter-select" onchange="filterGames()">
+                                    <option value="">全部</option>
+                                    <option value="pending">待适配</option>
+                                    <option value="in_progress">适配中</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="failed">失败</option>
+                                </select>
+                            </div>
+                            <button class="tool-btn" onclick="resetFilters()">重置</button>
+                        </div>
+                    </div>
+
+                    <!-- 字段显示设置面板 -->
+                    <div id="column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllColumns()">取消全选</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>游戏名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="english_name" checked><span>英文名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="platform" checked><span>游戏平台</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_id" checked><span>游戏ID</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_type" checked><span>游戏类型</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="description" checked><span>游戏简介</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="developer" checked><span>开发商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="operator" checked><span>运营商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="release_date" checked><span>上线日期</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="config_path" checked><span>配置路径</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_progress" checked><span>适配进度</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>上线状态</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quality" checked><span>品质</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_account" checked><span>游戏账号</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="storage_location" checked><span>存储位置</span></label></div>
+                        </div>
+                    </div>
+
+                    <!-- 表格 -->
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th data-field="name">游戏名称</th>
+                                    <th data-field="english_name">英文名称</th>
+                                    <th data-field="platform">游戏平台</th>
+                                    <th data-field="game_id">游戏ID</th>
+                                    <th data-field="game_type">游戏类型</th>
+                                    <th data-field="description">游戏简介</th>
+                                    <th data-field="developer">开发商</th>
+                                    <th data-field="operator">运营商</th>
+                                    <th data-field="release_date">上线日期</th>
+                                    <th data-field="config_path">配置路径</th>
+                                    <th data-field="adapter_progress">适配进度</th>
+                                    <th data-field="owner">负责人</th>
+                                    <th data-field="online_status">上线状态</th>
+                                    <th data-field="quality">品质</th>
+                                    <th data-field="game_account">游戏账号</th>
+                                    <th data-field="storage_location">存储位置</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="games-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="games-stats">
+                        <div class="stats-items" id="games-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 成员列表 ========== -->
+                <section id="members" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>添加成员</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('members')"><span class="tool-icon">📤</span>导出</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="members-search" class="filter-input" placeholder="搜索姓名/角色..." style="width:180px" oninput="filterModule('members')">
+                            <select id="members-status-filter" class="compact-select" onchange="filterModule('members')">
+                                <option value="">全部状态</option>
+                                <option value="active">活跃</option>
+                                <option value="inactive">非活跃</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>姓名</th>
+                                    <th>企业微信ID</th>
+                                    <th>角色</th>
+                                    <th>职责</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="members-stats">
+                        <div class="stats-items" id="members-stats-items"></div>
+                    </div>
+                </section>
+                <section id="devices" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>添加设备</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('devices')"><span class="tool-icon">📤</span>导出</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
+                            <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
+                                <option value="">全部状态</option>
+                                <option value="available">可用</option>
+                                <option value="assigned">已分配</option>
+                                <option value="maintenance">维护中</option>
+                                <option value="broken">损坏</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>厂商</th>
+                                    <th>设备类型</th>
+                                    <th>设备名称</th>
+                                    <th>设备需求</th>
+                                    <th>数量</th>
+                                    <th>保管者</th>
+                                    <th>备注</th>
+                                    <th>适配完成率</th>
+                                    <th>总BUG数</th>
+                                    <th>适配完成数</th>
+                                    <th>适配游戏数</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devices-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="devices-stats">
+                        <div class="stats-items" id="devices-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 适配进展 ========== -->
+                <section id="progress" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openAddGameToProgress()"><span class="tool-icon">＋</span>添加游戏</button>
+                            <button class="tool-btn" onclick="openBatchAddGameToProgress()"><span class="tool-icon">📋</span>批量添加</button>
+                        </div>
+                    </div>
+                    <!-- 设备Tab页 -->
+                    <div class="device-tabs">
+                        <div id="device-tab-container" class="device-tab-container"></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>游戏</th>
+                                    <th>游戏平台</th>
+                                    <th>游戏类型</th>
+                                    <th>适配进度</th>
+                                    <th>负责人</th>
+                                    <th>上线状态</th>
+                                    <th>品质</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="progress-table">
+                                <tr><td colspan="9" class="empty-state"><div class="empty-icon">📊</div><div>选择设备查看适配进展</div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="progress-stats">
+                        <div class="stats-items" id="progress-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 适配矩阵 ========== -->
+                <section id="matrix" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <span class="toolbar-title">🔲 游戏 × 设备 适配矩阵</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <select id="matrix-platform-filter" class="compact-select" onchange="renderMatrix()">
+                                <option value="">全部平台</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="matrix-legend">
+                        <span class="legend-item"><span class="legend-dot legend-online"></span>已上线</span>
+                        <span class="legend-item"><span class="legend-dot legend-progress"></span>适配中</span>
+                        <span class="legend-item"><span class="legend-dot legend-pending"></span>待上线</span>
+                        <span class="legend-item"><span class="legend-dot legend-none"></span>未适配</span>
+                    </div>
+                    <div class="table-container matrix-container">
+                        <table class="data-table matrix-table" id="matrix-table">
+                            <thead id="matrix-thead"></thead>
+                            <tbody id="matrix-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ========== 测试列表 ========== -->
+                <section id="tests" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('test-modal')"><span class="tool-icon">＋</span>添加测试</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('tests')"><span class="tool-icon">📤</span>导出</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="tests-search" class="filter-input" placeholder="搜索测试名称/游戏..." style="width:180px" oninput="filterModule('tests')">
+                            <select id="tests-status-filter" class="compact-select" onchange="filterModule('tests')">
+                                <option value="">全部状态</option>
+                                <option value="pending">待测试</option>
+                                <option value="in_progress">测试中</option>
+                                <option value="completed">已完成</option>
+                                <option value="failed">失败</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>测试名称</th>
+                                    <th>游戏</th>
+                                    <th>设备</th>
+                                    <th>测试人</th>
+                                    <th>测试日期</th>
+                                    <th>状态</th>
+                                    <th>优先级</th>
+                                    <th>缺陷数</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tests-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="tests-stats">
+                        <div class="stats-items" id="tests-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 缺陷列表 ========== -->
+                <section id="bugs" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('bug-modal')"><span class="tool-icon">＋</span>添加缺陷</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('bugs')"><span class="tool-icon">📤</span>导出</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="bugs-search" class="filter-input" placeholder="搜索描述/设备/负责人..." style="width:180px" oninput="filterModule('bugs')">
+                            <select id="bugs-status-filter" class="compact-select" onchange="filterModule('bugs')">
+                                <option value="">全部状态</option>
+                                <option value="open">待处理</option>
+                                <option value="in_progress">处理中</option>
+                                <option value="fixed">已修复</option>
+                                <option value="closed">已关闭</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>涉及版本</th>
+                                    <th>设备名称</th>
+                                    <th>发现时间</th>
+                                    <th>负责人</th>
+                                    <th>缺陷状态</th>
+                                    <th>优先级</th>
+                                    <th>问题类型</th>
+                                    <th>描述</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bugs-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="bugs-stats">
+                        <div class="stats-items" id="bugs-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 配置计划 ========== -->
+                <section id="config-plan" class="tab-content">
+                    <div id="plan-list-view">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="showCreatePlanView()"><span class="tool-icon">＋</span>新增适配计划</button>
+                            </div>
+                        </div>
+                        <div class="device-tabs">
+                            <div id="plan-tab-container" class="device-tab-container"></div>
+                        </div>
+                        <div id="plan-detail-area">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="50">序号</th>
+                                            <th>游戏名称</th>
+                                            <th>游戏平台</th>
+                                            <th>负责人</th>
+                                            <th>适配进展</th>
+                                            <th>问题备注</th>
+                                            <th>缺陷列表</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="plan-games-table">
+                                        <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建</div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="plan-create-view" style="display: none;">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn" onclick="showPlanListView()"><span class="tool-icon">←</span>返回</button>
+                                <span class="toolbar-title">新增适配计划</span>
+                            </div>
+                        </div>
+                        <div class="plan-form-container">
+                            <form id="plan-form" onsubmit="submitPlan(event)">
+                                <div class="form-row">
+                                    <div class="form-group"><label>标题 *</label><input type="text" id="plan-title" placeholder="请输入计划标题" required></div>
+                                    <div class="form-group"><label>时间 *</label><input type="date" id="plan-date" required></div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>机型 *</label>
+                                        <div class="tag-input-container">
+                                            <div id="plan-devices-tags" class="tag-list"></div>
+                                            <button type="button" class="tool-btn tool-btn-primary" onclick="openDeviceSelectModal()">+ 选择机型</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group"><label>交织版本</label><input type="text" id="plan-interlace-version" placeholder="请输入交织版本"></div>
+                                    <div class="form-group"><label>客户端版本</label><input type="text" id="plan-client-version" placeholder="请输入客户端版本"></div>
+                                </div>
+                                <div class="form-group"><label>目标说明</label><textarea id="plan-goal" rows="3" placeholder="请输入目标说明"></textarea></div>
+                                <div class="form-group">
+                                    <label>游戏列表 *</label>
+                                    <div class="tag-input-container">
+                                        <div id="plan-games-tags" class="tag-list"></div>
+                                        <button type="button" class="tool-btn tool-btn-primary" onclick="openPlanGameSelectModal()">+ 选择游戏</button>
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
+                                    <button type="submit" class="tool-btn tool-btn-primary">创建计划</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ========== 字段设置 ========== -->
+                <section id="field-settings" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openAddFieldModal()"><span class="tool-icon">＋</span>新增字段</button>
+                            <button class="tool-btn" onclick="loadFieldOptions()"><span class="tool-icon">🔄</span>刷新</button>
+                        </div>
+                    </div>
+                    <p class="field-settings-desc">管理系统中所有序列类型（下拉选项）字段的选项配置。修改后将实时生效。</p>
+                    <div class="field-group-tabs">
+                        <button class="field-group-tab active" data-group="all" onclick="switchFieldGroup('all')">全部</button>
+                        <button class="field-group-tab" data-group="成员管理" onclick="switchFieldGroup('成员管理')">成员管理</button>
+                        <button class="field-group-tab" data-group="设备管理" onclick="switchFieldGroup('设备管理')">设备管理</button>
+                        <button class="field-group-tab" data-group="游戏管理" onclick="switchFieldGroup('游戏管理')">游戏管理</button>
+                        <button class="field-group-tab" data-group="测试管理" onclick="switchFieldGroup('测试管理')">测试管理</button>
+                        <button class="field-group-tab" data-group="缺陷管理" onclick="switchFieldGroup('缺陷管理')">缺陷管理</button>
+                        <button class="field-group-tab" data-group="配置计划" onclick="switchFieldGroup('配置计划')">配置计划</button>
+                        <button class="field-group-tab" data-group="用户管理" onclick="switchFieldGroup('用户管理')">用户管理</button>
+                    </div>
+                    <div id="field-cards-container" class="field-cards-container"></div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ===== 弹窗区域（保持原有弹窗结构） ===== -->
+
+    <!-- 游戏选择弹窗（适配进展用） -->
+    <div id="game-select-modal" class="modal">
+        <div class="modal-content game-select-modal-content">
+            <div class="modal-header">
+                <h3 id="game-select-modal-title">添加游戏到适配列表</h3>
+                <span class="close-btn" onclick="closeGameSelectModal()">&times;</span>
+            </div>
+            <div class="game-select-body">
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-games" onchange="toggleSelectAllGames()"><span>源列表</span></label>
+                        <span class="game-count" id="source-game-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="game-select-search" placeholder="🔍 搜索游戏名称..." oninput="filterGameSelectList()"></div>
+                    <div class="game-select-list" id="source-game-list"></div>
+                </div>
+                <div class="game-select-actions">
+                    <button class="btn btn-transfer" onclick="transferGamesToTarget()" title="添加选中游戏到目标列表">›</button>
+                    <button class="btn btn-transfer" onclick="transferGamesFromTarget()" title="从目标列表移除选中游戏">‹</button>
+                </div>
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-target" onchange="toggleSelectAllTarget()"><span>目标列表</span></label>
+                        <span class="game-count" id="target-game-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="target-select-search" placeholder="🔍 搜索..." oninput="filterTargetSelectList()"></div>
+                    <div class="game-select-list" id="target-game-list"><div class="game-select-empty">无数据</div></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGameSelectModal()">取 消</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmAddGamesToProgress()">确 定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 机型选择弹窗 -->
+    <div id="device-select-modal" class="modal">
+        <div class="modal-content game-select-modal-content">
+            <div class="modal-header">
+                <h3>选择机型</h3>
+                <span class="close-btn" onclick="closeDeviceSelectModal()">&times;</span>
+            </div>
+            <div class="game-select-body">
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-devices-src" onchange="toggleSelectAllDevicesSrc()"><span>可选机型</span></label>
+                        <span class="game-count" id="device-src-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="device-select-search" placeholder="🔍 搜索机型名称..." oninput="filterDeviceSelectList()"></div>
+                    <div class="game-select-list" id="device-source-list"></div>
+                </div>
+                <div class="game-select-actions">
+                    <button class="btn btn-transfer" onclick="transferDevicesToTarget()">›</button>
+                    <button class="btn btn-transfer" onclick="transferDevicesFromTarget()">‹</button>
+                </div>
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-devices-tgt" onchange="toggleSelectAllDevicesTgt()"><span>已选机型</span></label>
+                        <span class="game-count" id="device-tgt-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="device-target-search" placeholder="🔍 搜索..." oninput="filterDeviceTargetList()"></div>
+                    <div class="game-select-list" id="device-target-list"><div class="game-select-empty">无数据</div></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeviceSelectModal()">取 消</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmDeviceSelect()">确 定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏选择弹窗（配置计划用） -->
+    <div id="plan-game-select-modal" class="modal">
+        <div class="modal-content game-select-modal-content">
+            <div class="modal-header">
+                <h3>选择游戏</h3>
+                <span class="close-btn" onclick="closePlanGameSelectModal()">&times;</span>
+            </div>
+            <div class="game-select-body">
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-plan-games-src" onchange="toggleSelectAllPlanGamesSrc()"><span>可选游戏</span></label>
+                        <span class="game-count" id="plan-game-src-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="plan-game-select-search" placeholder="🔍 搜索游戏名称..." oninput="filterPlanGameSelectList()"></div>
+                    <div class="game-select-list" id="plan-game-source-list"></div>
+                </div>
+                <div class="game-select-actions">
+                    <button class="btn btn-transfer" onclick="transferPlanGamesToTarget()">›</button>
+                    <button class="btn btn-transfer" onclick="transferPlanGamesFromTarget()">‹</button>
+                </div>
+                <div class="game-select-panel">
+                    <div class="game-select-panel-header">
+                        <label class="checkbox-label"><input type="checkbox" id="select-all-plan-games-tgt" onchange="toggleSelectAllPlanGamesTgt()"><span>已选游戏</span></label>
+                        <span class="game-count" id="plan-game-tgt-count">0/0</span>
+                    </div>
+                    <div class="game-select-search"><input type="text" id="plan-game-target-search" placeholder="🔍 搜索..." oninput="filterPlanGameTargetList()"></div>
+                    <div class="game-select-list" id="plan-game-target-list"><div class="game-select-empty">无数据</div></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePlanGameSelectModal()">取 消</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmPlanGameSelect()">确 定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 缺陷详情弹窗 -->
+    <div id="bug-detail-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>关联缺陷列表</h3>
+                <span class="close-btn" onclick="closeBugDetailModal()">&times;</span>
+            </div>
+            <div class="table-container" style="margin-top: 10px;">
+                <table class="data-table">
+                    <thead><tr><th width="40">序号</th><th>缺陷描述</th><th>状态</th><th>优先级</th><th>负责人</th></tr></thead>
+                    <tbody id="bug-detail-table"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBugDetailModal()">关 闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 字段弹窗 -->
+    <div id="field-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="field-modal-title">新增字段</h3>
+                <span class="close-btn" onclick="closeFieldModal()">&times;</span>
+            </div>
+            <form id="field-form" onsubmit="submitField(event)">
+                <input type="hidden" id="field-edit-key">
+                <div class="form-grid">
+                    <div class="form-group"><label>字段Key *</label><input type="text" id="field-key-input" placeholder="例如: my_custom_field" required><small class="form-hint">唯一标识符，仅支持英文字母、数字和下划线</small></div>
+                    <div class="form-group"><label>字段名称 *</label><input type="text" id="field-label-input" placeholder="例如: 自定义状态" required></div>
+                    <div class="form-group">
+                        <label>所属分组 *</label>
+                        <select id="field-group-input" required>
+                            <option value="成员管理">成员管理</option><option value="设备管理">设备管理</option><option value="游戏管理">游戏管理</option>
+                            <option value="测试管理">测试管理</option><option value="缺陷管理">缺陷管理</option><option value="配置计划">配置计划</option><option value="用户管理">用户管理</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeFieldModal()">取 消</button>
+                    <button type="submit" class="tool-btn tool-btn-primary">保 存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 数据表单弹窗 -->
+    <div id="member-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑 成员</h3>
+                <span class="close-btn" onclick="closeModal('member-modal')">&times;</span>
+            </div>
+            <form id="member-form">
+                <input type="hidden" id="member-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>姓名 *</label><input type="text" id="member-name" required></div>
+                    <div class="form-group"><label>企业微信ID</label><input type="text" id="member-wechat-id"></div>
+                    <div class="form-group"><label>角色</label><input type="text" id="member-role"></div>
+                    <div class="form-group"><label>状态</label><select id="member-status"><option value="active">活跃</option><option value="inactive">非活跃</option></select></div>
+                    <div class="form-group full-width"><label>职责</label><textarea id="member-duty" rows="3"></textarea></div>
+                    <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('member-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="device-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑 设备</h3>
+                <span class="close-btn" onclick="closeModal('device-modal')">&times;</span>
+            </div>
+            <form id="device-form">
+                <input type="hidden" id="device-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>厂商名称 *</label><input type="text" id="device-manufacturer" required></div>
+                    <div class="form-group"><label>设备类型 *</label><input type="text" id="device-type" required></div>
+                    <div class="form-group"><label>设备名称 *</label><input type="text" id="device-name" required></div>
+                    <div class="form-group"><label>设备数量</label><input type="number" id="device-quantity" value="1"></div>
+                    <div class="form-group"><label>设备保管者</label><input type="text" id="device-keeper"></div>
+                    <div class="form-group"><label>适配完成率</label><input type="text" id="device-adapter-rate" placeholder="例如：80%"></div>
+                    <div class="form-group"><label>总BUG数</label><input type="number" id="device-total-bugs" value="0"></div>
+                    <div class="form-group"><label>适配完成数</label><input type="number" id="device-completed-adaptations" value="0"></div>
+                    <div class="form-group"><label>适配游戏数</label><input type="number" id="device-total-games" value="0"></div>
+                    <div class="form-group"><label>状态</label><select id="device-status"><option value="available">可用</option><option value="assigned">已分配</option><option value="maintenance">维护中</option><option value="broken">损坏</option></select></div>
+                    <div class="form-group"><label>分配给</label><select id="device-assigned"><option value="">未分配</option></select></div>
+                    <div class="form-group full-width"><label>设备需求</label><textarea id="device-requirements" rows="2"></textarea></div>
+                    <div class="form-group full-width"><label>备注</label><textarea id="device-notes" rows="2"></textarea></div>
+                    <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('device-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="game-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑 游戏</h3>
+                <span class="close-btn" onclick="closeModal('game-modal')">&times;</span>
+            </div>
+            <form id="game-form">
+                <input type="hidden" id="game-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>游戏名称 *</label><input type="text" id="game-name" required></div>
+                    <div class="form-group"><label>英文名称</label><input type="text" id="game-english-name"></div>
+                    <div class="form-group"><label>游戏平台</label><input type="text" id="game-platform"></div>
+                    <div class="form-group"><label>游戏ID</label><input type="text" id="game-id-input"></div>
+                    <div class="form-group"><label>游戏类型</label><input type="text" id="game-type"></div>
+                    <div class="form-group"><label>游戏上线日期</label><input type="date" id="game-release-date"></div>
+                    <div class="form-group"><label>游戏开发商</label><input type="text" id="game-developer"></div>
+                    <div class="form-group"><label>游戏运营商</label><input type="text" id="game-operator"></div>
+                    <div class="form-group"><label>配置文件路径</label><input type="text" id="game-config-path"></div>
+                    <div class="form-group"><label>适配进度</label><input type="text" id="game-adapter-progress" placeholder="例如：80%"></div>
+                    <div class="form-group"><label>游戏版本</label><input type="text" id="game-version"></div>
+                    <div class="form-group"><label>安装包大小</label><input type="text" id="game-package-size" placeholder="例如：500MB"></div>
+                    <div class="form-group"><label>适配状态</label><select id="game-adaptation-status"><option value="pending">待适配</option><option value="in_progress">适配中</option><option value="completed">已完成</option><option value="failed">失败</option></select></div>
+                    <div class="form-group"><label>负责人</label><select id="game-owner"><option value="">未分配</option></select></div>
+                    <div class="form-group"><label>上线状态</label><select id="game-online-status"><option value="pending">待上线</option><option value="in_progress">适配中</option><option value="paused">暂停适配</option><option value="online">已上线</option></select></div>
+                    <div class="form-group"><label>品质</label><select id="game-quality"><option value="normal">一般</option><option value="recommended">推荐</option></select></div>
+                    <div class="form-group"><label>游戏账号</label><input type="text" id="game-account" placeholder="游戏测试账号"></div>
+                    <div class="form-group"><label>存储位置</label><select id="game-storage-location"><option value="硬盘1号">硬盘1号</option><option value="硬盘2号">硬盘2号</option><option value="硬盘3号">硬盘3号</option><option value="硬盘4号">硬盘4号</option><option value="硬盘5号">硬盘5号</option><option value="硬盘6号">硬盘6号</option><option value="硬盘7号">硬盘7号</option><option value="硬盘8号">硬盘8号</option><option value="硬盘9号">硬盘9号</option><option value="硬盘10号">硬盘10号</option></select></div>
+                    <div class="form-group full-width"><label>游戏简介</label><textarea id="game-description" rows="2"></textarea></div>
+                    <div class="form-group full-width"><label>适配备注</label><textarea id="game-adaptation-notes" rows="3"></textarea></div>
+                    <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('game-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="test-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑 测试</h3>
+                <span class="close-btn" onclick="closeModal('test-modal')">&times;</span>
+            </div>
+            <form id="test-form">
+                <input type="hidden" id="test-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>测试名称 *</label><input type="text" id="test-name" required></div>
+                    <div class="form-group"><label>测试日期</label><input type="date" id="test-date" required></div>
+                    <div class="form-group"><label>游戏</label><select id="test-game" required></select></div>
+                    <div class="form-group"><label>设备</label><select id="test-device" required></select></div>
+                    <div class="form-group"><label>测试人</label><select id="test-tester" required></select></div>
+                    <div class="form-group"><label>状态</label><select id="test-status"><option value="pending">待测试</option><option value="in_progress">测试中</option><option value="completed">已完成</option><option value="failed">失败</option></select></div>
+                    <div class="form-group"><label>优先级</label><select id="test-priority"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="urgent">紧急</option></select></div>
+                    <div class="form-group"><label>测试结果</label><input type="text" id="test-result"></div>
+                    <div class="form-group"><label>缺陷数量</label><input type="number" id="test-bugs" value="0"></div>
+                    <div class="form-group full-width"><label>描述</label><textarea id="test-description" rows="3"></textarea></div>
+                    <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('test-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="bug-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑 缺陷</h3>
+                <span class="close-btn" onclick="closeModal('bug-modal')">&times;</span>
+            </div>
+            <form id="bug-form">
+                <input type="hidden" id="bug-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>涉及版本</label><input type="text" id="bug-versions"></div>
+                    <div class="form-group"><label>设备名称</label><input type="text" id="bug-device-name"></div>
+                    <div class="form-group"><label>发现时间</label><input type="date" id="bug-discovery-time"></div>
+                    <div class="form-group"><label>负责人</label><input type="text" id="bug-owner"></div>
+                    <div class="form-group"><label>缺陷状态</label><select id="bug-status"><option value="open">待处理</option><option value="in_progress">处理中</option><option value="fixed">已修复</option><option value="closed">已关闭</option></select></div>
+                    <div class="form-group"><label>优先级</label><select id="bug-priority"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></div>
+                    <div class="form-group"><label>问题类型</label><input type="text" id="bug-problem-type"></div>
+                    <div class="form-group"><label>计划修复时间</label><input type="date" id="bug-planned-fix-time"></div>
+                    <div class="form-group"><label>实际修复时间</label><input type="date" id="bug-actual-fix-time"></div>
+                    <div class="form-group full-width"><label>描述</label><textarea id="bug-description" rows="4"></textarea></div>
+                    <div class="form-group full-width"><label>复现步骤</label><textarea id="bug-steps" rows="4"></textarea></div>
+                    <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('bug-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== 全局搜索命令面板 ===== -->
+    <div id="global-search-overlay" class="gs-overlay" style="display:none" onclick="closeGlobalSearch()">
+        <div class="gs-panel" onclick="event.stopPropagation()">
+            <div class="gs-input-wrap">
+                <span class="gs-search-icon">🔍</span>
+                <input type="text" id="gs-input" class="gs-input" placeholder="搜索游戏、设备、成员、缺陷、计划..." autocomplete="off" oninput="onGlobalSearchInput()">
+                <kbd class="gs-kbd">ESC</kbd>
+            </div>
+            <div id="gs-results" class="gs-results"></div>
+            <div class="gs-footer">
+                <span><kbd>↑</kbd><kbd>↓</kbd> 导航</span>
+                <span><kbd>Enter</kbd> 跳转</span>
+                <span><kbd>Esc</kbd> 关闭</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="gameAccountsData.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
