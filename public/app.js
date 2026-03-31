@@ -4973,9 +4973,9 @@ async function submitUserForm(e) {
     const userId = document.getElementById('um-user-id').value;
     const isEdit = !!userId;
 
-    const username = document.getElementById('um-username').value.trim() || null;
+    let username = document.getElementById('um-username').value.trim() || null;
     const realName = document.getElementById('um-realname').value.trim();
-    const password = document.getElementById('um-password').value;
+    let password = document.getElementById('um-password').value;
     const role_id = parseInt(document.getElementById('um-role-select').value) || null;
     const status = isEdit ? document.getElementById('um-user-status').value : 'active';
     const wechat_id = document.getElementById('um-wechat-id').value.trim();
@@ -4987,10 +4987,14 @@ async function submitUserForm(e) {
         showToast('真实姓名不能为空', 'warning');
         return;
     }
-    // 如果设了用户名，新建时需要密码
-    if (!isEdit && username && !password) {
-        showToast('设置了用户名则必须设置密码', 'warning');
-        return;
+    // 新建时：企微ID自动填充为用户名，密码默认123456
+    if (!isEdit) {
+        if (!username && wechat_id) {
+            username = wechat_id;
+        }
+        if (username && !password) {
+            password = '123456';
+        }
     }
 
     const body = { username, realName, role_id, status, wechat_id, project_role, duty, is_member };
