@@ -43,10 +43,21 @@ authRouter.get('/me', auth.verifyToken, usersController.getCurrentUser);
 // ==================== 用户管理路由（需要认证） ====================
 const usersRouter = express.Router();
 usersRouter.use(auth.verifyToken);
-usersRouter.get('/', auth.checkPermission('users', 'manage'), usersController.getAllUsers);
-usersRouter.post('/', auth.checkPermission('users', 'manage'), usersController.createUser);
-usersRouter.put('/:userId/permissions', auth.checkPermission('users', 'manage'), usersController.updatePermissions);
-usersRouter.delete('/:userId', auth.checkPermission('users', 'manage'), usersController.deleteUser);
+usersRouter.get('/', auth.checkPermission('user_management', 'view'), usersController.getAllUsers);
+usersRouter.post('/', auth.checkPermission('user_management', 'create'), usersController.createUser);
+usersRouter.put('/:userId', auth.checkPermission('user_management', 'edit'), usersController.updateUser);
+usersRouter.put('/:userId/role', auth.checkPermission('user_management', 'edit'), usersController.updateUserRole);
+usersRouter.delete('/:userId', auth.checkPermission('user_management', 'delete'), usersController.deleteUser);
+
+// ==================== 角色管理路由（需要认证） ====================
+const rolesRouter = express.Router();
+rolesRouter.use(auth.verifyToken);
+rolesRouter.get('/', usersController.getAllRoles);
+rolesRouter.get('/matrix', auth.checkPermission('user_management', 'view'), usersController.getPermissionMatrix);
+rolesRouter.get('/:roleId/permissions', auth.checkPermission('user_management', 'view'), usersController.getRolePermissions);
+rolesRouter.put('/:roleId/permissions', auth.checkPermission('user_management', 'edit'), usersController.updateRolePermissions);
+rolesRouter.post('/', auth.checkPermission('user_management', 'create'), usersController.createRole);
+rolesRouter.delete('/:roleId', auth.checkPermission('user_management', 'delete'), usersController.deleteRole);
 
 // ==================== 受保护的API路由 ====================
 const membersRouter = express.Router();
@@ -803,6 +814,7 @@ batchRouter.post('/delete', (req, res) => {
 // 注册路由
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/roles', rolesRouter);
 app.use('/api/members', membersRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/games', gamesRouter);

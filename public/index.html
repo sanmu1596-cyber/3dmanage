@@ -69,6 +69,9 @@
                         <a class="sidebar-item" data-tab="field-settings" onclick="switchTab('field-settings')">
                             <span class="sidebar-icon">⚙️</span>字段设置
                         </a>
+                        <a class="sidebar-item" data-tab="user-management" onclick="switchTab('user-management')">
+                            <span class="sidebar-icon">🔐</span>用户管理
+                        </a>
                     </div>
                 </div>
                 <div class="sidebar-section sidebar-stats">
@@ -606,6 +609,88 @@
                     <div id="field-cards-container" class="field-cards-container"></div>
                 </section>
 
+                <!-- ========== 用户管理 ========== -->
+                <section id="user-management" class="tab-content">
+                    <!-- 子Tab切换 -->
+                    <div class="um-sub-tabs">
+                        <button class="um-sub-tab active" data-subtab="role-permissions" onclick="switchUserMgmtTab('role-permissions')">
+                            🔐 用户组权限
+                        </button>
+                        <button class="um-sub-tab" data-subtab="user-list" onclick="switchUserMgmtTab('user-list')">
+                            👥 成员管理
+                        </button>
+                    </div>
+
+                    <!-- === 子页面1：用户组权限 === -->
+                    <div id="um-role-permissions" class="um-subtab-content active">
+                        <div class="um-role-layout">
+                            <!-- 左侧角色列表 -->
+                            <div class="um-role-sidebar">
+                                <div class="um-role-sidebar-header">
+                                    <h4>角色列表</h4>
+                                    <button class="tool-btn tool-btn-primary" onclick="openCreateRoleModal()" title="新增角色" style="padding: 3px 10px; font-size: 12px;">＋</button>
+                                </div>
+                                <div id="um-role-list" class="um-role-list">
+                                    <!-- JS动态生成 -->
+                                </div>
+                            </div>
+                            <!-- 右侧权限矩阵 -->
+                            <div class="um-perm-panel">
+                                <div class="um-perm-header">
+                                    <div>
+                                        <h4 id="um-perm-title">选择角色查看权限</h4>
+                                        <p id="um-perm-desc" class="um-perm-desc"></p>
+                                    </div>
+                                    <div id="um-perm-actions" class="um-perm-actions" style="display:none;">
+                                        <button class="tool-btn" onclick="umSelectAllPerms()">全选</button>
+                                        <button class="tool-btn" onclick="umDeselectAllPerms()">取消全选</button>
+                                        <button class="tool-btn tool-btn-primary" onclick="umSavePermissions()">💾 保存权限</button>
+                                    </div>
+                                </div>
+                                <div id="um-perm-matrix" class="um-perm-matrix">
+                                    <div class="um-perm-empty">
+                                        <div class="empty-icon">🔐</div>
+                                        <div>请在左侧选择一个角色</div>
+                                        <div class="empty-sub">点击角色后，可在此配置其权限矩阵</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- === 子页面2：成员管理 === -->
+                    <div id="um-user-list" class="um-subtab-content">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openCreateUserModal()"><span class="tool-icon">＋</span>添加用户</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="um-user-search" class="filter-input" placeholder="搜索用户名/姓名..." style="width:180px" oninput="filterUserList()">
+                                <select id="um-user-role-filter" class="compact-select" onchange="filterUserList()">
+                                    <option value="">全部角色</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>用户名</th>
+                                        <th>真实姓名</th>
+                                        <th>角色</th>
+                                        <th>状态</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="um-users-table">
+                                    <tr><td colspan="7" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
             </main>
         </div>
     </div>
@@ -897,6 +982,69 @@
                     <div class="form-group full-width"><label>描述</label><textarea id="bug-description" rows="4"></textarea></div>
                     <div class="form-group full-width"><label>复现步骤</label><textarea id="bug-steps" rows="4"></textarea></div>
                     <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('bug-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 创建用户弹窗 -->
+    <div id="um-user-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="um-user-modal-title">添加用户</h3>
+                <span class="close-btn" onclick="closeModal('um-user-modal')">&times;</span>
+            </div>
+            <form id="um-user-form" onsubmit="submitUserForm(event)">
+                <input type="hidden" id="um-user-id">
+                <div class="form-grid">
+                    <div class="form-group"><label>用户名 *</label><input type="text" id="um-username" placeholder="登录账号" required></div>
+                    <div class="form-group"><label>真实姓名 *</label><input type="text" id="um-realname" placeholder="真实姓名" required></div>
+                    <div class="form-group"><label id="um-password-label">密码 *</label><input type="password" id="um-password" placeholder="登录密码"></div>
+                    <div class="form-group">
+                        <label>角色</label>
+                        <select id="um-role-select"></select>
+                    </div>
+                    <div class="form-group" id="um-status-group" style="display:none;">
+                        <label>状态</label>
+                        <select id="um-user-status">
+                            <option value="active">活跃</option>
+                            <option value="disabled">禁用</option>
+                        </select>
+                    </div>
+                    <div class="form-submit">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('um-user-modal')">取消</button>
+                        <button type="submit" class="tool-btn tool-btn-primary">保存</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 创建角色弹窗 -->
+    <div id="um-role-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>新增角色</h3>
+                <span class="close-btn" onclick="closeModal('um-role-modal')">&times;</span>
+            </div>
+            <form id="um-role-form" onsubmit="submitRoleForm(event)">
+                <div class="form-group"><label>角色名称 *</label><input type="text" id="um-role-name" placeholder="例如：访客" required></div>
+                <div class="form-group"><label>角色描述</label><input type="text" id="um-role-desc" placeholder="角色用途说明"></div>
+                <div class="form-group">
+                    <label>角色颜色</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="um-role-colors">
+                        <label class="um-color-opt" style="background:#e53e3e;"><input type="radio" name="um-role-color" value="#e53e3e"></label>
+                        <label class="um-color-opt" style="background:#dd6b20;"><input type="radio" name="um-role-color" value="#dd6b20"></label>
+                        <label class="um-color-opt" style="background:#d69e2e;"><input type="radio" name="um-role-color" value="#d69e2e"></label>
+                        <label class="um-color-opt" style="background:#38a169;"><input type="radio" name="um-role-color" value="#38a169"></label>
+                        <label class="um-color-opt" style="background:#3182ce;"><input type="radio" name="um-role-color" value="#3182ce"></label>
+                        <label class="um-color-opt" style="background:#805ad5;"><input type="radio" name="um-role-color" value="#805ad5"></label>
+                        <label class="um-color-opt selected" style="background:#718096;"><input type="radio" name="um-role-color" value="#718096" checked></label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('um-role-modal')">取消</button>
+                    <button type="submit" class="tool-btn tool-btn-primary">创建</button>
                 </div>
             </form>
         </div>

@@ -2152,3 +2152,379 @@ th .row-checkbox-all { width: 16px; height: 16px; cursor: pointer; accent-color:
 .matrix-cell[data-status="pending"] { background: rgba(217, 232, 234, 0.8); }
 .matrix-cell[data-status="none"] { background: var(--bg-surface); border: 1px solid var(--border-light); }
 .matrix-cell[title] { position: relative; }
+
+/* ========== 用户管理模块 ========== */
+
+/* 子Tab栏 */
+.um-sub-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 16px;
+    background: var(--bg-card);
+    border-bottom: 2px solid var(--border);
+    flex-shrink: 0;
+}
+
+.um-sub-tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    font-weight: 500;
+}
+
+.um-sub-tab:hover {
+    color: var(--primary);
+    background: rgba(47, 127, 187, 0.05);
+}
+
+.um-sub-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 700;
+}
+
+.um-subtab-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.um-subtab-content.active {
+    display: flex;
+}
+
+/* 角色权限页面布局 */
+.um-role-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* 左侧角色列表 */
+.um-role-sidebar {
+    width: 240px;
+    border-right: 1px solid var(--border);
+    background: var(--bg-card);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.um-role-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.um-role-sidebar-header h4 {
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.um-role-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+
+.um-role-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+}
+
+.um-role-item:hover {
+    background: rgba(217, 232, 234, 0.4);
+}
+
+.um-role-item.active {
+    background: rgba(47, 127, 187, 0.08);
+    border-left-color: var(--primary);
+}
+
+.um-role-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.um-role-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.um-role-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.um-role-item-name .um-system-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 8px;
+    background: rgba(47, 127, 187, 0.1);
+    color: var(--primary);
+    font-weight: 400;
+}
+
+.um-role-item-desc {
+    font-size: 11px;
+    color: var(--text-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.um-role-item-count {
+    font-size: 11px;
+    color: var(--text-light);
+    background: rgba(217, 232, 234, 0.5);
+    padding: 1px 6px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.um-role-item-delete {
+    opacity: 0;
+    color: var(--danger);
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.um-role-item:hover .um-role-item-delete {
+    opacity: 0.6;
+}
+
+.um-role-item-delete:hover {
+    opacity: 1 !important;
+}
+
+/* 右侧权限矩阵 */
+.um-perm-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.um-perm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    flex-shrink: 0;
+}
+
+.um-perm-header h4 {
+    font-family: var(--font-title);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0;
+}
+
+.um-perm-desc {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+
+.um-perm-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 权限矩阵表格 */
+.um-perm-matrix {
+    flex: 1;
+    overflow: auto;
+    padding: 16px 20px;
+}
+
+.um-perm-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+}
+
+.um-perm-empty .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.um-matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.um-matrix-table th {
+    padding: 8px 10px;
+    text-align: center;
+    font-family: var(--font-title);
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border-bottom: 2px solid var(--border);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.um-matrix-table th:first-child {
+    text-align: left;
+    width: 140px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.um-matrix-table td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.um-matrix-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.um-matrix-table tbody tr:hover {
+    background: rgba(47, 127, 187, 0.04);
+}
+
+/* 模块分组行 */
+.um-matrix-module-group td {
+    background: rgba(217, 232, 234, 0.3);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* 权限checkbox */
+.um-perm-check {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.um-perm-check:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* 全选按钮 */
+.um-module-toggle {
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-left: 8px;
+}
+
+.um-module-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(47, 127, 187, 0.05);
+}
+
+/* 角色颜色选择器 */
+.um-color-opt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+}
+
+.um-color-opt input[type="radio"] {
+    display: none;
+}
+
+.um-color-opt:hover, .um-color-opt.selected {
+    border-color: var(--text-primary);
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 用户列表中的角色标签 */
+.um-role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+}
+
+/* 用户管理中的快捷操作 */
+.um-action-btns {
+    display: flex;
+    gap: 4px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .um-role-layout {
+        flex-direction: column;
+    }
+    .um-role-sidebar {
+        width: 100%;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+    .um-role-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 6px;
+    }
+    .um-role-item {
+        padding: 6px 10px;
+        border-left: none;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+    }
+    .um-role-item.active {
+        border-color: var(--primary);
+    }
+}
