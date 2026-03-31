@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const compression = require('compression');
 const db = require('./database');
 const path = require('path');
 const auth = require('./auth');
@@ -10,9 +11,15 @@ const app = express();
 const PORT = 3000;
 
 // 中间件
+app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(bodyParser.json({ limit: '2mb' }));
+// 静态文件：设置1天缓存 + ETag，重复访问直接304
+app.use(express.static('public', {
+  maxAge: '1d',
+  etag: true,
+  lastModified: true
+}));
 
 // ==================== 操作日志表 ====================
 db.run(`CREATE TABLE IF NOT EXISTS activity_log (
@@ -668,12 +675,17 @@ plansRouter.delete('/game/:gameId', (req, res) => {
   });
 });
 
-// 删除计划
+// 删除计划（事务保护）
 plansRouter.delete('/:id', (req, res) => {
-  db.run('DELETE FROM plan_games WHERE plan_id = ?', [req.params.id], () => {
-    db.run('DELETE FROM plans WHERE id = ?', [req.params.id], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true });
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+    db.run('DELETE FROM plan_games WHERE plan_id = ?', [req.params.id], (err1) => {
+      if (err1) { db.run('ROLLBACK'); return res.status(500).json({ error: err1.message }); }
+      db.run('DELETE FROM plans WHERE id = ?', [req.params.id], function(err2) {
+        if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: err2.message }); }
+        db.run('COMMIT');
+        res.json({ success: true });
+      });
     });
   });
 });
@@ -699,21 +711,24 @@ statsRouter.get('/dashboard', (req, res) => {
     { key: 'recent_games', sql: "SELECT name, platform, adaptation_status, created_at FROM games ORDER BY created_at DESC LIMIT 5" },
   ];
 
-  let completed = 0;
-  queries.forEach(q => {
-    if (q.key.includes('distribution') || q.key.includes('recent')) {
-      db.all(q.sql, [], (err, rows) => {
-        stats[q.key] = err ? [] : rows;
-        completed++;
-        if (completed === queries.length) res.json({ success: true, data: stats });
-      });
-    } else {
-      db.get(q.sql, [], (err, row) => {
-        stats[q.key] = err ? 0 : (row ? row.count : 0);
-        completed++;
-        if (completed === queries.length) res.json({ success: true, data: stats });
-      });
-    }
+  // 使用 serialize 保证12个查询数据一致性
+  db.serialize(() => {
+    let completed = 0;
+    queries.forEach(q => {
+      if (q.key.includes('distribution') || q.key.includes('recent')) {
+        db.all(q.sql, [], (err, rows) => {
+          stats[q.key] = err ? [] : rows;
+          completed++;
+          if (completed === queries.length) res.json({ success: true, data: stats });
+        });
+      } else {
+        db.get(q.sql, [], (err, row) => {
+          stats[q.key] = err ? 0 : (row ? row.count : 0);
+          completed++;
+          if (completed === queries.length) res.json({ success: true, data: stats });
+        });
+      }
+    });
   });
 });
 

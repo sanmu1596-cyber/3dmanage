@@ -19,11 +19,23 @@ const DEV_MODE = true;
 const permissionCache = new Map();
 const CACHE_TTL = 60000; // 1分钟缓存
 
+// Token认证缓存（避免每个请求都查sessions+users+roles三表JOIN）
+const tokenCache = new Map();
+const TOKEN_CACHE_TTL = 30000; // 30秒缓存
+
 function clearPermissionCache(roleId) {
   if (roleId) {
     permissionCache.delete(roleId);
   } else {
     permissionCache.clear();
+  }
+}
+
+function clearTokenCache(token) {
+  if (token) {
+    tokenCache.delete(token);
+  } else {
+    tokenCache.clear();
   }
 }
 
@@ -74,6 +86,13 @@ const verifyToken = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ error: '未提供认证token' });
   }
+
+  // 检查token缓存
+  const cached = tokenCache.get(token);
+  if (cached && Date.now() - cached.time < TOKEN_CACHE_TTL) {
+    req.user = cached.user;
+    return next();
+  }
   
   const sql = `
     SELECT s.*, u.id as user_id, u.username, u.real_name, u.status as user_status,
@@ -118,6 +137,9 @@ const verifyToken = (req, res, next) => {
       is_super_admin: isSuperAdmin,
       permissions
     };
+
+    // 写入token缓存
+    tokenCache.set(token, { user: req.user, time: Date.now() });
     
     next();
   });
@@ -156,5 +178,6 @@ module.exports = {
   verifyToken,
   checkPermission,
   clearPermissionCache,
+  clearTokenCache,
   loadRolePermissions
 };

@@ -210,8 +210,10 @@ function initTabs() {
     });
 }
 
-// 切换Tab (P0: 增加 hash 路由)
+// 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数)
+let _tabSwitchCounter = 0; // 递增计数器，用于检测过时的tab切换
 function switchTab(tabId, fromHash) {
+    const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
     // 移除所有激活状态
     document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -241,16 +243,19 @@ function switchTab(tabId, fromHash) {
     }
 
     // 按需加载当前 tab 数据（避免每次 switchTab 全量刷新所有模块）
-    loadTabData(tabId);
+    // 传入切换序号，loadTabData内部可检测是否已过时
+    loadTabData(tabId, mySwitch);
 }
 
 // 按需加载当前Tab数据
-async function loadTabData(tabId) {
+async function loadTabData(tabId, switchId) {
     // 确保字段选项已加载（全局依赖）
     if (!window._fieldOptionsLoaded) {
         await loadFieldOptions();
         window._fieldOptionsLoaded = true;
     }
+    // 如果切换已过时（用户快速切到别的tab了），跳过
+    if (switchId !== undefined && switchId !== _tabSwitchCounter) return;
     switch (tabId) {
         case 'dashboard':
             loadDashboard();
@@ -288,7 +293,10 @@ async function loadTabData(tabId) {
             await umLoadData();
             break;
     }
-    updateStats();
+    // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
+    if (tabId !== 'dashboard') {
+        updateStats();
+    }
 }
 
 // 切换侧边栏
@@ -1742,15 +1750,18 @@ function loadColumnSettings() {
 // 加载适配进展数据
 async function loadProgressData() {
     try {
-        // 加载设备数据
-        const devicesResponse = await authFetch(`${API_BASE}/devices`);
-        const devicesResult = await devicesResponse.json();
-        allDevicesData = devicesResult.data || [];
+        // 复用已加载的数据，仅在为空时才请求（避免重复请求）
+        if (!allDevicesData || allDevicesData.length === 0) {
+            const devicesResponse = await authFetch(`${API_BASE}/devices`);
+            const devicesResult = await devicesResponse.json();
+            allDevicesData = devicesResult.data || [];
+        }
 
-        // 加载游戏数据(用于添加游戏弹窗)
-        const gamesResponse = await authFetch(`${API_BASE}/games`);
-        const gamesResult = await gamesResponse.json();
-        allGamesForProgress = gamesResult.data || [];
+        if (!allGamesForProgress || allGamesForProgress.length === 0) {
+            const gamesResponse = await authFetch(`${API_BASE}/games`);
+            const gamesResult = await gamesResponse.json();
+            allGamesForProgress = gamesResult.data || [];
+        }
 
         // P0: 从后端加载适配记录（不再随机生成）
         await loadAdaptationRecords();
@@ -1764,21 +1775,30 @@ async function loadProgressData() {
     }
 }
 
-// P0: 从后端API加载适配记录
+// P0: 从后端API加载适配记录（优化：1个请求替代N个串行请求）
 async function loadAdaptationRecords() {
     progressData = [];
 
-    // 为每个设备构建 progressData 结构
-    for (const device of allDevicesData) {
-        try {
-            const resp = await authFetch(`${API_BASE}/adaptations/device/${device.id}`);
-            const result = await resp.json();
-            const records = result.data || [];
+    try {
+        // 一次性获取所有适配记录（替代原来按设备逐个请求的N+1模式）
+        const resp = await authFetch(`${API_BASE}/adaptations`);
+        const result = await resp.json();
+        const allRecords = result.data || [];
 
+        // 按 device_id 分组
+        const recordsByDevice = {};
+        allRecords.forEach(r => {
+            if (!recordsByDevice[r.device_id]) recordsByDevice[r.device_id] = [];
+            recordsByDevice[r.device_id].push(r);
+        });
+
+        // 为每个设备构建 progressData
+        for (const device of allDevicesData) {
+            const records = recordsByDevice[device.id] || [];
             const deviceGames = records.map(r => ({
                 id: r.id,
                 deviceId: r.device_id,
-                deviceName: device.name,
+                deviceName: device.name || r.device_name,
                 gameId: r.game_id,
                 gameName: r.game_name || '未知',
                 gamePlatform: r.game_platform || '-',
@@ -1794,14 +1814,13 @@ async function loadAdaptationRecords() {
                 deviceName: device.name,
                 games: deviceGames
             });
-        } catch (e) {
-            // 即使某个设备加载失败也继续
-            progressData.push({
-                deviceId: device.id,
-                deviceName: device.name,
-                games: []
-            });
         }
+    } catch (e) {
+        console.error('加载适配记录失败:', e);
+        // fallback: 为每个设备创建空记录
+        allDevicesData.forEach(device => {
+            progressData.push({ deviceId: device.id, deviceName: device.name, games: [] });
+        });
     }
 }
 

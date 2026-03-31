@@ -66,6 +66,8 @@ exports.logout = (req, res) => {
   const token = req.headers['x-auth-token'];
   
   if (token) {
+    // 清除token缓存
+    auth.clearTokenCache(token);
     if (req.user && req.user.id) {
       const sql = 'UPDATE login_logs SET logout_time = CURRENT_TIMESTAMP WHERE user_id = ? AND logout_time IS NULL';
       db.run(sql, [req.user.id]);
