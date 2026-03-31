@@ -12,8 +12,9 @@ const generateToken = () => {
 };
 
 // ========== 开发模式开关 ==========
-// TODO: 开发完成后将此值改为 false 以恢复登录认证
-const DEV_MODE = true;
+// 默认 true（本地开发免登录），云服务器启动时设置 DEV_MODE=false 开启登录认证
+// 用法：DEV_MODE=false node server.js  或  pm2 start 3dmanage --env DEV_MODE=false
+const DEV_MODE = process.env.DEV_MODE !== 'false';
 
 // 权限缓存（简单内存缓存，避免每次请求都查DB）
 const permissionCache = new Map();
@@ -173,6 +174,7 @@ const checkPermission = (module, action) => {
 };
 
 module.exports = {
+  DEV_MODE,
   hashPassword,
   generateToken,
   verifyToken,

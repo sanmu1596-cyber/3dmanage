@@ -117,20 +117,39 @@ let allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
 let currentDeviceId = null;
 let progressData = []; // 存储各设备的游戏适配数据
 
-// ========== 登录模块已暂时禁用（开发期间） ==========
-// TODO: 开发完成后恢复登录认证功能
+// ========== 登录认证模块（支持正式模式和开发调试模式） ==========
+// 正式模式：前端带 token 请求，401 自动跳登录页
+// 开发模式（DEV_MODE=true）：不带 token，不检查登录，方便开发调试
 
-// 认证 Fetch 封装（开发模式：不带token，不处理401跳转）
+let IS_DEV_MODE = false; // 由 /api/config 接口初始化
+
+// 认证 Fetch 封装
 async function authFetch(url, options = {}) {
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
 
+    // 正式模式下自动携带 token
+    if (!IS_DEV_MODE) {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            headers['X-Auth-Token'] = token;
+        }
+    }
+
     const response = await fetch(url, {
         ...options,
         headers
     });
+
+    // 处理 401 未认证 → 跳转登录页
+    if (response.status === 401 && !IS_DEV_MODE) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/login.html';
+        throw new Error('未认证，跳转登录页');
+    }
 
     // 处理 403 权限不足
     if (response.status === 403) {
@@ -142,14 +161,66 @@ async function authFetch(url, options = {}) {
     return response;
 }
 
-// 检查登录状态 - 开发模式下跳过
-function checkLoginStatus() {
-    // 开发模式：不检查登录状态
+// 检查登录状态
+async function checkLoginStatus() {
+    try {
+        // 先获取服务端配置
+        const configResp = await fetch(`${API_BASE}/config`);
+        const configResult = await configResp.json();
+        IS_DEV_MODE = configResult.devMode === true;
+    } catch (e) {
+        console.warn('获取服务端配置失败，默认正式模式', e);
+        IS_DEV_MODE = false;
+    }
+
+    // 开发模式：跳过登录检查
+    if (IS_DEV_MODE) {
+        console.log('[DEV_MODE] 开发调试模式，跳过登录检查');
+        return;
+    }
+
+    // 正式模式：检查 localStorage 中的 token
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        window.location.href = '/login.html';
+        return;
+    }
+
+    // 验证 token 是否仍有效
+    try {
+        const resp = await fetch(`${API_BASE}/auth/me`, {
+            headers: { 'X-Auth-Token': token }
+        });
+        if (!resp.ok) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userInfo');
+            window.location.href = '/login.html';
+            return;
+        }
+        // 更新本地缓存的用户信息
+        const result = await resp.json();
+        if (result.success && result.user) {
+            localStorage.setItem('userInfo', JSON.stringify(result.user));
+        }
+    } catch (e) {
+        console.error('Token 验证失败', e);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/login.html';
+    }
 }
 
-// 获取当前用户信息 - 开发模式返回默认管理员
+// 获取当前用户信息
 function getCurrentUser() {
-    return { username: 'admin', realName: '管理员', role: 'admin' };
+    if (IS_DEV_MODE) {
+        return { username: 'admin', realName: '管理员', role: '超级管理员', role_id: 1 };
+    }
+    try {
+        const userInfo = localStorage.getItem('userInfo');
+        return userInfo ? JSON.parse(userInfo) : { username: '未知', realName: '未知', role: '未知' };
+    } catch (e) {
+        return { username: '未知', realName: '未知', role: '未知' };
+    }
 }
 
 // 更新用户信息显示
@@ -157,22 +228,49 @@ function updateUserInfo() {
     const user = getCurrentUser();
     const userInfoEl = document.getElementById('user-info');
     if (userInfoEl) {
-        userInfoEl.innerHTML = `
-            <span class="user-avatar">👤</span>
-            <span class="user-name">${escapeHtml(user.realName || user.username)}</span>
-            <span style="color:var(--text-light);font-size:12px;margin-left:6px;">(开发模式)</span>
-        `;
+        if (IS_DEV_MODE) {
+            userInfoEl.innerHTML = `
+                <span class="user-avatar">👤</span>
+                <span class="user-name">${escapeHtml(user.realName || user.username)}</span>
+                <span style="color:var(--text-light);font-size:12px;margin-left:6px;">(开发模式)</span>
+            `;
+        } else {
+            userInfoEl.innerHTML = `
+                <span class="user-avatar">👤</span>
+                <span class="user-name">${escapeHtml(user.realName || user.username)}</span>
+                <span class="user-role-badge" style="font-size:11px;margin-left:6px;color:var(--text-light);">${escapeHtml(user.role || '')}</span>
+                <button class="logout-btn" onclick="logout()" title="退出登录">🚪 退出</button>
+            `;
+        }
     }
 }
 
-// 登出 - 开发模式下仅刷新页面
+// 登出
 async function logout() {
-    window.location.reload();
+    if (IS_DEV_MODE) {
+        window.location.reload();
+        return;
+    }
+    try {
+        const token = localStorage.getItem('authToken');
+        await fetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': token || ''
+            }
+        });
+    } catch (e) {
+        // 登出请求失败也无所谓，继续清理本地状态
+    }
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userInfo');
+    window.location.href = '/login.html';
 }
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
-    checkLoginStatus();
+    await checkLoginStatus(); // 必须先确认登录状态和 DEV_MODE
     initTabs();
     loadColumnSettings(); // 加载列显示设置
     loadGameAccounts(); // 加载游戏账号数据

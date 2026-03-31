@@ -44,6 +44,12 @@ function logActivity(action, resourceType, resourceId, resourceName, changesJson
   );
 }
 
+// ==================== 公开接口（不需要token） ====================
+// 前端通过此接口判断是否需要登录
+app.get('/api/config', (req, res) => {
+  res.json({ success: true, devMode: auth.DEV_MODE });
+});
+
 // ==================== 认证路由（不需要token） ====================
 const authRouter = express.Router();
 authRouter.post('/login', usersController.login);
@@ -868,9 +874,19 @@ app.use('/api/plans', plansRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/batch', batchRouter);
 
+// 定期清理过期session（每小时执行一次）
+setInterval(() => {
+  db.run('DELETE FROM sessions WHERE expires_at < datetime("now")', function(err) {
+    if (!err && this.changes > 0) {
+      console.log(`[Session清理] 已清理 ${this.changes} 个过期session`);
+    }
+  });
+}, 60 * 60 * 1000);
+
 // 启动服务器 (监听所有网络接口，支持外网访问)
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`服务器运行在 http://${HOST}:${PORT}`);
   console.log(`本机访问: http://localhost:${PORT}`);
+  console.log(`认证模式: ${auth.DEV_MODE ? '开发模式（免登录）' : '正式模式（需登录）'}`);
 });

@@ -3,12 +3,81 @@ const db = require('./database');
 
 // ==================== 认证 ====================
 
+// 登录频率限制（防暴力破解）
+const loginAttempts = new Map(); // key: ip, value: { count, firstAttempt, lockedUntil }
+const LOGIN_LIMIT = 5;          // 最多连续失败次数
+const LOGIN_WINDOW = 5 * 60 * 1000;  // 5分钟窗口
+const LOCK_DURATION = 15 * 60 * 1000; // 锁定15分钟
+
+function checkLoginRate(ip) {
+  const record = loginAttempts.get(ip);
+  if (!record) return { allowed: true };
+  
+  // 如果在锁定期内
+  if (record.lockedUntil && Date.now() < record.lockedUntil) {
+    const remainSec = Math.ceil((record.lockedUntil - Date.now()) / 1000);
+    return { allowed: false, remainSec };
+  }
+  
+  // 锁定期已过，重置
+  if (record.lockedUntil && Date.now() >= record.lockedUntil) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+  
+  // 窗口期已过，重置
+  if (Date.now() - record.firstAttempt > LOGIN_WINDOW) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+  
+  return { allowed: true };
+}
+
+function recordFailedLogin(ip) {
+  const record = loginAttempts.get(ip) || { count: 0, firstAttempt: Date.now() };
+  record.count++;
+  
+  if (record.count >= LOGIN_LIMIT) {
+    record.lockedUntil = Date.now() + LOCK_DURATION;
+  }
+  
+  loginAttempts.set(ip, record);
+  return record.count;
+}
+
+function clearLoginAttempts(ip) {
+  loginAttempts.delete(ip);
+}
+
+// 定时清理过期的频率限制记录（每10分钟）
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of loginAttempts.entries()) {
+    if (record.lockedUntil && now >= record.lockedUntil) {
+      loginAttempts.delete(ip);
+    } else if (now - record.firstAttempt > LOGIN_WINDOW) {
+      loginAttempts.delete(ip);
+    }
+  }
+}, 10 * 60 * 1000);
+
 // 登录
 exports.login = (req, res) => {
   const { username, password } = req.body;
+  const ip = req.ip || req.connection.remoteAddress;
   
   if (!username || !password) {
     return res.status(400).json({ error: '用户名和密码不能为空' });
+  }
+  
+  // 检查频率限制
+  const rateCheck = checkLoginRate(ip);
+  if (!rateCheck.allowed) {
+    return res.status(429).json({ 
+      error: `登录尝试次数过多，请${rateCheck.remainSec}秒后再试`,
+      retryAfter: rateCheck.remainSec
+    });
   }
   
   const hashedPassword = auth.hashPassword(password);
@@ -26,36 +95,46 @@ exports.login = (req, res) => {
     }
     
     if (!user) {
-      return res.status(401).json({ error: '用户名或密码错误' });
+      const failCount = recordFailedLogin(ip);
+      const remaining = LOGIN_LIMIT - failCount;
+      const msg = remaining > 0 
+        ? `用户名或密码错误（还可尝试${remaining}次）` 
+        : `登录尝试次数过多，账户已锁定15分钟`;
+      return res.status(401).json({ error: msg });
     }
     
-    // 生成token
-    const token = auth.generateToken();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // 登录成功，清除失败记录
+    clearLoginAttempts(ip);
     
-    const sessionSql = 'INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)';
-    db.run(sessionSql, [user.id, token, expiresAt.toISOString()], function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
+    // 清理该用户的旧session（只保留最新的，避免session泄露）
+    db.run('DELETE FROM sessions WHERE user_id = ?', [user.id], () => {
+      // 生成新token
+      const token = auth.generateToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       
-      // 记录登录日志
-      const logSql = 'INSERT INTO login_logs (user_id, ip_address, user_agent) VALUES (?, ?, ?)';
-      const ipAddress = req.ip || req.connection.remoteAddress;
-      const userAgent = req.headers['user-agent'];
-      db.run(logSql, [user.id, ipAddress, userAgent]);
-      
-      res.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          realName: user.real_name,
-          role: user.role_name || '未分配',
-          role_id: user.role_id,
-          roleColor: user.role_color
+      const sessionSql = 'INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)';
+      db.run(sessionSql, [user.id, token, expiresAt.toISOString()], function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
         }
+        
+        // 记录登录日志
+        const logSql = 'INSERT INTO login_logs (user_id, ip_address, user_agent) VALUES (?, ?, ?)';
+        const userAgent = req.headers['user-agent'];
+        db.run(logSql, [user.id, ip, userAgent]);
+        
+        res.json({
+          success: true,
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            realName: user.real_name,
+            role: user.role_name || '未分配',
+            role_id: user.role_id,
+            roleColor: user.role_color
+          }
+        });
       });
     });
   });
@@ -68,12 +147,14 @@ exports.logout = (req, res) => {
   if (token) {
     // 清除token缓存
     auth.clearTokenCache(token);
-    if (req.user && req.user.id) {
-      const sql = 'UPDATE login_logs SET logout_time = CURRENT_TIMESTAMP WHERE user_id = ? AND logout_time IS NULL';
-      db.run(sql, [req.user.id]);
-    }
-    const deleteSessionSql = 'DELETE FROM sessions WHERE token = ?';
-    db.run(deleteSessionSql, [token]);
+    
+    // 先查session获取user_id，再删除session并更新登录日志
+    db.get('SELECT user_id FROM sessions WHERE token = ?', [token], (err, session) => {
+      if (session && session.user_id) {
+        db.run('UPDATE login_logs SET logout_time = CURRENT_TIMESTAMP WHERE user_id = ? AND logout_time IS NULL', [session.user_id]);
+      }
+      db.run('DELETE FROM sessions WHERE token = ?', [token]);
+    });
   }
   
   res.json({ success: true, message: '登出成功' });
