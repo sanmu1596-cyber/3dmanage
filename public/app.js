@@ -975,26 +975,27 @@ function filterModule(moduleName) {
     cfg.render(data);
 }
 
-// 更新统计数据（用数据源替代DOM查询，避免.empty-state选择器错误）
-function updateStats() {
-    const stats = {
-        members: (allMembersData || []).length,
-        devices: (allDevicesData || []).length,
-        games: (allGamesData || []).length,
-        tests: document.querySelectorAll('#tests-table tr:not(:has(.empty-state))').length || 0,
-        bugs: document.querySelectorAll('#bugs-table tr:not(:has(.empty-state))').length || 0
-    };
-    // 兜底：如果 :has() 不支持，回退到检查有无空状态
-    const testsTable = document.getElementById('tests-table');
-    if (testsTable && testsTable.querySelector('.empty-state')) stats.tests = 0;
-    const bugsTable = document.getElementById('bugs-table');
-    if (bugsTable && bugsTable.querySelector('.empty-state')) stats.bugs = 0;
-
-    document.getElementById('stat-members').textContent = stats.members;
-    document.getElementById('stat-devices').textContent = stats.devices;
-    document.getElementById('stat-games').textContent = stats.games;
-    document.getElementById('stat-tests').textContent = stats.tests;
-    document.getElementById('stat-bugs').textContent = stats.bugs;
+// 更新统计数据（直接查后端API，确保实时准确）
+async function updateStats() {
+    try {
+        const response = await authFetch(`${API_BASE}/stats/dashboard`);
+        const result = await response.json();
+        if (result.success) {
+            const d = result.data;
+            document.getElementById('stat-members').textContent = d.members_total || 0;
+            document.getElementById('stat-devices').textContent = d.devices_total || 0;
+            document.getElementById('stat-games').textContent = d.games_total || 0;
+            document.getElementById('stat-tests').textContent = d.tests_total || 0;
+            document.getElementById('stat-bugs').textContent = d.bugs_total || 0;
+        }
+    } catch (e) {
+        // 后端不可用时降级到内存数据
+        document.getElementById('stat-members').textContent = (allMembersData || []).length;
+        document.getElementById('stat-devices').textContent = (allDevicesData || []).length;
+        document.getElementById('stat-games').textContent = (allGamesData || []).length;
+        document.getElementById('stat-tests').textContent = (allTestsData || []).length;
+        document.getElementById('stat-bugs').textContent = (allBugsData || []).length;
+    }
 
     // 更新各模块底部统计
     updateGamesModuleStats();
@@ -4866,7 +4867,7 @@ function umRenderUserList(data) {
     if (!tbody) return;
 
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>';
         return;
     }
 
@@ -4875,22 +4876,27 @@ function umRenderUserList(data) {
         const roleName = user.role || '未分配';
         const statusText = user.status === 'active' ? '正常' : '禁用';
         const statusClass = user.status === 'active' ? 'status-online' : 'status-pending';
-        const createdAt = user.createdAt ? user.createdAt.slice(0, 10) : '-';
+        const memberBadge = user.isMember
+            ? '<span class="status-badge status-online">✓ 是</span>'
+            : '<span class="status-badge status-pending">否</span>';
+        const displayName = escapeHtml(user.realName || user.username || '-');
         return `<tr>
             <td class="text-center"><strong>${idx + 1}</strong></td>
-            <td>${escapeHtml(user.username)}</td>
-            <td>${escapeHtml(user.realName || '-')}</td>
+            <td><strong>${displayName}</strong></td>
+            <td>${escapeHtml(user.username || '(无账号)')}</td>
+            <td>${escapeHtml(user.wechatId || '-')}</td>
+            <td>${escapeHtml(user.projectRole || '-')}</td>
             <td><span class="um-role-badge" style="background:${roleColor}20;color:${roleColor};border:1px solid ${roleColor}40;">${escapeHtml(roleName)}</span></td>
+            <td>${memberBadge}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td>${createdAt}</td>
             <td>
                 <button class="btn-icon" title="编辑" onclick="umEditUser(${user.id})">✏️</button>
-                <button class="btn-icon" title="重置密码" onclick="umResetPassword(${user.id}, '${escapeHtml(user.username)}')">🔑</button>
+                <button class="btn-icon" title="重置密码" onclick="umResetPassword(${user.id}, '${escapeHtml(user.realName || user.username || '')}')">🔑</button>
                 ${user.status === 'active'
                     ? `<button class="btn-icon" title="禁用" onclick="umToggleUserStatus(${user.id}, 'disabled')">🚫</button>`
                     : `<button class="btn-icon" title="启用" onclick="umToggleUserStatus(${user.id}, 'active')">✅</button>`
                 }
-                <button class="btn-icon" title="删除" onclick="umDeleteUser(${user.id}, '${escapeHtml(user.username)}')">🗑️</button>
+                <button class="btn-icon" title="删除" onclick="umDeleteUser(${user.id}, '${escapeHtml(user.realName || user.username || '')}')">🗑️</button>
             </td>
         </tr>`;
     }).join('');
@@ -4904,7 +4910,9 @@ function filterUserList() {
     if (keyword) {
         filtered = filtered.filter(u =>
             (u.username || '').toLowerCase().includes(keyword) ||
-            (u.realName || '').toLowerCase().includes(keyword)
+            (u.realName || '').toLowerCase().includes(keyword) ||
+            (u.wechatId || '').toLowerCase().includes(keyword) ||
+            (u.projectRole || '').toLowerCase().includes(keyword)
         );
     }
     if (roleId) {
@@ -4921,8 +4929,12 @@ function openCreateUserModal() {
     document.getElementById('um-username').disabled = false;
     document.getElementById('um-realname').value = '';
     document.getElementById('um-password').value = '';
-    document.getElementById('um-password').required = true;
-    document.getElementById('um-password-label').textContent = '密码 *';
+    document.getElementById('um-password').required = false;
+    document.getElementById('um-password-label').textContent = '密码（选填）';
+    document.getElementById('um-wechat-id').value = '';
+    document.getElementById('um-project-role').value = '';
+    document.getElementById('um-duty').value = '';
+    document.getElementById('um-is-member').checked = true;
     document.getElementById('um-status-group').style.display = 'none';
     // 默认选第一个角色
     const roleSelect = document.getElementById('um-role-select');
@@ -4938,12 +4950,16 @@ function umEditUser(userId) {
     if (!user) return;
     document.getElementById('um-user-modal-title').textContent = '编辑用户';
     document.getElementById('um-user-id').value = user.id;
-    document.getElementById('um-username').value = user.username;
-    document.getElementById('um-username').disabled = true; // 用户名不可改
+    document.getElementById('um-username').value = user.username || '';
+    document.getElementById('um-username').disabled = !!user.username; // 有账号则不可改
     document.getElementById('um-realname').value = user.realName || '';
     document.getElementById('um-password').value = '';
     document.getElementById('um-password').required = false;
     document.getElementById('um-password-label').textContent = '密码（留空不修改）';
+    document.getElementById('um-wechat-id').value = user.wechatId || '';
+    document.getElementById('um-project-role').value = user.projectRole || '';
+    document.getElementById('um-duty').value = user.duty || '';
+    document.getElementById('um-is-member').checked = !!user.isMember;
     document.getElementById('um-status-group').style.display = 'block';
     document.getElementById('um-user-status').value = user.status || 'active';
     const roleSelect = document.getElementById('um-role-select');
@@ -4957,22 +4973,27 @@ async function submitUserForm(e) {
     const userId = document.getElementById('um-user-id').value;
     const isEdit = !!userId;
 
-    const username = document.getElementById('um-username').value.trim();
+    const username = document.getElementById('um-username').value.trim() || null;
     const realName = document.getElementById('um-realname').value.trim();
     const password = document.getElementById('um-password').value;
-    const role_id = parseInt(document.getElementById('um-role-select').value);
+    const role_id = parseInt(document.getElementById('um-role-select').value) || null;
     const status = isEdit ? document.getElementById('um-user-status').value : 'active';
+    const wechat_id = document.getElementById('um-wechat-id').value.trim();
+    const project_role = document.getElementById('um-project-role').value.trim();
+    const duty = document.getElementById('um-duty').value.trim();
+    const is_member = document.getElementById('um-is-member').checked;
 
-    if (!username || !realName) {
-        showToast('用户名和真实姓名不能为空', 'warning');
+    if (!realName) {
+        showToast('真实姓名不能为空', 'warning');
         return;
     }
-    if (!isEdit && !password) {
-        showToast('新建用户必须设置密码', 'warning');
+    // 如果设了用户名，新建时需要密码
+    if (!isEdit && username && !password) {
+        showToast('设置了用户名则必须设置密码', 'warning');
         return;
     }
 
-    const body = { username, realName, role_id, status };
+    const body = { username, realName, role_id, status, wechat_id, project_role, duty, is_member };
     if (password) body.password = password;
 
     try {

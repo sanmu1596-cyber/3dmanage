@@ -73,9 +73,10 @@ gamesRouter.use(auth.verifyToken);
 testsRouter.use(auth.verifyToken);
 bugsRouter.use(auth.verifyToken);
 
-// ==================== 成员管理 API ====================
+// ==================== 成员管理 API（已合并到 users 表，通过 is_member=1 标识项目成员）====================
 membersRouter.get('/', auth.checkPermission('members', 'view'), (req, res) => {
-  const sql = 'SELECT * FROM members ORDER BY created_at DESC';
+  const sql = `SELECT id, real_name as name, wechat_id, project_role as role, duty, status, created_at, updated_at
+               FROM users WHERE is_member = 1 ORDER BY created_at DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -87,9 +88,9 @@ membersRouter.get('/', auth.checkPermission('members', 'view'), (req, res) => {
 
 membersRouter.post('/', auth.checkPermission('members', 'edit'), (req, res) => {
   const { name, wechat_id, role, duty, status } = req.body;
-  const sql = `INSERT INTO members (name, wechat_id, role, duty, status)
-               VALUES (?, ?, ?, ?, ?)`;
-  db.run(sql, [name, wechat_id, role, duty, status], function(err) {
+  const sql = `INSERT INTO users (real_name, wechat_id, project_role, duty, status, is_member)
+               VALUES (?, ?, ?, ?, ?, 1)`;
+  db.run(sql, [name, wechat_id || '', role || '', duty || '', status || 'active'], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -100,9 +101,9 @@ membersRouter.post('/', auth.checkPermission('members', 'edit'), (req, res) => {
 
 membersRouter.put('/:id', auth.checkPermission('members', 'edit'), (req, res) => {
   const { name, wechat_id, role, duty, status } = req.body;
-  const sql = `UPDATE members SET name = ?, wechat_id = ?, role = ?, duty = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-               WHERE id = ?`;
-  db.run(sql, [name, wechat_id, role, duty, status, req.params.id], function(err) {
+  const sql = `UPDATE users SET real_name = ?, wechat_id = ?, project_role = ?, duty = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND is_member = 1`;
+  db.run(sql, [name, wechat_id || '', role || '', duty || '', status || 'active', req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -112,7 +113,8 @@ membersRouter.put('/:id', auth.checkPermission('members', 'edit'), (req, res) =>
 });
 
 membersRouter.delete('/:id', auth.checkPermission('members', 'delete'), (req, res) => {
-  const sql = 'DELETE FROM members WHERE id = ?';
+  // 删除成员：将 is_member 设为 0（软删除），保留用户记录
+  const sql = 'UPDATE users SET is_member = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_member = 1';
   db.run(sql, [req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -124,9 +126,9 @@ membersRouter.delete('/:id', auth.checkPermission('members', 'delete'), (req, re
 
 // ==================== 设备管理 API ====================
 devicesRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
-  const sql = `SELECT d.*, m.name as assigned_to_name
+  const sql = `SELECT d.*, u.real_name as assigned_to_name
                FROM devices d
-               LEFT JOIN members m ON d.assigned_to = m.id
+               LEFT JOIN users u ON d.assigned_to = u.id
                ORDER BY d.created_at DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -189,9 +191,9 @@ devicesRouter.delete('/:id', auth.checkPermission('devices', 'delete'), (req, re
 
 // ==================== 游戏管理 API ====================
 gamesRouter.get('/', auth.checkPermission('games', 'view'), (req, res) => {
-  const sql = `SELECT g.*, m.name as owner_name
+  const sql = `SELECT g.*, u.real_name as owner_name
                FROM games g
-               LEFT JOIN members m ON g.owner_id = m.id
+               LEFT JOIN users u ON g.owner_id = u.id
                ORDER BY g.created_at DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -265,11 +267,11 @@ gamesRouter.delete('/:id', auth.checkPermission('games', 'delete'), (req, res) =
 
 // ==================== 测试管理 API ====================
 testsRouter.get('/', auth.checkPermission('tests', 'view'), (req, res) => {
-  const sql = `SELECT t.*, g.name as game_name, d.name as device_name, m.name as tester_name
+  const sql = `SELECT t.*, g.name as game_name, d.name as device_name, u.real_name as tester_name
                FROM tests t
                LEFT JOIN games g ON t.game_id = g.id
                LEFT JOIN devices d ON t.device_id = d.id
-               LEFT JOIN members m ON t.tester_id = m.id
+               LEFT JOIN users u ON t.tester_id = u.id
                ORDER BY t.created_at DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -319,10 +321,10 @@ testsRouter.delete('/:id', auth.checkPermission('tests', 'delete'), (req, res) =
 
 // ==================== 缺陷管理 API ====================
 bugsRouter.get('/', auth.checkPermission('bugs', 'view'), (req, res) => {
-  const sql = `SELECT b.*, t.name as test_name, m.name as assignee_name
+  const sql = `SELECT b.*, t.name as test_name, u.real_name as assignee_name
                FROM bugs b
                LEFT JOIN tests t ON b.test_id = t.id
-               LEFT JOIN members m ON b.assignee_id = m.id
+               LEFT JOIN users u ON b.assignee_id = u.id
                ORDER BY b.created_at DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -685,7 +687,7 @@ statsRouter.get('/dashboard', (req, res) => {
   const queries = [
     { key: 'games_total', sql: 'SELECT COUNT(*) as count FROM games' },
     { key: 'devices_total', sql: 'SELECT COUNT(*) as count FROM devices' },
-    { key: 'members_total', sql: 'SELECT COUNT(*) as count FROM members' },
+    { key: 'members_total', sql: "SELECT COUNT(*) as count FROM users WHERE is_member = 1" },
     { key: 'bugs_open', sql: "SELECT COUNT(*) as count FROM bugs WHERE bug_status IN ('open','in_progress')" },
     { key: 'bugs_total', sql: 'SELECT COUNT(*) as count FROM bugs' },
     { key: 'tests_total', sql: 'SELECT COUNT(*) as count FROM tests' },
@@ -765,7 +767,7 @@ statsRouter.get('/search', (req, res) => {
       sql: `SELECT id, name as title, manufacturer as subtitle FROM devices WHERE name LIKE ? OR manufacturer LIKE ? LIMIT 5`,
       params: [like, like] },
     { type: 'member', icon: '👥', label: '成员',
-      sql: `SELECT id, name as title, role as subtitle FROM members WHERE name LIKE ? OR role LIKE ? OR wechat_id LIKE ? LIMIT 5`,
+      sql: `SELECT id, real_name as title, project_role as subtitle FROM users WHERE is_member = 1 AND (real_name LIKE ? OR project_role LIKE ? OR wechat_id LIKE ?) LIMIT 5`,
       params: [like, like, like] },
     { type: 'bug', icon: '🐛', label: '缺陷',
       sql: `SELECT id, description as title, device_name as subtitle FROM bugs WHERE description LIKE ? OR device_name LIKE ? OR owner LIKE ? LIMIT 5`,
@@ -797,7 +799,7 @@ batchRouter.use(auth.verifyToken);
 
 batchRouter.post('/delete', (req, res) => {
   const { resource, ids } = req.body;
-  const allowedTables = { members: 'members', devices: 'devices', games: 'games', tests: 'tests', bugs: 'bugs', adaptations: 'adaptation_records' };
+  const allowedTables = { members: 'users', devices: 'devices', games: 'games', tests: 'tests', bugs: 'bugs', adaptations: 'adaptation_records' };
   const table = allowedTables[resource];
   if (!table) return res.status(400).json({ error: 'Invalid resource type' });
   if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids must be a non-empty array' });

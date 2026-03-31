@@ -89,15 +89,20 @@ exports.getCurrentUser = (req, res) => {
 
 // 创建用户
 exports.createUser = (req, res) => {
-  const { username, password, realName, role_id } = req.body;
+  const { username, password, realName, role_id, wechat_id, project_role, duty, is_member } = req.body;
   
-  if (!username || !password || !realName) {
-    return res.status(400).json({ error: '用户名、密码和真实姓名不能为空' });
+  if (!realName) {
+    return res.status(400).json({ error: '真实姓名不能为空' });
   }
   
-  const hashedPassword = auth.hashPassword(password);
+  // 如果提供了 username，则需要密码
+  if (username && !password) {
+    return res.status(400).json({ error: '设置了用户名则密码不能为空' });
+  }
   
-  const sql = 'INSERT INTO users (username, password, real_name, role, role_id) VALUES (?, ?, ?, ?, ?)';
+  const hashedPassword = password ? auth.hashPassword(password) : '';
+  
+  const sql = 'INSERT INTO users (username, password, real_name, role, role_id, wechat_id, project_role, duty, is_member) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
   
   // 查询角色名称用于存储到 role 字段（兼容旧代码）
   const getRoleName = (roleId, callback) => {
@@ -108,7 +113,7 @@ exports.createUser = (req, res) => {
   };
 
   getRoleName(role_id, (roleName) => {
-    db.run(sql, [username, hashedPassword, realName, roleName, role_id || null], function(err) {
+    db.run(sql, [username || null, hashedPassword, realName, roleName, role_id || null, wechat_id || '', project_role || '', duty || '', is_member ? 1 : 0], function(err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(409).json({ error: '用户名已存在' });
@@ -125,7 +130,8 @@ exports.createUser = (req, res) => {
 exports.getAllUsers = (req, res) => {
   const sql = `
     SELECT u.id, u.username, u.real_name, u.status, u.created_at,
-           u.role_id, r.name as role_name, r.color as role_color, r.description as role_description
+           u.role_id, u.wechat_id, u.project_role, u.duty, u.is_member,
+           r.name as role_name, r.color as role_color, r.description as role_description
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
     ORDER BY u.created_at ASC
@@ -138,14 +144,18 @@ exports.getAllUsers = (req, res) => {
     
     const users = rows.map(user => ({
       id: user.id,
-      username: user.username,
+      username: user.username || '',
       realName: user.real_name,
       role: user.role_name || '未分配',
       role_id: user.role_id,
       roleColor: user.role_color || '#718096',
       roleDescription: user.role_description || '',
       status: user.status,
-      createdAt: user.created_at
+      createdAt: user.created_at,
+      wechatId: user.wechat_id || '',
+      projectRole: user.project_role || '',
+      duty: user.duty || '',
+      isMember: !!user.is_member
     }));
     
     res.json({ success: true, data: users });
@@ -186,7 +196,7 @@ exports.updateUserRole = (req, res) => {
 // 更新用户信息（密码重置、状态等）
 exports.updateUser = (req, res) => {
   const { userId } = req.params;
-  const { realName, status, password, role_id } = req.body;
+  const { realName, status, password, role_id, wechat_id, project_role, duty, is_member } = req.body;
   
   const updates = [];
   const params = [];
@@ -206,6 +216,22 @@ exports.updateUser = (req, res) => {
   if (role_id !== undefined) {
     updates.push('role_id = ?');
     params.push(role_id);
+  }
+  if (wechat_id !== undefined) {
+    updates.push('wechat_id = ?');
+    params.push(wechat_id);
+  }
+  if (project_role !== undefined) {
+    updates.push('project_role = ?');
+    params.push(project_role);
+  }
+  if (duty !== undefined) {
+    updates.push('duty = ?');
+    params.push(duty);
+  }
+  if (is_member !== undefined) {
+    updates.push('is_member = ?');
+    params.push(is_member ? 1 : 0);
   }
 
   if (updates.length === 0) {

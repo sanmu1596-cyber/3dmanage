@@ -675,16 +675,18 @@
                                 <thead>
                                     <tr>
                                         <th width="50">序号</th>
+                                        <th>姓名</th>
                                         <th>用户名</th>
-                                        <th>真实姓名</th>
-                                        <th>角色</th>
+                                        <th>企微ID</th>
+                                        <th>项目角色</th>
+                                        <th>系统角色</th>
+                                        <th>成员</th>
                                         <th>状态</th>
-                                        <th>创建时间</th>
                                         <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="um-users-table">
-                                    <tr><td colspan="7" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>
+                                    <tr><td colspan="9" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -987,9 +989,9 @@
         </div>
     </div>
 
-    <!-- 创建用户弹窗 -->
+    <!-- 创建/编辑用户弹窗 -->
     <div id="um-user-modal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h3 id="um-user-modal-title">添加用户</h3>
                 <span class="close-btn" onclick="closeModal('um-user-modal')">&times;</span>
@@ -997,12 +999,22 @@
             <form id="um-user-form" onsubmit="submitUserForm(event)">
                 <input type="hidden" id="um-user-id">
                 <div class="form-grid">
-                    <div class="form-group"><label>用户名 *</label><input type="text" id="um-username" placeholder="登录账号" required></div>
                     <div class="form-group"><label>真实姓名 *</label><input type="text" id="um-realname" placeholder="真实姓名" required></div>
-                    <div class="form-group"><label id="um-password-label">密码 *</label><input type="password" id="um-password" placeholder="登录密码"></div>
+                    <div class="form-group"><label>企业微信ID</label><input type="text" id="um-wechat-id" placeholder="企业微信ID"></div>
+                    <div class="form-group"><label>项目角色</label><input type="text" id="um-project-role" placeholder="如：项目经理/适配工程师"></div>
                     <div class="form-group">
-                        <label>角色</label>
+                        <label>系统角色</label>
                         <select id="um-role-select"></select>
+                    </div>
+                    <div class="form-group"><label>用户名</label><input type="text" id="um-username" placeholder="登录账号（可选）"></div>
+                    <div class="form-group"><label id="um-password-label">密码</label><input type="password" id="um-password" placeholder="登录密码（可选）"></div>
+                    <div class="form-group full-width"><label>职责描述</label><textarea id="um-duty" rows="2" placeholder="职责描述"></textarea></div>
+                    <div class="form-group">
+                        <label>项目成员</label>
+                        <label class="checkbox-label" style="margin-top:6px;">
+                            <input type="checkbox" id="um-is-member" checked>
+                            <span>加入项目成员列表</span>
+                        </label>
                     </div>
                     <div class="form-group" id="um-status-group" style="display:none;">
                         <label>状态</label>
