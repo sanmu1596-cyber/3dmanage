@@ -283,6 +283,13 @@ async function loadTabData(tabId, switchId) {
             await loadBugs();
             break;
         case 'config-plan':
+            // 配置计划需要设备和游戏数据（穿梭框选择用）
+            if (!allDevicesData || allDevicesData.length === 0) await loadDevices();
+            if (!allGamesForProgress || allGamesForProgress.length === 0) {
+                const gamesResp = await authFetch(`${API_BASE}/games`);
+                const gamesResult = await gamesResp.json();
+                allGamesForProgress = gamesResult.data || [];
+            }
             await loadConfigPlans();
             break;
         case 'field-settings':
@@ -398,9 +405,9 @@ function renderDevicesTable(data) {
                 <td>${escapeHtml(device.manufacturer || '-')}</td>
                 <td>${escapeHtml(device.device_type || '-')}</td>
                 <td>${escapeHtml(device.name)}</td>
-                <td>${escapeHtml(device.requirements || '-')}</td>
-                <td>${escapeHtml(device.quantity || 1)}</td>
-                <td>${escapeHtml(device.keeper || '-')}</td>
+                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>
+                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>
+                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>
                 <td>${escapeHtml(device.notes || '-')}</td>
                 <td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>
                 <td>${escapeHtml(device.total_bugs || 0)}</td>
@@ -423,6 +430,148 @@ function renderDevicesTable(data) {
             </tr>
         `;
     }
+}
+
+// ==================== 设备行内编辑 ====================
+
+/**
+ * 双击单元格进入编辑模式
+ * @param {HTMLElement} td - 被双击的<td>元素
+ * @param {number} deviceId - 设备ID
+ * @param {string} field - 字段名 (requirements/quantity/keeper)
+ * @param {string} inputType - 输入类型 (text/number)
+ */
+function startInlineEdit(td, deviceId, field, inputType) {
+    // 防止重复激活
+    if (td.querySelector('input, textarea, select')) return;
+
+    const currentValue = td.textContent.trim();
+    const displayValue = currentValue === '-' ? '' : currentValue;
+
+    td.classList.add('editing');
+
+    // 保管者：下拉选择（从成员列表获取）
+    if (field === 'keeper') {
+        const select = document.createElement('select');
+        select.className = 'inline-edit-select';
+        // 空选项
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '-- 选择保管者 --';
+        select.appendChild(emptyOpt);
+        // 从成员列表填充
+        (allMembersData || []).forEach(member => {
+            const opt = document.createElement('option');
+            opt.value = member.name;
+            opt.textContent = member.name;
+            if (member.name === displayValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+        td.innerHTML = '';
+        td.appendChild(select);
+        select.focus();
+        // change 直接保存
+        select.addEventListener('change', () => saveInlineEdit(td, deviceId, field, select.value));
+        select.addEventListener('blur', () => {
+            // 延迟关闭，让change事件先触发
+            setTimeout(() => {
+                if (td.querySelector('select')) cancelInlineEdit(td, currentValue);
+            }, 150);
+        });
+        select.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
+        });
+    }
+    // 设备需求：textarea（自适应高度）
+    else if (field === 'requirements') {
+        const textarea = document.createElement('textarea');
+        textarea.className = 'inline-edit-textarea';
+        textarea.value = displayValue;
+        td.innerHTML = '';
+        td.appendChild(textarea);
+        // 自适应高度
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+        textarea.focus();
+        textarea.select();
+        textarea.addEventListener('input', () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        });
+        textarea.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, textarea.value));
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); textarea.blur(); }
+            if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
+        });
+    }
+    // 数量：纯文本 input + 数字校验（不用 type=number 避免丑箭头）
+    else if (field === 'quantity') {
+        td.innerHTML = `<input type="text" inputmode="numeric" class="inline-edit-input inline-edit-qty" value="${escapeHtml(displayValue)}">`;
+        const input = td.querySelector('input');
+        input.focus();
+        input.select();
+        input.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
+        });
+    }
+    // 其他：通用 input
+    else {
+        td.innerHTML = `<input type="text" class="inline-edit-input" value="${escapeHtml(displayValue)}">`;
+        const input = td.querySelector('input');
+        input.focus();
+        input.select();
+        input.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
+        });
+    }
+}
+
+/**
+ * 保存行内编辑
+ */
+async function saveInlineEdit(td, deviceId, field, newValue) {
+    td.classList.remove('editing');
+    const trimmed = newValue.trim();
+
+    // 构造PATCH请求体
+    const body = {};
+    body[field] = field === 'quantity' ? (parseInt(trimmed) || 1) : trimmed;
+
+    try {
+        const response = await authFetch(`${API_BASE}/devices/${deviceId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            // 更新本地数据
+            const device = allDevicesData.find(d => d.id === deviceId);
+            if (device) device[field] = body[field];
+            // 显示新值
+            td.textContent = trimmed || '-';
+            showToast('已保存', 'success');
+        } else {
+            td.textContent = trimmed || '-';
+            showToast('保存失败', 'danger');
+        }
+    } catch (error) {
+        console.error('行内编辑保存失败:', error);
+        td.textContent = trimmed || '-';
+        showToast('保存失败', 'danger');
+    }
+}
+
+/**
+ * 取消行内编辑（按Esc）
+ */
+function cancelInlineEdit(td, originalValue) {
+    td.classList.remove('editing');
+    td.textContent = originalValue;
 }
 
 // 加载游戏列表
@@ -2181,7 +2330,7 @@ function renderSourceGameList(filterText) {
         container.innerHTML = items.map((game, idx) => {
             const realIndex = gameSelectSourceList.indexOf(game);
             return `
-                <div class="game-select-item ${game.checked ? 'selected' : ''}" onclick="toggleSourceGameCheck(${realIndex})">
+                <div class="game-select-item ${game.checked ? 'selected' : ''}" onclick="toggleSourceGameCheck(${realIndex})" ondblclick="event.stopPropagation(); dblTransferSourceGame(${realIndex})">
                     <input type="checkbox" ${game.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleSourceGameCheck(${realIndex})">
                     <div class="game-select-item-info">
                         <span class="game-select-item-name">${escapeHtml(game.name)}</span>
@@ -2193,6 +2342,18 @@ function renderSourceGameList(filterText) {
     }
 
     updateSourceCount();
+}
+
+// 双击左框游戏 → 移到右框（适配进展用）
+function dblTransferSourceGame(i) {
+    const item = gameSelectSourceList[i];
+    if (!item) return;
+    item.checked = false;
+    gameSelectTargetList.push(item);
+    gameSelectSourceList.splice(i, 1);
+    document.getElementById('select-all-games').checked = false;
+    renderSourceGameList(document.getElementById('game-select-search').value);
+    renderTargetGameList(document.getElementById('target-select-search').value);
 }
 
 // 渲染目标列表
@@ -2211,7 +2372,7 @@ function renderTargetGameList(filterText) {
         container.innerHTML = items.map((game, idx) => {
             const realIndex = gameSelectTargetList.indexOf(game);
             return `
-                <div class="game-select-item ${game.checked ? 'selected' : ''}" onclick="toggleTargetGameCheck(${realIndex})">
+                <div class="game-select-item ${game.checked ? 'selected' : ''}" onclick="toggleTargetGameCheck(${realIndex})" ondblclick="event.stopPropagation(); dblTransferTargetGame(${realIndex})">
                     <input type="checkbox" ${game.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleTargetGameCheck(${realIndex})">
                     <div class="game-select-item-info">
                         <span class="game-select-item-name">${escapeHtml(game.name)}</span>
@@ -2223,6 +2384,18 @@ function renderTargetGameList(filterText) {
     }
 
     updateTargetCount();
+}
+
+// 双击右框游戏 → 移回左框（适配进展用）
+function dblTransferTargetGame(i) {
+    const item = gameSelectTargetList[i];
+    if (!item) return;
+    item.checked = false;
+    gameSelectSourceList.push(item);
+    gameSelectTargetList.splice(i, 1);
+    document.getElementById('select-all-target').checked = false;
+    renderSourceGameList(document.getElementById('game-select-search').value);
+    renderTargetGameList(document.getElementById('target-select-search').value);
 }
 
 // 切换源列表游戏选中状态
@@ -3000,7 +3173,7 @@ function renderDeviceSourceList(filterText) {
     } else {
         container.innerHTML = items.map(d => {
             const ri = deviceSelectSourceList.indexOf(d);
-            return `<div class="game-select-item ${d.checked ? 'selected' : ''}" onclick="toggleDeviceSrc(${ri})">
+            return `<div class="game-select-item ${d.checked ? 'selected' : ''}" onclick="toggleDeviceSrc(${ri})" ondblclick="event.stopPropagation(); dblTransferDeviceSrc(${ri})">
                 <input type="checkbox" ${d.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleDeviceSrc(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(d.name)}</span>
@@ -3011,6 +3184,18 @@ function renderDeviceSourceList(filterText) {
     }
     const checked = deviceSelectSourceList.filter(d => d.checked).length;
     document.getElementById('device-src-count').textContent = `${checked}/${deviceSelectSourceList.length}`;
+}
+
+// 双击左框item → 移到右框
+function dblTransferDeviceSrc(i) {
+    const item = deviceSelectSourceList[i];
+    if (!item) return;
+    item.checked = false;
+    deviceSelectTargetList.push(item);
+    deviceSelectSourceList.splice(i, 1);
+    document.getElementById('select-all-devices-src').checked = false;
+    renderDeviceSourceList(document.getElementById('device-select-search').value);
+    renderDeviceTargetList(document.getElementById('device-target-search').value);
 }
 
 function renderDeviceTargetList(filterText) {
@@ -3025,7 +3210,7 @@ function renderDeviceTargetList(filterText) {
     } else {
         container.innerHTML = items.map(d => {
             const ri = deviceSelectTargetList.indexOf(d);
-            return `<div class="game-select-item ${d.checked ? 'selected' : ''}" onclick="toggleDeviceTgt(${ri})">
+            return `<div class="game-select-item ${d.checked ? 'selected' : ''}" onclick="toggleDeviceTgt(${ri})" ondblclick="event.stopPropagation(); dblTransferDeviceTgt(${ri})">
                 <input type="checkbox" ${d.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleDeviceTgt(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(d.name)}</span>
@@ -3036,6 +3221,18 @@ function renderDeviceTargetList(filterText) {
     }
     const checked = deviceSelectTargetList.filter(d => d.checked).length;
     document.getElementById('device-tgt-count').textContent = `${checked}/${deviceSelectTargetList.length}`;
+}
+
+// 双击右框item → 移回左框
+function dblTransferDeviceTgt(i) {
+    const item = deviceSelectTargetList[i];
+    if (!item) return;
+    item.checked = false;
+    deviceSelectSourceList.push(item);
+    deviceSelectTargetList.splice(i, 1);
+    document.getElementById('select-all-devices-tgt').checked = false;
+    renderDeviceSourceList(document.getElementById('device-select-search').value);
+    renderDeviceTargetList(document.getElementById('device-target-search').value);
 }
 
 function toggleDeviceSrc(i) {
@@ -3141,7 +3338,7 @@ function renderPlanGameSourceList(filterText) {
     } else {
         container.innerHTML = items.map(g => {
             const ri = planGameSelectSourceList.indexOf(g);
-            return `<div class="game-select-item ${g.checked ? 'selected' : ''}" onclick="togglePlanGameSrc(${ri})">
+            return `<div class="game-select-item ${g.checked ? 'selected' : ''}" onclick="togglePlanGameSrc(${ri})" ondblclick="event.stopPropagation(); dblTransferPlanGameSrc(${ri})">
                 <input type="checkbox" ${g.checked ? 'checked' : ''} onclick="event.stopPropagation(); togglePlanGameSrc(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(g.name)}</span>
@@ -3152,6 +3349,18 @@ function renderPlanGameSourceList(filterText) {
     }
     const checked = planGameSelectSourceList.filter(g => g.checked).length;
     document.getElementById('plan-game-src-count').textContent = `${checked}/${planGameSelectSourceList.length}`;
+}
+
+// 双击左框游戏 → 移到右框
+function dblTransferPlanGameSrc(i) {
+    const item = planGameSelectSourceList[i];
+    if (!item) return;
+    item.checked = false;
+    planGameSelectTargetList.push(item);
+    planGameSelectSourceList.splice(i, 1);
+    document.getElementById('select-all-plan-games-src').checked = false;
+    renderPlanGameSourceList(document.getElementById('plan-game-select-search').value);
+    renderPlanGameTargetList(document.getElementById('plan-game-target-search').value);
 }
 
 function renderPlanGameTargetList(filterText) {
@@ -3166,7 +3375,7 @@ function renderPlanGameTargetList(filterText) {
     } else {
         container.innerHTML = items.map(g => {
             const ri = planGameSelectTargetList.indexOf(g);
-            return `<div class="game-select-item ${g.checked ? 'selected' : ''}" onclick="togglePlanGameTgt(${ri})">
+            return `<div class="game-select-item ${g.checked ? 'selected' : ''}" onclick="togglePlanGameTgt(${ri})" ondblclick="event.stopPropagation(); dblTransferPlanGameTgt(${ri})">
                 <input type="checkbox" ${g.checked ? 'checked' : ''} onclick="event.stopPropagation(); togglePlanGameTgt(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(g.name)}</span>
@@ -3177,6 +3386,18 @@ function renderPlanGameTargetList(filterText) {
     }
     const checked = planGameSelectTargetList.filter(g => g.checked).length;
     document.getElementById('plan-game-tgt-count').textContent = `${checked}/${planGameSelectTargetList.length}`;
+}
+
+// 双击右框游戏 → 移回左框
+function dblTransferPlanGameTgt(i) {
+    const item = planGameSelectTargetList[i];
+    if (!item) return;
+    item.checked = false;
+    planGameSelectSourceList.push(item);
+    planGameSelectTargetList.splice(i, 1);
+    document.getElementById('select-all-plan-games-tgt').checked = false;
+    renderPlanGameSourceList(document.getElementById('plan-game-select-search').value);
+    renderPlanGameTargetList(document.getElementById('plan-game-target-search').value);
 }
 
 function togglePlanGameSrc(i) {

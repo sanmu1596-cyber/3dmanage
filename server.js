@@ -14,11 +14,14 @@ const PORT = 3000;
 app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
 app.use(bodyParser.json({ limit: '2mb' }));
-// 静态文件：设置1天缓存 + ETag，重复访问直接304
+// 静态文件：开发阶段禁用缓存，确保每次加载最新；生产环境可改回 maxAge: '1d'
 app.use(express.static('public', {
-  maxAge: '1d',
+  maxAge: 0,
   etag: true,
-  lastModified: true
+  lastModified: true,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
 }));
 
 // ==================== 操作日志表 ====================
@@ -181,6 +184,28 @@ devicesRouter.put('/:id', auth.checkPermission('devices', 'edit'), (req, res) =>
       res.status(500).json({ error: err.message });
       return;
     }
+    res.json({ success: true });
+  });
+});
+
+// 单字段更新（行内编辑用）
+devicesRouter.patch('/:id', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const allowedFields = ['requirements', 'quantity', 'keeper', 'notes', 'manufacturer',
+                         'device_type', 'name', 'status', 'adapter_completion_rate',
+                         'total_bugs', 'completed_adaptations', 'total_games', 'assigned_to'];
+  const updates = [];
+  const values = [];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowedFields.includes(key)) {
+      updates.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+  values.push(req.params.id);
+  const sql = `UPDATE devices SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
 });
