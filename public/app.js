@@ -3019,7 +3019,7 @@ async function openPlanDetail(planIndex) {
 
     // 切换视图
     document.getElementById('plan-list-view').style.display = 'none';
-    document.getElementById('plan-detail-view').style.display = 'block';
+    document.getElementById('plan-detail-view').style.display = 'flex';
 
     // 设置标题
     document.getElementById('plan-detail-title').innerHTML = `${escapeHtml(plan.title)} <span style="font-size:12px;color:var(--text-light);font-weight:400;margin-left:8px;">${escapeHtml(plan.planNo)}</span>`;
@@ -5727,7 +5727,7 @@ function renderMyTaskDetail(planId) {
 
     // 切换视图
     document.getElementById('my-tasks-plan-cards').style.display = 'none';
-    document.getElementById('my-tasks-detail-view').style.display = '';
+    document.getElementById('my-tasks-detail-view').style.display = 'flex';
 
     // 设置标题
     document.getElementById('my-tasks-detail-title').innerHTML = 
