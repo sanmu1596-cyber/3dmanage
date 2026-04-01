@@ -388,7 +388,12 @@ async function loadTabData(tabId, switchId) {
                 const gamesResult = await gamesResp.json();
                 allGamesForProgress = gamesResult.data || [];
             }
+            if (!allMembersData || allMembersData.length === 0) await loadMembers();
             await loadConfigPlans();
+            break;
+        case 'my-tasks':
+            if (!allMembersData || allMembersData.length === 0) await loadMembers();
+            await loadMyTasks();
             break;
         case 'field-settings':
             await loadFieldOptions();
@@ -2724,6 +2729,10 @@ async function confirmAddGamesToProgress() {
 let configPlans = [];           // 所有计划
 let currentPlanIndex = null;    // 当前选中的计划索引
 
+// 配置计划分页状态
+let planCurrentPage = 1;
+let planPageSize = 20;
+
 // 机型选择弹窗数据
 let deviceSelectSourceList = [];
 let deviceSelectTargetList = [];
@@ -2756,6 +2765,7 @@ const mockBugsData = [
 
 function showCreatePlanView() {
     document.getElementById('plan-list-view').style.display = 'none';
+    document.getElementById('plan-detail-view').style.display = 'none';
     document.getElementById('plan-create-view').style.display = 'block';
 
     // 重置表单
@@ -2771,7 +2781,12 @@ function showCreatePlanView() {
 
 function showPlanListView() {
     document.getElementById('plan-create-view').style.display = 'none';
+    document.getElementById('plan-detail-view').style.display = 'none';
     document.getElementById('plan-list-view').style.display = 'block';
+}
+
+function backToPlanList() {
+    showPlanListView();
 }
 
 // ========== 创建计划表单 ==========
@@ -2803,14 +2818,20 @@ function removePlanGame(index) {
 }
 
 // 提交计划
-async function submitPlan(event) {
-    event.preventDefault();
+async function submitPlan(event, planStatus) {
+    if (event && event.preventDefault) event.preventDefault();
+    planStatus = planStatus || 'draft';
 
     const title = document.getElementById('plan-title').value.trim();
     const date = document.getElementById('plan-date').value;
     const interlaceVersion = document.getElementById('plan-interlace-version').value.trim();
     const clientVersion = document.getElementById('plan-client-version').value.trim();
     const goal = document.getElementById('plan-goal').value.trim();
+
+    if (!title || !date) {
+        showToast('请填写标题和时间', 'warning');
+        return;
+    }
 
     if (planSelectedDevices.length === 0) {
         showToast('请至少选择一个机型', 'warning');
@@ -2822,24 +2843,32 @@ async function submitPlan(event) {
         return;
     }
 
+    // 获取默认负责人
+    const defaultAssigneeSelect = document.getElementById('plan-default-assignee');
+    const defaultAssigneeId = defaultAssigneeSelect ? defaultAssigneeSelect.value : '';
+    const defaultAssigneeName = defaultAssigneeId ? (defaultAssigneeSelect.options[defaultAssigneeSelect.selectedIndex].text || '') : '';
+
     // 生成Tab名称: 机型+日期
     const tabName = planSelectedDevices.map(d => d.name).join('+') + ' ' + date;
 
-    // P0: 写入后端
     const payload = {
         title,
         plan_date: date,
-        devices_json: JSON.stringify(planSelectedDevices),
+        devices_json: planSelectedDevices,
         interlace_version: interlaceVersion,
         client_version: clientVersion,
         goal,
         tab_name: tabName,
+        status: planStatus,
         games: planSelectedGames.map((game, i) => ({
             game_id: game.id,
             game_name: game.name,
             game_platform: game.platform || '-',
-            owner_name: game.ownerName || '-',
+            game_type: game.game_type || '-',
+            owner_name: defaultAssigneeName || '',
+            assigned_to: defaultAssigneeId ? parseInt(defaultAssigneeId) : null,
             adapt_status: 'not_started',
+            adapt_progress: 0,
             remark: '',
             sort_order: i
         }))
@@ -2854,13 +2883,10 @@ async function submitPlan(event) {
         const result = await resp.json();
 
         if (result.success) {
-            showToast('配置计划创建成功', 'success');
-            // 重新加载所有计划
+            const statusText = planStatus === 'published' ? '创建并发布' : '保存草稿';
+            showToast(`配置计划${statusText}成功`, 'success');
             await loadConfigPlans();
-            // 返回列表视图
             showPlanListView();
-            // 选中最新的计划
-            if (configPlans.length > 0) selectPlan(0); // 按 created_at DESC 排序，最新在前
         } else {
             showToast('创建失败: ' + (result.error || '未知错误'), 'danger');
         }
@@ -2879,25 +2905,153 @@ async function loadConfigPlans() {
         if (result.success && result.data) {
             configPlans = result.data.map(p => ({
                 id: p.id,
+                planNo: p.plan_no || '',
                 title: p.title,
                 date: p.plan_date,
-                devices: JSON.parse(p.devices_json || '[]'),
+                devices: typeof p.devices_json === 'string' ? JSON.parse(p.devices_json || '[]') : (p.devices_json || []),
                 interlaceVersion: p.interlace_version || '',
                 clientVersion: p.client_version || '',
                 goal: p.goal || '',
                 tabName: p.tab_name || p.title,
+                status: p.status || 'draft',
+                creatorName: p.creator_name || '',
                 createdAt: p.created_at,
+                gameCount: p.game_count || 0,
+                finishedCount: p.finished_count || 0,
+                adaptingCount: p.adapting_count || 0,
+                assigneeCount: p.assignee_count || 0,
+                avgProgress: p.avg_progress || 0,
                 games: [] // 详情按需加载
             }));
         } else {
             configPlans = [];
         }
 
-        renderPlanTabs();
+        renderPlanCards();
     } catch (e) {
         console.error('加载配置计划失败:', e);
         configPlans = [];
     }
+}
+
+// 筛选计划
+let planStatusFilter = '';
+function filterPlans() {
+    planStatusFilter = document.getElementById('plan-status-filter').value;
+    renderPlanCards();
+}
+
+// 渲染计划卡片列表
+function renderPlanCards() {
+    const container = document.getElementById('plan-cards-container');
+    const summaryBar = document.getElementById('plans-summary-bar');
+    
+    // 筛选
+    let filtered = configPlans;
+    if (planStatusFilter) {
+        filtered = filtered.filter(p => p.status === planStatusFilter);
+    }
+
+    // 汇总
+    const totalCount = configPlans.length;
+    const draftCount = configPlans.filter(p => p.status === 'draft').length;
+    const publishedCount = configPlans.filter(p => p.status === 'published').length;
+    if (summaryBar) {
+        summaryBar.innerHTML = `
+            <span class="summary-item"><span class="summary-dot dot-total"></span>共 <strong>${totalCount}</strong> 个计划</span>
+            <span class="summary-item"><span class="summary-dot dot-draft"></span>草稿 <strong>${draftCount}</strong></span>
+            <span class="summary-item"><span class="summary-dot dot-published"></span>已发布 <strong>${publishedCount}</strong></span>
+        `;
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📋</div><div>${configPlans.length === 0 ? '暂无适配计划' : '没有符合筛选条件的计划'}</div><div class="empty-sub">${configPlans.length === 0 ? '点击"新增适配计划"创建第一个计划' : '请调整筛选条件'}</div></div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map((plan, i) => {
+        const notStartedCount = plan.gameCount - plan.finishedCount - plan.adaptingCount;
+        const progressPercent = plan.avgProgress || 0;
+        const deviceNames = plan.devices.map(d => d.name || d).join('、');
+        const dateDisplay = plan.date || '';
+        
+        return `
+        <div class="plan-card status-${plan.status}" onclick="openPlanDetail(${configPlans.indexOf(plan)})">
+            <span class="plan-card-status status-${plan.status}">${plan.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
+            <div class="plan-card-header">
+                <span class="plan-card-title">${escapeHtml(plan.title)}</span>
+            </div>
+            <span class="plan-card-no">${escapeHtml(plan.planNo)}</span>
+            <div class="plan-card-meta">
+                <span class="plan-card-meta-item"><span class="meta-icon">📅</span>${dateDisplay}</span>
+                <span class="plan-card-meta-item"><span class="meta-icon">💻</span>${escapeHtml(deviceNames) || '未选机型'}</span>
+                <span class="plan-card-meta-item"><span class="meta-icon">👤</span>${plan.assigneeCount} 人参与</span>
+                ${plan.creatorName ? `<span class="plan-card-meta-item"><span class="meta-icon">✍️</span>${escapeHtml(plan.creatorName)}</span>` : ''}
+            </div>
+            <div class="plan-card-progress">
+                <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progressPercent}%"></div></div>
+                <div class="plan-card-progress-label">
+                    <span>整体进度</span>
+                    <span>${progressPercent}%</span>
+                </div>
+            </div>
+            <div class="plan-card-stats">
+                <span class="plan-card-stat stat-total">🎮 ${plan.gameCount} 款游戏</span>
+                ${notStartedCount > 0 ? `<span class="plan-card-stat stat-not-started">⏳ 未开始 ${notStartedCount}</span>` : ''}
+                ${plan.adaptingCount > 0 ? `<span class="plan-card-stat stat-adapting">🔄 适配中 ${plan.adaptingCount}</span>` : ''}
+                ${plan.finishedCount > 0 ? `<span class="plan-card-stat stat-finished">✅ 已完成 ${plan.finishedCount}</span>` : ''}
+            </div>
+            <div class="plan-card-actions" onclick="event.stopPropagation()">
+                ${plan.status === 'draft' ? `<button class="plan-card-action-btn btn-publish" onclick="event.stopPropagation(); publishPlan(${configPlans.indexOf(plan)})">🚀 发布</button>` : ''}
+                <button class="plan-card-action-btn" onclick="event.stopPropagation(); openPlanDetail(${configPlans.indexOf(plan)})">📋 详情</button>
+                <button class="plan-card-action-btn btn-danger" onclick="event.stopPropagation(); deletePlan(${configPlans.indexOf(plan)})">🗑️ 删除</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// 打开计划详情视图
+async function openPlanDetail(planIndex) {
+    const plan = configPlans[planIndex];
+    if (!plan) return;
+
+    currentPlanIndex = planIndex;
+
+    // 切换视图
+    document.getElementById('plan-list-view').style.display = 'none';
+    document.getElementById('plan-detail-view').style.display = 'block';
+
+    // 设置标题
+    document.getElementById('plan-detail-title').innerHTML = `${escapeHtml(plan.title)} <span style="font-size:12px;color:var(--text-light);font-weight:400;margin-left:8px;">${escapeHtml(plan.planNo)}</span>`;
+
+    // 操作按钮
+    const actionsEl = document.getElementById('plan-detail-actions');
+    actionsEl.innerHTML = '';
+    if (plan.status === 'draft') {
+        actionsEl.innerHTML += `<button class="tool-btn tool-btn-primary" onclick="publishPlan(${planIndex})">🚀 发布计划</button>`;
+    }
+    actionsEl.innerHTML += `<button class="btn btn-small btn-delete" onclick="deletePlan(${planIndex})">🗑️ 删除</button>`;
+
+    // 信息条
+    const infoBar = document.getElementById('plan-detail-info-bar');
+    const deviceNames = plan.devices.map(d => escapeHtml(d.name || d)).join('、');
+    const statusLabel = plan.status === 'published' ? '<span class="status-badge status-online">已发布</span>' : '<span class="status-badge status-pending">草稿</span>';
+    
+    infoBar.innerHTML = `
+        <span class="info-tag"><span class="tag-label">状态：</span>${statusLabel}</span>
+        <span class="info-tag"><span class="tag-label">日期：</span><span class="tag-value">${escapeHtml(plan.date)}</span></span>
+        <span class="info-tag"><span class="tag-label">机型：</span><span class="tag-value">${deviceNames || '-'}</span></span>
+        ${plan.interlaceVersion ? `<span class="info-tag"><span class="tag-label">交织版本：</span><span class="tag-value">${escapeHtml(plan.interlaceVersion)}</span></span>` : ''}
+        ${plan.clientVersion ? `<span class="info-tag"><span class="tag-label">客户端版本：</span><span class="tag-value">${escapeHtml(plan.clientVersion)}</span></span>` : ''}
+        ${plan.goal ? `<span class="info-tag"><span class="tag-label">目标：</span><span class="tag-value">${escapeHtml(plan.goal)}</span></span>` : ''}
+    `;
+
+    // 加载游戏列表详情
+    if (!plan.games || plan.games.length === 0) {
+        await loadPlanDetail(plan.id);
+    }
+
+    renderPlanDetailGames(planIndex);
 }
 
 // P0: 从后端加载单个计划详情（含游戏列表）
@@ -2915,11 +3069,14 @@ async function loadPlanDetail(planId) {
                     gameId: g.game_id,
                     name: g.game_name || '未知',
                     platform: g.game_platform || '-',
-                    gameType: '-',
-                    ownerName: g.owner_name || '-',
+                    gameType: g.game_type || '-',
+                    ownerName: g.owner_name || g.assigned_name || '',
+                    assignedTo: g.assigned_to || null,
+                    assignedName: g.assigned_name || g.owner_name || '',
                     adaptStatus: g.adapt_status || 'not_started',
+                    adaptProgress: g.adapt_progress || 0,
                     remark: g.remark || '',
-                    bugs: [] // 缺陷关联后续可扩展
+                    bugs: g.bugs_json || []
                 }));
             }
         }
@@ -2951,135 +3108,76 @@ function getRandomBugsForGame(gameName) {
     }));
 }
 
-// ========== 计划Tabs ==========
+// ========== 计划详情 - 游戏列表渲染 ==========
 
-function renderPlanTabs() {
-    const container = document.getElementById('plan-tab-container');
-    container.innerHTML = '';
-
-    configPlans.forEach((plan, index) => {
-        const tab = document.createElement('button');
-        tab.className = 'device-tab' + (index === currentPlanIndex ? ' active' : '');
-        tab.textContent = plan.tabName;
-        tab.title = plan.title;
-        tab.onclick = () => selectPlan(index);
-        container.appendChild(tab);
-    });
-}
-
-async function selectPlan(planIndex) {
-    currentPlanIndex = planIndex;
-
-    // 更新Tab激活状态
-    const tabs = document.querySelectorAll('#plan-tab-container .device-tab');
-    tabs.forEach((tab, i) => {
-        tab.classList.toggle('active', i === planIndex);
-    });
-
-    // P0: 先从后端加载详情
-    const plan = configPlans[planIndex];
-    if (plan && plan.id && (!plan.games || plan.games.length === 0)) {
-        await loadPlanDetail(plan.id);
-    }
-
-    // 渲染计划详情
-    renderPlanDetail(planIndex);
-}
-
-function renderPlanDetail(planIndex) {
+function renderPlanDetailGames(planIndex) {
     const plan = configPlans[planIndex];
     if (!plan) return;
 
-    const detailArea = document.getElementById('plan-detail-area');
+    const tbody = document.getElementById('plan-games-table');
+    const statsItems = document.getElementById('plan-detail-stats-items');
+    const totalGames = plan.games.length;
 
-    // 生成信息栏 + 表格
-    let html = `
-        <div class="plan-info-bar">
-            <div class="plan-info-item"><span class="info-label">标题：</span><span class="info-value">${escapeHtml(plan.title)}</span></div>
-            <div class="plan-info-item"><span class="info-label">日期：</span><span class="info-value">${escapeHtml(plan.date)}</span></div>
-            <div class="plan-info-item"><span class="info-label">机型：</span><span class="info-value">${plan.devices.map(d => escapeHtml(d.name)).join('、')}</span></div>
-            ${plan.interlaceVersion ? `<div class="plan-info-item"><span class="info-label">交织版本：</span><span class="info-value">${escapeHtml(plan.interlaceVersion)}</span></div>` : ''}
-            ${plan.clientVersion ? `<div class="plan-info-item"><span class="info-label">客户端版本：</span><span class="info-value">${escapeHtml(plan.clientVersion)}</span></div>` : ''}
-            ${plan.goal ? `<div class="plan-info-item"><span class="info-label">目标说明：</span><span class="info-value">${escapeHtml(plan.goal)}</span></div>` : ''}
-            <div class="plan-info-item" style="margin-left:auto;"><button class="btn btn-small btn-delete" onclick="deletePlan(${planIndex})">🗑️ 删除此计划</button></div>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th width="50">序号</th>
-                        <th>游戏名称</th>
-                        <th>游戏平台</th>
-                        <th>负责人</th>
-                        <th>适配进展</th>
-                        <th>问题备注</th>
-                        <th>缺陷列表</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
+    if (totalGames === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无游戏</div></td></tr>`;
+        if (statsItems) statsItems.innerHTML = '';
+        return;
+    }
 
-    if (plan.games.length === 0) {
-        html += `
+    tbody.innerHTML = plan.games.map((game, idx) => {
+        return `
             <tr>
-                <td colspan="8" class="empty-state">
-                    <div class="empty-icon">📋</div>
-                    <div class="empty-text">暂无游戏</div>
+                <td class="text-center"><strong>${idx + 1}</strong></td>
+                <td>${escapeHtml(game.name)}</td>
+                <td>${escapeHtml(game.platform)}</td>
+                <td>
+                    <select class="adapt-status-select" onchange="updatePlanGameAssignee(${planIndex}, ${idx}, this)">
+                        <option value="">未指派</option>
+                        ${(allMembersData || []).map(m => 
+                            `<option value="${m.id || ''}" ${(game.assignedTo == m.id || (!game.assignedTo && game.ownerName === m.name)) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
+                        ).join('')}
+                    </select>
+                </td>
+                <td>
+                    <select class="adapt-status-select" onchange="updatePlanGameAdaptStatus(${planIndex}, ${idx}, this.value)">
+                        ${(getFieldOptionsByKey('plan_adapt_status').length > 0 
+                            ? getFieldOptionsByKey('plan_adapt_status') 
+                            : [{value:'not_started',label:'未开始'},{value:'adapting',label:'适配中'},{value:'finished',label:'已结束'}]
+                        ).map(o => `<option value="${o.value}" ${game.adaptStatus === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
+                    </select>
+                </td>
+                <td>
+                    <div class="progress-bar-container" style="min-width:120px;">
+                        <div class="progress-bar-track"><div class="progress-bar" style="width: ${game.adaptProgress || 0}%"></div></div>
+                        <span class="progress-text">${game.adaptProgress || 0}%</span>
+                    </div>
+                </td>
+                <td>
+                    <input type="text" class="remark-input" value="${escapeHtml(game.remark || '')}"
+                        placeholder="输入备注..."
+                        onchange="updatePlanGameRemark(${planIndex}, ${idx}, this.value)">
+                </td>
+                <td>
+                    <button class="btn btn-small btn-delete" onclick="deletePlanGame(${planIndex}, ${idx})">删除</button>
                 </td>
             </tr>
         `;
-    } else {
-        plan.games.forEach((game, index) => {
-            const adaptStatusMap = {};
-            getFieldOptionsByKey('plan_adapt_status').forEach(o => adaptStatusMap[o.value] = o.label);
-            if (!adaptStatusMap['not_started']) Object.assign(adaptStatusMap, {'not_started':'未开始','adapting':'适配中','finished':'已结束'});
+    }).join('');
 
-            const bugCount = game.bugs ? game.bugs.length : 0;
-
-            html += `
-                <tr>
-                    <td class="text-center"><strong>${index + 1}</strong></td>
-                    <td>${escapeHtml(game.name)}</td>
-                    <td>${escapeHtml(game.platform)}</td>
-                    <td class="editable-cell" onclick="editPlanGameOwner(${planIndex}, ${index}, this)">
-                        <span class="cell-value">${escapeHtml(game.ownerName || '-')}</span>
-                        <span class="edit-icon">✎</span>
-                    </td>
-                    <td>
-                        <select class="adapt-status-select" onchange="updatePlanGameAdaptStatus(${planIndex}, ${index}, this.value)">
-                            ${(getFieldOptionsByKey('plan_adapt_status').length > 0 
-                                ? getFieldOptionsByKey('plan_adapt_status') 
-                                : [{value:'not_started',label:'未开始'},{value:'adapting',label:'适配中'},{value:'finished',label:'已结束'}]
-                            ).map(o => `<option value="${o.value}" ${game.adaptStatus === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
-                        </select>
-                    </td>
-                    <td>
-                        <input type="text" class="remark-input" value="${escapeHtml(game.remark || '')}"
-                            placeholder="输入备注..."
-                            onchange="updatePlanGameRemark(${planIndex}, ${index}, this.value)">
-                    </td>
-                    <td>
-                        ${bugCount > 0
-                            ? `<span class="bug-count-badge" onclick="showPlanBugDetail(${planIndex}, ${index})">🐛 ${bugCount} 个缺陷</span>`
-                            : `<span class="bug-count-badge no-bugs">✅ 无缺陷</span>`
-                        }
-                    </td>
-                    <td>
-                        <button class="btn btn-small btn-delete" onclick="deletePlanGame(${planIndex}, ${index})">删除</button>
-                    </td>
-                </tr>
-            `;
-        });
+    // 统计
+    if (statsItems) {
+        const finished = plan.games.filter(g => g.adaptStatus === 'finished').length;
+        const adapting = plan.games.filter(g => g.adaptStatus === 'adapting').length;
+        const notStarted = totalGames - finished - adapting;
+        const assigned = plan.games.filter(g => g.assignedTo).length;
+        statsItems.innerHTML = `
+            <span class="stat-item">共 <strong>${totalGames}</strong> 款游戏</span>
+            <span class="stat-item">已指派 <strong>${assigned}</strong></span>
+            <span class="stat-item">未开始 <strong>${notStarted}</strong></span>
+            <span class="stat-item">适配中 <strong>${adapting}</strong></span>
+            <span class="stat-item">已完成 <strong>${finished}</strong></span>
+        `;
     }
-
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
-
-    detailArea.innerHTML = html;
 }
 
 // ========== 计划详情操作 ==========
@@ -3095,12 +3193,7 @@ function deletePlan(planIndex) {
             if (result.success) {
                 showToast('计划已删除', 'success');
                 await loadConfigPlans();
-                if (configPlans.length > 0) {
-                    selectPlan(0);
-                } else {
-                    currentPlanIndex = -1;
-                    document.getElementById('plan-detail-area').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无配置计划</div></div>';
-                }
+                showPlanListView();
             } else {
                 showToast('删除失败: ' + (result.error || '未知错误'), 'danger');
             }
@@ -3201,7 +3294,7 @@ function deletePlanGame(planIndex, gameIndex) {
             }
         }
         configPlans[planIndex].games.splice(gameIndex, 1);
-        renderPlanDetail(planIndex);
+        renderPlanDetailGames(planIndex);
         showToast('游戏已删除', 'success');
     });
 }
@@ -5411,3 +5504,430 @@ function umDeleteUser(userId, username) {
         }
     });
 }
+
+// ==================== 发布计划 ====================
+async function publishPlan(planIndex) {
+    const plan = configPlans[planIndex];
+    if (!plan || !plan.id) return;
+
+    // 检查是否有游戏未指派负责人
+    const unassigned = plan.games.filter(g => !g.assignedTo && !g.ownerName);
+    if (unassigned.length > 0) {
+        showConfirm(`还有 ${unassigned.length} 个游戏未指派负责人，确定发布吗？\n发布后负责人可在"我的任务"中看到分配给他们的任务。`, async () => {
+            await doPublishPlan(planIndex);
+        });
+    } else {
+        await doPublishPlan(planIndex);
+    }
+}
+
+async function doPublishPlan(planIndex) {
+    const plan = configPlans[planIndex];
+    try {
+        const resp = await authFetch(`${API_BASE}/plans/${plan.id}/publish`, { method: 'POST' });
+        const result = await resp.json();
+        if (result.success) {
+            plan.status = 'published';
+            showToast('计划已发布！负责人可在"我的任务"中查看', 'success');
+            // 如果当前在详情视图，刷新详情；如果在列表视图，刷新卡片
+            if (document.getElementById('plan-detail-view').style.display !== 'none') {
+                openPlanDetail(planIndex);
+            } else {
+                renderPlanCards();
+            }
+        } else {
+            showToast('发布失败: ' + (result.error || '未知错误'), 'danger');
+        }
+    } catch (e) {
+        showToast('发布失败，请重试', 'danger');
+    }
+}
+
+// ==================== 更新计划游戏负责人 ====================
+async function updatePlanGameAssignee(planIndex, gameIndex, selectEl) {
+    const plan = configPlans[planIndex];
+    const game = plan.games[gameIndex];
+    if (!game || !game.id) return;
+
+    const assignedTo = selectEl.value ? parseInt(selectEl.value) : null;
+    const ownerName = selectEl.options[selectEl.selectedIndex].text || '';
+
+    try {
+        await authFetch(`${API_BASE}/plans/game/${game.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assigned_to: assignedTo, owner_name: assignedTo ? ownerName : '' })
+        });
+        game.assignedTo = assignedTo;
+        game.ownerName = assignedTo ? ownerName : '';
+        game.assignedName = assignedTo ? ownerName : '';
+    } catch (e) {
+        showToast('更新负责人失败', 'danger');
+    }
+}
+
+// ==================== 我的任务（二级结构：计划卡片 → 任务列表） ====================
+let myTasksData = [];           // 所有任务（扁平）
+let myTasksFiltered = [];       // 当前二级视图中筛选后的任务
+let myTaskPlans = [];           // 按 plan_id 分组后的计划列表
+let currentMyTaskPlanId = null; // 当前打开的计划ID
+
+async function loadMyTasks() {
+    try {
+        const resp = await authFetch(`${API_BASE}/my-tasks`);
+        const result = await resp.json();
+        myTasksData = result.data || [];
+    } catch (e) {
+        console.error('加载我的任务失败:', e);
+        myTasksData = [];
+    }
+
+    // 按 plan_id 分组，聚合统计
+    const planMap = {};
+    myTasksData.forEach(t => {
+        const pid = t.plan_id;
+        if (!planMap[pid]) {
+            planMap[pid] = {
+                planId: pid,
+                planTitle: t.plan_title || '',
+                planNo: t.plan_no || '',
+                planDate: t.plan_date || '',
+                planGoal: t.plan_goal || '',
+                devicesJson: t.devices_json || [],
+                interlaceVersion: t.interlace_version || '',
+                clientVersion: t.client_version || '',
+                tasks: []
+            };
+        }
+        planMap[pid].tasks.push(t);
+    });
+    myTaskPlans = Object.values(planMap);
+
+    // 更新汇总栏（显示在工具栏右侧）
+    const summaryBar = document.getElementById('my-tasks-summary-bar');
+    if (summaryBar) {
+        const total = myTasksData.length;
+        const notStarted = myTasksData.filter(t => t.adapt_status === 'not_started').length;
+        const adapting = myTasksData.filter(t => t.adapt_status === 'adapting').length;
+        const finished = myTasksData.filter(t => t.adapt_status === 'finished').length;
+        summaryBar.innerHTML = `
+            <span class="stat-item">共 <strong>${total}</strong> 项</span>
+            <span class="stat-item">未开始 <strong>${notStarted}</strong></span>
+            <span class="stat-item">适配中 <strong>${adapting}</strong></span>
+            <span class="stat-item">已结束 <strong>${finished}</strong></span>
+        `;
+    }
+
+    // 如果当前在二级视图且计划仍存在，刷新二级
+    if (currentMyTaskPlanId) {
+        const stillExists = myTaskPlans.find(p => p.planId === currentMyTaskPlanId);
+        if (stillExists) {
+            renderMyTaskDetail(currentMyTaskPlanId);
+            return;
+        }
+    }
+
+    // 默认显示一级：计划卡片
+    currentMyTaskPlanId = null;
+    renderMyTaskPlanCards();
+}
+
+// 一级状态筛选（工具栏下拉）
+function filterMyTasks() {
+    const statusFilter = document.getElementById('my-tasks-status-filter').value;
+
+    if (currentMyTaskPlanId) {
+        // 在二级视图：筛选当前计划的任务
+        const plan = myTaskPlans.find(p => p.planId === currentMyTaskPlanId);
+        if (plan) {
+            myTasksFiltered = statusFilter 
+                ? plan.tasks.filter(t => t.adapt_status === statusFilter) 
+                : [...plan.tasks];
+        }
+        renderMyTasksTable();
+    } else {
+        // 在一级视图：筛选卡片（按状态过滤有对应状态任务的计划）
+        renderMyTaskPlanCards();
+    }
+}
+
+// ========== 一级视图：计划卡片 ==========
+function renderMyTaskPlanCards() {
+    const container = document.getElementById('my-tasks-plan-cards');
+    const detailView = document.getElementById('my-tasks-detail-view');
+
+    // 确保显示一级，隐藏二级
+    container.style.display = '';
+    detailView.style.display = 'none';
+
+    if (myTaskPlans.length === 0) {
+        container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📌</div><div>暂无分配给您的任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></div>`;
+        return;
+    }
+
+    // 如果有状态筛选，只显示包含该状态任务的计划
+    const statusFilter = document.getElementById('my-tasks-status-filter').value;
+    let filteredPlans = myTaskPlans;
+    if (statusFilter) {
+        filteredPlans = myTaskPlans.filter(p => p.tasks.some(t => t.adapt_status === statusFilter));
+    }
+
+    if (filteredPlans.length === 0) {
+        container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📌</div><div>没有符合筛选条件的计划</div></div>`;
+        return;
+    }
+
+    container.innerHTML = filteredPlans.map(plan => {
+        const total = plan.tasks.length;
+        const notStarted = plan.tasks.filter(t => t.adapt_status === 'not_started').length;
+        const adapting = plan.tasks.filter(t => t.adapt_status === 'adapting').length;
+        const finished = plan.tasks.filter(t => t.adapt_status === 'finished').length;
+        const avgProgress = total > 0 ? Math.round(plan.tasks.reduce((s, t) => s + (t.adapt_progress || 0), 0) / total) : 0;
+        const devices = Array.isArray(plan.devicesJson) ? plan.devicesJson : [];
+        const deviceNames = devices.map(d => d.name || d).slice(0, 3).join(', ');
+        const deviceMore = devices.length > 3 ? ` 等${devices.length}台` : '';
+
+        // 进度条颜色
+        const progressColor = avgProgress >= 80 ? '#38a169' : avgProgress >= 40 ? '#d69e2e' : '#e53e3e';
+
+        return `
+        <div class="plan-card my-task-plan-card" onclick="openMyTaskPlan(${plan.planId})" style="cursor:pointer;">
+            <div class="plan-card-header">
+                <span class="plan-card-title">${escapeHtml(plan.planTitle)}</span>
+                <span class="plan-card-no">${escapeHtml(plan.planNo)}</span>
+            </div>
+            <div class="plan-card-meta">
+                <span>📅 ${plan.planDate || '-'}</span>
+                <span>📱 ${deviceNames}${deviceMore || ''}</span>
+            </div>
+            ${plan.planGoal ? `<div class="plan-card-goal">${escapeHtml(plan.planGoal)}</div>` : ''}
+            <div class="plan-card-progress-bar">
+                <div class="plan-card-progress-fill" style="width:${avgProgress}%;background:${progressColor};"></div>
+            </div>
+            <div class="plan-card-stats">
+                <span class="stat-item">🎮 <strong>${total}</strong> 游戏</span>
+                <span class="stat-item" style="color:#718096;">⏳ ${notStarted}</span>
+                <span class="stat-item" style="color:#d69e2e;">🔧 ${adapting}</span>
+                <span class="stat-item" style="color:#38a169;">✅ ${finished}</span>
+                <span style="margin-left:auto;font-weight:600;color:${progressColor};">${avgProgress}%</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ========== 进入二级视图 ==========
+function openMyTaskPlan(planId) {
+    currentMyTaskPlanId = planId;
+    renderMyTaskDetail(planId);
+}
+
+function renderMyTaskDetail(planId) {
+    const plan = myTaskPlans.find(p => p.planId === planId);
+    if (!plan) return;
+
+    // 切换视图
+    document.getElementById('my-tasks-plan-cards').style.display = 'none';
+    document.getElementById('my-tasks-detail-view').style.display = '';
+
+    // 设置标题
+    document.getElementById('my-tasks-detail-title').innerHTML = 
+        `${escapeHtml(plan.planTitle)} <span style="font-size:12px;color:var(--text-light);font-weight:400;margin-left:8px;">${escapeHtml(plan.planNo)}</span>`;
+
+    // 计划元信息
+    const infoEl = document.getElementById('my-tasks-detail-info');
+    if (infoEl) {
+        const devices = Array.isArray(plan.devicesJson) ? plan.devicesJson : [];
+        const deviceNames = devices.map(d => d.name || d).join(', ') || '-';
+        infoEl.innerHTML = `
+            <div class="plan-detail-info-grid">
+                <div class="info-item"><span class="info-label">📅 计划日期</span><span class="info-value">${plan.planDate || '-'}</span></div>
+                <div class="info-item"><span class="info-label">📱 适配设备</span><span class="info-value">${escapeHtml(deviceNames)}</span></div>
+                <div class="info-item"><span class="info-label">🔀 交织版本</span><span class="info-value">${escapeHtml(plan.interlaceVersion || '-')}</span></div>
+                <div class="info-item"><span class="info-label">📦 客户端版本</span><span class="info-value">${escapeHtml(plan.clientVersion || '-')}</span></div>
+                ${plan.planGoal ? `<div class="info-item"><span class="info-label">🎯 目标</span><span class="info-value">${escapeHtml(plan.planGoal)}</span></div>` : ''}
+            </div>
+        `;
+    }
+
+    // 筛选任务
+    const statusFilter = document.getElementById('my-tasks-status-filter').value;
+    myTasksFiltered = statusFilter
+        ? plan.tasks.filter(t => t.adapt_status === statusFilter)
+        : [...plan.tasks];
+
+    renderMyTasksTable();
+}
+
+// ========== 二级视图：任务表格 ==========
+function renderMyTasksTable() {
+    const tbody = document.getElementById('my-tasks-table');
+    const statsItems = document.getElementById('my-tasks-stats-items');
+
+    if (!myTasksFiltered || myTasksFiltered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📌</div><div>该计划下暂无符合条件的任务</div></td></tr>`;
+        if (statsItems) statsItems.innerHTML = '';
+        return;
+    }
+
+    tbody.innerHTML = myTasksFiltered.map((task, index) => `
+        <tr>
+            <td class="text-center"><strong>${index + 1}</strong></td>
+            <td>${escapeHtml(task.game_name || '')}</td>
+            <td>${escapeHtml(task.game_platform || task.game_platform_full || '-')}</td>
+            <td>
+                <select class="adapt-status-select" data-task-id="${task.id}" onchange="onMyTaskFieldChange(${index})">
+                    <option value="not_started" ${task.adapt_status === 'not_started' ? 'selected' : ''}>未开始</option>
+                    <option value="adapting" ${task.adapt_status === 'adapting' ? 'selected' : ''}>适配中</option>
+                    <option value="finished" ${task.adapt_status === 'finished' ? 'selected' : ''}>已结束</option>
+                </select>
+            </td>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <input type="range" class="progress-slider" min="0" max="100" step="5" 
+                        value="${task.adapt_progress || 0}" 
+                        data-task-id="${task.id}"
+                        oninput="this.nextElementSibling.textContent=this.value+'%'; onMyTaskFieldChange(${index})">
+                    <span class="progress-text" style="min-width:36px;">${task.adapt_progress || 0}%</span>
+                </div>
+            </td>
+            <td>
+                <input type="text" class="remark-input" value="${escapeHtml(task.remark || '')}"
+                    placeholder="输入问题备注..."
+                    data-task-id="${task.id}"
+                    onchange="onMyTaskFieldChange(${index})">
+            </td>
+            <td>
+                <button class="tool-btn tool-btn-primary" style="padding:3px 10px;font-size:12px;" onclick="submitSingleTask(${index})">提交</button>
+            </td>
+        </tr>
+    `).join('');
+
+    // 统计
+    if (statsItems) {
+        const total = myTasksFiltered.length;
+        const notStarted = myTasksFiltered.filter(t => t.adapt_status === 'not_started').length;
+        const adapting = myTasksFiltered.filter(t => t.adapt_status === 'adapting').length;
+        const finished = myTasksFiltered.filter(t => t.adapt_status === 'finished').length;
+        const avgProgress = total > 0 ? Math.round(myTasksFiltered.reduce((s, t) => s + (t.adapt_progress || 0), 0) / total) : 0;
+        statsItems.innerHTML = `
+            <span class="stat-item">共 <strong>${total}</strong> 项任务</span>
+            <span class="stat-item">未开始 <strong>${notStarted}</strong></span>
+            <span class="stat-item">适配中 <strong>${adapting}</strong></span>
+            <span class="stat-item">已结束 <strong>${finished}</strong></span>
+            <span class="stat-item">平均进度 <strong>${avgProgress}%</strong></span>
+        `;
+    }
+}
+
+// ========== 返回一级视图 ==========
+function backToMyTasksPlanCards() {
+    currentMyTaskPlanId = null;
+    document.getElementById('my-tasks-plan-cards').style.display = '';
+    document.getElementById('my-tasks-detail-view').style.display = 'none';
+    renderMyTaskPlanCards();
+}
+
+function onMyTaskFieldChange(index) {
+    const task = myTasksFiltered[index];
+    if (task) task._dirty = true;
+}
+
+// 提交单条任务
+async function submitSingleTask(index) {
+    const task = myTasksFiltered[index];
+    if (!task) return;
+
+    const rows = document.querySelectorAll('#my-tasks-table tr');
+    const row = rows[index];
+    if (!row) return;
+
+    const statusSelect = row.querySelector('.adapt-status-select');
+    const progressSlider = row.querySelector('.progress-slider');
+    const remarkInput = row.querySelector('.remark-input');
+
+    const payload = {
+        adapt_status: statusSelect ? statusSelect.value : task.adapt_status,
+        adapt_progress: progressSlider ? parseInt(progressSlider.value) : (task.adapt_progress || 0),
+        remark: remarkInput ? remarkInput.value : (task.remark || '')
+    };
+
+    try {
+        const resp = await authFetch(`${API_BASE}/my-tasks/${task.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        if (result.success) {
+            task.adapt_status = payload.adapt_status;
+            task.adapt_progress = payload.adapt_progress;
+            task.remark = payload.remark;
+            task._dirty = false;
+            showToast(`「${task.game_name}」进展已提交并同步`, 'success');
+        } else {
+            showToast('提交失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('提交失败，请重试', 'danger');
+    }
+}
+
+// 全部提交（当前计划内的所有任务）
+async function submitAllMyTasks() {
+    if (myTasksFiltered.length === 0) {
+        showToast('没有可提交的任务', 'warning');
+        return;
+    }
+
+    const rows = document.querySelectorAll('#my-tasks-table tr');
+    const items = [];
+
+    myTasksFiltered.forEach((task, index) => {
+        const row = rows[index];
+        if (!row) return;
+
+        const statusSelect = row.querySelector('.adapt-status-select');
+        const progressSlider = row.querySelector('.progress-slider');
+        const remarkInput = row.querySelector('.remark-input');
+
+        items.push({
+            plan_game_id: task.id,
+            adapt_status: statusSelect ? statusSelect.value : task.adapt_status,
+            adapt_progress: progressSlider ? parseInt(progressSlider.value) : (task.adapt_progress || 0),
+            remark: remarkInput ? remarkInput.value : (task.remark || '')
+        });
+    });
+
+    try {
+        const resp = await authFetch(`${API_BASE}/my-tasks/batch-submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast(`已提交 ${result.count} 项任务，数据已同步到适配进展`, 'success');
+            await loadMyTasks();
+        } else {
+            showToast('批量提交失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('批量提交失败，请重试', 'danger');
+    }
+}
+
+// ==================== showCreatePlanView 增强：加载成员下拉框 ====================
+// 覆盖原函数，在原逻辑基础上添加成员下拉框填充
+const _origShowCreatePlanView = showCreatePlanView;
+showCreatePlanView = function() {
+    _origShowCreatePlanView();
+
+    // 填充"默认负责人"下拉框
+    const assigneeSelect = document.getElementById('plan-default-assignee');
+    if (assigneeSelect && allMembersData && allMembersData.length > 0) {
+        assigneeSelect.innerHTML = '<option value="">不指定（后续逐个指派）</option>' +
+            allMembersData.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+    }
+};
+
+

@@ -209,6 +209,34 @@
   - 平台筛选下拉
   - GET /api/stats/matrix 返回 devices/games/recordMap
 
+## 2026年3月31日
+
+### R-20260331-01 users/members表合并
+- **需求**: 废弃独立的members表，用户和成员统一管理
+- **详情**: users表扩展 wechat_id/project_role/duty/is_member 字段；成员查询改为 `WHERE is_member=1`；软删除(is_member=0)
+
+### R-20260331-02 RBAC权限系统
+- **需求**: 完整的角色权限控制
+- **详情**: roles表 + role_permissions表；6默认角色；9模块×6操作=54权限位；角色管理UI
+
+### R-20260331-03 用户管理模块
+- **需求**: 侧边栏新增用户管理入口
+- **详情**: 用户列表/新增/编辑/角色分配/状态管理/密码重置
+
+### R-20260331-04 登录认证模块
+- **需求**: DEV_MODE控制的登录认证
+- **详情**: 
+  - 前端 `/api/config` 获取 devMode
+  - 正式模式: authFetch带 X-Auth-Token，401跳登录页
+  - DEV_MODE=false 时启用登录
+
+### R-20260331-05 登录模块安全加固
+- **需求**: 全面测试登录模块并修复安全问题
+- **详情**: 
+  - 14项功能+3项容错+5项安全+性能测试，全部通过
+  - 修复9个问题: Enter重复提交、暴露默认密码、频率限制(5次/5分钟锁15分钟)、登出token反查、旧session清理、定期清理过期session、错误提示延至8s、锁定倒计时、失败聚焦密码框
+  - 改动: usersController.js / login.html / server.js
+
 ---
 
 _本文档持续更新中。每当乔老师提出新需求时，大神会自动追加记录。_

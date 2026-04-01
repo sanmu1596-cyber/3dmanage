@@ -646,22 +646,31 @@ adaptationRouter.delete('/:id', (req, res) => {
 const plansRouter = express.Router();
 plansRouter.use(auth.verifyToken);
 
-// 获取所有计划
+// 获取所有计划（含创建者信息 + 游戏统计）
 plansRouter.get('/', (req, res) => {
-  db.all('SELECT * FROM plans ORDER BY created_at DESC', [], (err, rows) => {
+  db.all(`SELECT p.*, u.real_name as creator_name,
+          (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id) as game_count,
+          (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.adapt_status = 'finished') as finished_count,
+          (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.adapt_status = 'adapting') as adapting_count,
+          (SELECT COUNT(DISTINCT pg.assigned_to) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.assigned_to IS NOT NULL) as assignee_count,
+          (SELECT ROUND(AVG(pg.adapt_progress), 0) FROM plan_games pg WHERE pg.plan_id = p.id) as avg_progress
+          FROM plans p LEFT JOIN users u ON p.creator_id = u.id 
+          ORDER BY p.created_at DESC`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const data = rows.map(r => ({ ...r, devices_json: JSON.parse(r.devices_json || '[]') }));
     res.json({ success: true, data });
   });
 });
 
-// 获取计划详情（含游戏列表）
+// 获取计划详情（含游戏列表+负责人信息）
 plansRouter.get('/:id', (req, res) => {
   db.get('SELECT * FROM plans WHERE id = ?', [req.params.id], (err, plan) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!plan) return res.status(404).json({ error: '计划不存在' });
     plan.devices_json = JSON.parse(plan.devices_json || '[]');
-    db.all('SELECT * FROM plan_games WHERE plan_id = ? ORDER BY sort_order', [plan.id], (err2, games) => {
+    db.all(`SELECT pg.*, u.real_name as assigned_name 
+            FROM plan_games pg LEFT JOIN users u ON pg.assigned_to = u.id 
+            WHERE pg.plan_id = ? ORDER BY pg.sort_order`, [plan.id], (err2, games) => {
       if (err2) return res.status(500).json({ error: err2.message });
       games = games.map(g => ({ ...g, bugs_json: JSON.parse(g.bugs_json || '[]') }));
       res.json({ success: true, data: { ...plan, games } });
@@ -669,32 +678,94 @@ plansRouter.get('/:id', (req, res) => {
   });
 });
 
-// 创建计划
+// 创建计划（默认草稿状态，自动生成编号）
 plansRouter.post('/', (req, res) => {
-  const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, games } = req.body;
-  const sql = `INSERT INTO plans (title, plan_date, devices_json, interlace_version, client_version, goal, tab_name) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  db.run(sql, [title, plan_date, JSON.stringify(devices_json || []), interlace_version || '', client_version || '', goal || '', tab_name || ''], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    const planId = this.lastID;
-    // 插入计划内游戏
-    if (games && games.length > 0) {
-      const stmt = db.prepare(`INSERT INTO plan_games (plan_id, game_id, game_name, game_platform, game_type, owner_name, adapt_status, remark, bugs_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      games.forEach((g, i) => {
-        stmt.run([planId, g.game_id || null, g.game_name, g.game_platform || '', g.game_type || '', g.owner_name || '', g.adapt_status || 'not_started', g.remark || '', JSON.stringify(g.bugs_json || []), i]);
-      });
-      stmt.finalize();
-    }
-    res.json({ success: true, id: planId });
+  const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, games, status } = req.body;
+  const planStatus = status || 'draft';
+  const creatorId = req.user ? req.user.id : null;
+
+  // 生成计划编号：PLAN-YYYYMMDD-HHmm-序号
+  const now = new Date();
+  const dateStr = now.getFullYear().toString() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0');
+  const timeStr = String(now.getHours()).padStart(2, '0') +
+    String(now.getMinutes()).padStart(2, '0');
+
+  // 查询当天已有计划数量来确定序号
+  db.get("SELECT COUNT(*) as cnt FROM plans WHERE plan_no LIKE ?", [`PLAN-${dateStr}-%`], (cntErr, cntRow) => {
+    const seq = String((cntRow ? cntRow.cnt : 0) + 1).padStart(2, '0');
+    const planNo = `PLAN-${dateStr}-${timeStr}-${seq}`;
+
+    const sql = `INSERT INTO plans (title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, status, creator_id, plan_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(sql, [title, plan_date, JSON.stringify(devices_json || []), interlace_version || '', client_version || '', goal || '', tab_name || '', planStatus, creatorId, planNo], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      const planId = this.lastID;
+      if (games && games.length > 0) {
+        const stmt = db.prepare(`INSERT INTO plan_games (plan_id, game_id, game_name, game_platform, game_type, owner_name, assigned_to, adapt_status, adapt_progress, remark, bugs_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        games.forEach((g, i) => {
+          stmt.run([planId, g.game_id || null, g.game_name, g.game_platform || '', g.game_type || '', g.owner_name || '', g.assigned_to || null, g.adapt_status || 'not_started', g.adapt_progress || 0, g.remark || '', JSON.stringify(g.bugs_json || []), i]);
+        });
+        stmt.finalize();
+      }
+      logActivity('create', 'plan', planId, title);
+      res.json({ success: true, id: planId, plan_no: planNo });
+    });
   });
 });
 
-// 更新计划内游戏
-plansRouter.put('/game/:gameId', (req, res) => {
-  const { adapt_status, owner_name, remark } = req.body;
-  const sql = `UPDATE plan_games SET adapt_status = COALESCE(?, adapt_status), owner_name = COALESCE(?, owner_name), remark = COALESCE(?, remark), updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-  db.run(sql, [adapt_status, owner_name, remark, req.params.gameId], function(err) {
+// 更新计划元信息
+plansRouter.put('/:id', (req, res) => {
+  const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, status } = req.body;
+  const sql = `UPDATE plans SET title = COALESCE(?, title), plan_date = COALESCE(?, plan_date), 
+               devices_json = COALESCE(?, devices_json), interlace_version = COALESCE(?, interlace_version),
+               client_version = COALESCE(?, client_version), goal = COALESCE(?, goal), 
+               tab_name = COALESCE(?, tab_name), status = COALESCE(?, status),
+               updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [title, plan_date, devices_json ? JSON.stringify(devices_json) : null, interlace_version, client_version, goal, tab_name, status, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
+  });
+});
+
+// 发布计划（状态从 draft 改为 published）
+plansRouter.post('/:id/publish', (req, res) => {
+  db.run("UPDATE plans SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '计划不存在' });
+    logActivity('publish', 'plan', parseInt(req.params.id), '发布计划');
+    res.json({ success: true });
+  });
+});
+
+// 更新计划内游戏（扩展：支持 assigned_to, adapt_progress）
+plansRouter.put('/game/:gameId', (req, res) => {
+  const { adapt_status, owner_name, assigned_to, adapt_progress, remark } = req.body;
+  const sql = `UPDATE plan_games SET 
+    adapt_status = COALESCE(?, adapt_status), 
+    owner_name = COALESCE(?, owner_name), 
+    assigned_to = COALESCE(?, assigned_to),
+    adapt_progress = COALESCE(?, adapt_progress),
+    remark = COALESCE(?, remark), 
+    updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [adapt_status, owner_name, assigned_to, adapt_progress, remark, req.params.gameId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 批量更新计划内游戏的负责人
+plansRouter.put('/:id/assign', (req, res) => {
+  const { assignments } = req.body; // [{plan_game_id, assigned_to, owner_name}]
+  if (!assignments || !Array.isArray(assignments)) return res.status(400).json({ error: 'assignments必须是数组' });
+  
+  const stmt = db.prepare(`UPDATE plan_games SET assigned_to = ?, owner_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND plan_id = ?`);
+  let errors = 0;
+  assignments.forEach(a => {
+    stmt.run([a.assigned_to, a.owner_name || '', a.plan_game_id, req.params.id], (err) => { if (err) errors++; });
+  });
+  stmt.finalize(() => {
+    res.json({ success: true, count: assignments.length, errors });
   });
 });
 
@@ -715,11 +786,196 @@ plansRouter.delete('/:id', (req, res) => {
       db.run('DELETE FROM plans WHERE id = ?', [req.params.id], function(err2) {
         if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: err2.message }); }
         db.run('COMMIT');
+        logActivity('delete', 'plan', parseInt(req.params.id), '删除计划');
         res.json({ success: true });
       });
     });
   });
 });
+
+// ==================== 我的任务 API ====================
+const myTasksRouter = express.Router();
+myTasksRouter.use(auth.verifyToken);
+
+// 获取当前用户的所有任务（已发布计划中分配给我的游戏）
+myTasksRouter.get('/', (req, res) => {
+  const userId = req.user ? req.user.id : null;
+  
+  // DEV_MODE下返回所有已发布计划的任务，正式模式下只返回分配给当前用户的
+  let sql, params;
+  if (auth.DEV_MODE) {
+    sql = `SELECT pg.*, p.title as plan_title, p.plan_no, p.plan_date, p.status as plan_status,
+               p.devices_json, p.interlace_version, p.client_version, p.goal as plan_goal,
+               p.created_at as plan_created_at,
+               g.platform as game_platform_full, g.game_type as game_type_full,
+               u.real_name as assigned_name
+               FROM plan_games pg
+               INNER JOIN plans p ON pg.plan_id = p.id
+               LEFT JOIN games g ON pg.game_id = g.id
+               LEFT JOIN users u ON pg.assigned_to = u.id
+               WHERE p.status = 'published'
+               ORDER BY p.plan_date DESC, pg.sort_order`;
+    params = [];
+  } else {
+    if (!userId) return res.json({ success: true, data: [] });
+    sql = `SELECT pg.*, p.title as plan_title, p.plan_no, p.plan_date, p.status as plan_status,
+               p.devices_json, p.interlace_version, p.client_version, p.goal as plan_goal,
+               p.created_at as plan_created_at,
+               g.platform as game_platform_full, g.game_type as game_type_full,
+               u.real_name as assigned_name
+               FROM plan_games pg
+               INNER JOIN plans p ON pg.plan_id = p.id
+               LEFT JOIN games g ON pg.game_id = g.id
+               LEFT JOIN users u ON pg.assigned_to = u.id
+               WHERE pg.assigned_to = ? AND p.status = 'published'
+               ORDER BY p.plan_date DESC, pg.sort_order`;
+    params = [userId];
+  }
+  
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const data = rows.map(r => ({
+      ...r,
+      devices_json: JSON.parse(r.devices_json || '[]'),
+      bugs_json: JSON.parse(r.bugs_json || '[]')
+    }));
+    res.json({ success: true, data });
+  });
+});
+
+// 负责人提交进展（单条）
+myTasksRouter.put('/:planGameId', (req, res) => {
+  const userId = req.user ? req.user.id : null;
+  const { adapt_status, adapt_progress, remark } = req.body;
+  
+  // 先验证这条任务确实分配给了当前用户（DEV_MODE跳过）
+  const checkSql = auth.DEV_MODE 
+    ? 'SELECT pg.*, p.devices_json FROM plan_games pg INNER JOIN plans p ON pg.plan_id = p.id WHERE pg.id = ?'
+    : 'SELECT pg.*, p.devices_json FROM plan_games pg INNER JOIN plans p ON pg.plan_id = p.id WHERE pg.id = ? AND pg.assigned_to = ?';
+  const checkParams = auth.DEV_MODE ? [req.params.planGameId] : [req.params.planGameId, userId];
+  
+  db.get(checkSql, checkParams, (err, task) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!task) return res.status(403).json({ error: '无权操作此任务' });
+    
+    // 更新 plan_games
+    const updateSql = `UPDATE plan_games SET 
+      adapt_status = COALESCE(?, adapt_status),
+      adapt_progress = COALESCE(?, adapt_progress), 
+      remark = COALESCE(?, remark),
+      updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(updateSql, [adapt_status, adapt_progress, remark, req.params.planGameId], function(updateErr) {
+      if (updateErr) return res.status(500).json({ error: updateErr.message });
+      
+      // 自动同步到 adaptation_records（遍历计划中的所有设备）
+      if (task.game_id) {
+        const devices = JSON.parse(task.devices_json || '[]');
+        if (devices.length > 0) {
+          const syncStmt = db.prepare(`INSERT OR REPLACE INTO adaptation_records 
+            (device_id, game_id, adapter_progress, owner_name, online_status, quality) 
+            VALUES (?, ?, ?, ?, ?, ?)`);
+          
+          const progressVal = adapt_progress !== undefined ? adapt_progress : (task.adapt_progress || 0);
+          const statusMap = { 'not_started': 'pending', 'adapting': 'in_progress', 'finished': 'online' };
+          const finalStatus = adapt_status ? (statusMap[adapt_status] || adapt_status) : (statusMap[task.adapt_status] || 'pending');
+          
+          devices.forEach(d => {
+            const deviceId = d.id || d;
+            syncStmt.run([deviceId, task.game_id, progressVal, task.owner_name || '', finalStatus, '']);
+          });
+          syncStmt.finalize(() => {
+            // 同步完成后重新计算所有涉及设备的统计
+            devices.forEach(d => recalcDeviceStats(d.id || d));
+          });
+        }
+      }
+      
+      res.json({ success: true });
+    });
+  });
+});
+
+// 负责人批量提交进展
+myTasksRouter.post('/batch-submit', (req, res) => {
+  const userId = req.user ? req.user.id : null;
+  const { items } = req.body; // [{plan_game_id, adapt_status, adapt_progress, remark}]
+  if (!items || !Array.isArray(items)) return res.status(400).json({ error: 'items必须是数组' });
+  
+  let processed = 0;
+  let errors = 0;
+  
+  items.forEach(item => {
+    // 更新 plan_games
+    const sql = `UPDATE plan_games SET 
+      adapt_status = COALESCE(?, adapt_status),
+      adapt_progress = COALESCE(?, adapt_progress),
+      remark = COALESCE(?, remark),
+      updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(sql, [item.adapt_status, item.adapt_progress, item.remark, item.plan_game_id], function(err) {
+      if (err) errors++;
+      processed++;
+      if (processed === items.length) {
+        // 同步到 adaptation_records: 获取所有涉及的 plan_games 数据
+        syncPlanGamesToAdaptation(items.map(i => i.plan_game_id), () => {
+          res.json({ success: true, count: items.length, errors });
+        });
+      }
+    });
+  });
+});
+
+// 辅助函数：同步 plan_games 数据到 adaptation_records
+function syncPlanGamesToAdaptation(planGameIds, callback) {
+  if (!planGameIds || planGameIds.length === 0) return callback();
+  
+  const placeholders = planGameIds.map(() => '?').join(',');
+  const sql = `SELECT pg.*, p.devices_json FROM plan_games pg 
+               INNER JOIN plans p ON pg.plan_id = p.id 
+               WHERE pg.id IN (${placeholders})`;
+  db.all(sql, planGameIds, (err, rows) => {
+    if (err) return callback();
+    
+    const statusMap = { 'not_started': 'pending', 'adapting': 'in_progress', 'finished': 'online' };
+    const stmt = db.prepare(`INSERT OR REPLACE INTO adaptation_records 
+      (device_id, game_id, adapter_progress, owner_name, online_status, quality) 
+      VALUES (?, ?, ?, ?, ?, ?)`);
+    
+    rows.forEach(pg => {
+      if (!pg.game_id) return;
+      const devices = JSON.parse(pg.devices_json || '[]');
+      const onlineStatus = statusMap[pg.adapt_status] || 'pending';
+      devices.forEach(d => {
+        const deviceId = d.id || d;
+        stmt.run([deviceId, pg.game_id, pg.adapt_progress || 0, pg.owner_name || '', onlineStatus, '']);
+      });
+    });
+    stmt.finalize(() => {
+      // 同步完成后重新计算所有涉及设备的统计
+      const allDeviceIds = new Set();
+      rows.forEach(pg => {
+        const devices = JSON.parse(pg.devices_json || '[]');
+        devices.forEach(d => allDeviceIds.add(d.id || d));
+      });
+      allDeviceIds.forEach(deviceId => recalcDeviceStats(deviceId));
+      callback();
+    });
+  });
+}
+
+// ==================== 设备适配统计自动计算 API ====================
+// 重新计算某设备的适配统计（基于 adaptation_records）
+function recalcDeviceStats(deviceId) {
+  db.get(`SELECT 
+    COUNT(*) as total_games,
+    SUM(CASE WHEN online_status = 'online' THEN 1 ELSE 0 END) as completed,
+    ROUND(AVG(adapter_progress), 0) as avg_progress
+    FROM adaptation_records WHERE device_id = ?`, [deviceId], (err, row) => {
+    if (err || !row) return;
+    const rate = row.total_games > 0 ? Math.round((row.completed / row.total_games) * 100) + '%' : '0%';
+    db.run(`UPDATE devices SET total_games = ?, completed_adaptations = ?, adapter_completion_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [row.total_games, row.completed, rate, deviceId]);
+  });
+}
 
 // ==================== Dashboard 统计 API ====================
 const statsRouter = express.Router();
@@ -871,6 +1127,7 @@ app.use('/api/bugs', bugsRouter);
 app.use('/api/field-options', fieldOptionsRouter);
 app.use('/api/adaptations', adaptationRouter);
 app.use('/api/plans', plansRouter);
+app.use('/api/my-tasks', myTasksRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/batch', batchRouter);
 

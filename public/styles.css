@@ -1512,6 +1512,22 @@ body.col-resizing * {
 }
 
 /* ========== 配置计划 ========== */
+#plan-list-view {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;          /* 关键：允许flex子项缩小 */
+}
+
+#plan-detail-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
 .plan-form-container {
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -1671,6 +1687,132 @@ body.col-resizing * {
 .adapt-status-not_started { background: rgba(138, 148, 168, 0.15); color: var(--text-secondary); border: 1px solid rgba(138, 148, 168, 0.3); }
 .adapt-status-adapting { background: rgba(68, 138, 255, 0.15); color: var(--info); border: 1px solid rgba(68, 138, 255, 0.3); }
 .adapt-status-finished { background: rgba(0, 230, 118, 0.15); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
+
+/* ========== 适配状态选择器（计划详情 & 我的任务） ========== */
+.adapt-status-select {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 90px;
+}
+.adapt-status-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 4px var(--primary-glow);
+}
+
+/* ========== 进度滑块（我的任务） ========== */
+.progress-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 80px;
+    height: 6px;
+    background: rgba(180, 200, 220, 0.35);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+.progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.progress-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.progress-slider:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 6px var(--primary-glow);
+}
+
+/* ========== 备注输入框 ========== */
+.remark-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 120px;
+}
+.remark-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 4px var(--primary-glow);
+}
+.remark-input::placeholder {
+    color: var(--text-light);
+}
+
+/* ========== 计划标签徽章（我的任务） ========== */
+.badge-plan {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(47, 127, 187, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(47, 127, 187, 0.2);
+    white-space: nowrap;
+}
+
+/* ========== 进度文本 ========== */
+.progress-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    min-width: 36px;
+    text-align: right;
+}
+
+/* ========== 表单提示 ========== */
+.form-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-light);
+    line-height: 1.4;
+}
+
+/* ========== 统计条（我的任务） ========== */
+.stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.stat-item strong {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* ========== 我的任务空状态增强 ========== */
+.empty-sub {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
 
 /* ========== 字段设置 ========== */
 .field-settings-desc {
@@ -2572,5 +2714,440 @@ th .row-checkbox-all { width: 16px; height: 16px; cursor: pointer; accent-color:
     }
     .um-role-item.active {
         border-color: var(--primary);
+    }
+}
+
+/* ==========================================
+   计划卡片网格 & 二级视图
+   ========================================== */
+
+/* 卡片网格布局 */
+.plan-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+    padding: 16px 0;
+}
+
+/* 空状态全宽 */
+.empty-state-full {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-light);
+}
+.empty-state-full .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+.empty-state-full .empty-sub {
+    font-size: 13px;
+    margin-top: 8px;
+    color: var(--text-light);
+    opacity: 0.7;
+}
+
+/* 计划卡片 */
+.plan-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+.plan-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
+}
+.plan-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 4px 0 0 4px;
+}
+.plan-card.status-draft::before {
+    background: var(--warning);
+}
+.plan-card.status-published::before {
+    background: var(--success);
+}
+
+/* 卡片头部 */
+.plan-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.plan-card-title {
+    font-family: var(--font-title);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    flex: 1;
+    margin-right: 8px;
+}
+.plan-card-no {
+    font-size: 11px;
+    color: var(--text-light);
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: var(--bg-surface);
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* 卡片元信息 */
+.plan-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 14px;
+}
+.plan-card-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.plan-card-meta-item .meta-icon {
+    font-size: 13px;
+    width: 16px;
+    text-align: center;
+}
+
+/* 卡片进度条 */
+.plan-card-progress {
+    margin-bottom: 14px;
+}
+.plan-card-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border-light);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.plan-card-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    background: linear-gradient(90deg, var(--primary), #4CAF50);
+}
+.plan-card-progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+/* 卡片底部统计 */
+.plan-card-stats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.plan-card-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.plan-card-stat.stat-total {
+    background: rgba(47, 127, 187, 0.1);
+    color: var(--primary);
+}
+.plan-card-stat.stat-adapting {
+    background: rgba(212, 136, 15, 0.1);
+    color: var(--warning);
+}
+.plan-card-stat.stat-finished {
+    background: rgba(46, 158, 90, 0.1);
+    color: var(--success);
+}
+.plan-card-stat.stat-not-started {
+    background: rgba(140, 150, 168, 0.1);
+    color: var(--text-light);
+}
+
+/* 卡片状态标签 */
+.plan-card-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+.plan-card-status.status-draft {
+    background: rgba(212, 136, 15, 0.12);
+    color: var(--warning);
+}
+.plan-card-status.status-published {
+    background: rgba(46, 158, 90, 0.12);
+    color: var(--success);
+}
+
+/* 详情返回栏 */
+.detail-back-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 12px;
+}
+.detail-plan-title {
+    font-family: var(--font-title);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* 计划详情信息条 */
+.plan-detail-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 14px 16px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+.plan-detail-info .info-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-secondary);
+}
+.plan-detail-info .info-tag .tag-label {
+    color: var(--text-light);
+    font-size: 12px;
+}
+.plan-detail-info .info-tag .tag-value {
+    font-weight: 500;
+}
+
+/* 汇总栏 */
+.plans-summary, .my-tasks-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+.summary-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.summary-item strong {
+    color: var(--text-primary);
+    font-size: 14px;
+}
+.summary-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.summary-dot.dot-total { background: var(--primary); }
+.summary-dot.dot-draft { background: var(--warning); }
+.summary-dot.dot-published { background: var(--success); }
+.summary-dot.dot-adapting { background: var(--warning); }
+.summary-dot.dot-finished { background: var(--success); }
+.summary-dot.dot-not-started { background: var(--text-light); }
+
+/* 我的任务-计划卡片特化 */
+.my-task-plan-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+.my-task-plan-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
+}
+.my-task-plan-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.my-task-plan-card-title {
+    font-family: var(--font-title);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.my-task-plan-card-badge {
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+.my-task-plan-card .plan-card-meta {
+    margin-bottom: 12px;
+}
+.my-task-plan-card .plan-card-progress {
+    margin-bottom: 10px;
+}
+.my-task-plan-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.my-task-plan-card-count {
+    font-size: 12px;
+    color: var(--text-light);
+}
+.my-task-plan-card-arrow {
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: translateX(-4px);
+}
+.my-task-plan-card:hover .my-task-plan-card-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* 计划卡片操作按钮（悬浮时显示） */
+.plan-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+.plan-card:hover .plan-card-actions {
+    opacity: 1;
+    max-height: 50px;
+}
+.plan-card-action-btn {
+    flex: 1;
+    padding: 6px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+.plan-card-action-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(47, 127, 187, 0.05);
+}
+.plan-card-action-btn.btn-danger:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(212, 64, 64, 0.05);
+}
+.plan-card-action-btn.btn-publish {
+    border-color: var(--success);
+    color: var(--success);
+    font-weight: 600;
+}
+.plan-card-action-btn.btn-publish:hover {
+    background: rgba(46, 158, 90, 0.08);
+}
+
+/* 卡片目标文本 */
+.plan-card-goal {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    padding: 6px 10px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--primary);
+}
+
+/* 计划详情信息条（二级视图顶部，横向排列） */
+.plan-detail-info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    padding: 12px 18px;
+    background: var(--bg-surface);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    border: 1px solid var(--border-light);
+}
+.plan-detail-info-grid .info-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.plan-detail-info-grid .info-label {
+    font-size: 12px;
+    color: var(--text-light);
+    font-weight: 500;
+}
+.plan-detail-info-grid .info-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+/* 分隔符：相邻 info-item 之间加竖线 */
+.plan-detail-info-grid .info-item + .info-item {
+    padding-left: 20px;
+    border-left: 1px solid var(--border-light);
+}
+
+/* 我的任务计划卡片 - 进度条间距微调 */
+.my-task-plan-card .plan-card-progress-bar {
+    margin-bottom: 10px;
+}
+.my-task-plan-card .plan-card-stats {
+    font-size: 12px;
+    align-items: center;
+}
+
+/* 响应式：小屏单列 */
+@media (max-width: 860px) {
+    .plan-cards-grid {
+        grid-template-columns: 1fr;
     }
 }

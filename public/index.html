@@ -63,6 +63,9 @@
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">项目管理</div>
                     <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
+                            <span class="sidebar-icon">📌</span>我的任务
+                        </a>
                         <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
                             <span class="sidebar-icon">📋</span>配置计划
                         </a>
@@ -511,39 +514,114 @@
                     </div>
                 </section>
 
+                <!-- ========== 我的任务 ========== -->
+                <section id="my-tasks" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <span class="toolbar-title">📌 我的任务</span>
+                            <span class="toolbar-divider"></span>
+                            <select id="my-tasks-status-filter" class="compact-select" onchange="filterMyTasks()">
+                                <option value="">全部状态</option>
+                                <option value="not_started">未开始</option>
+                                <option value="adapting">适配中</option>
+                                <option value="finished">已结束</option>
+                            </select>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="my-tasks-summary" id="my-tasks-summary-bar"></div>
+                        </div>
+                    </div>
+                    <!-- 计划卡片列表（一级） -->
+                    <div id="my-tasks-plan-cards" class="plan-cards-grid">
+                        <div class="empty-state-full"><div class="empty-icon">📌</div><div>暂无分配给您的任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></div>
+                    </div>
+                    <!-- 任务详情视图（二级） -->
+                    <div id="my-tasks-detail-view" style="display:none;">
+                        <div class="detail-back-bar">
+                            <button class="tool-btn" onclick="backToMyTasksPlanCards()"><span class="tool-icon">←</span>返回计划列表</button>
+                            <span class="detail-plan-title" id="my-tasks-detail-title"></span>
+                            <div style="margin-left:auto;display:flex;gap:8px;">
+                                <button class="tool-btn tool-btn-primary" onclick="submitAllMyTasks()"><span class="tool-icon">✓</span>全部提交</button>
+                            </div>
+                        </div>
+                        <div class="plan-detail-info" id="my-tasks-detail-info"></div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>游戏名称</th>
+                                        <th>游戏平台</th>
+                                        <th>适配进展</th>
+                                        <th>适配进度</th>
+                                        <th>问题备注</th>
+                                        <th width="80">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-tasks-table"></tbody>
+                            </table>
+                        </div>
+                        <div class="module-stats" id="my-tasks-stats">
+                            <div class="stats-items" id="my-tasks-stats-items"></div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- ========== 配置计划 ========== -->
                 <section id="config-plan" class="tab-content">
+                    <!-- 计划列表视图 -->
                     <div id="plan-list-view">
                         <div class="toolbar">
                             <div class="toolbar-left">
                                 <button class="tool-btn tool-btn-primary" onclick="showCreatePlanView()"><span class="tool-icon">＋</span>新增适配计划</button>
+                                <span class="toolbar-divider"></span>
+                                <select id="plan-status-filter" class="compact-select" onchange="filterPlans()">
+                                    <option value="">全部状态</option>
+                                    <option value="draft">草稿</option>
+                                    <option value="published">已发布</option>
+                                </select>
+                            </div>
+                            <div class="toolbar-right">
+                                <div class="plans-summary" id="plans-summary-bar"></div>
                             </div>
                         </div>
-                        <div class="device-tabs">
-                            <div id="plan-tab-container" class="device-tab-container"></div>
-                        </div>
-                        <div id="plan-detail-area">
-                            <div class="table-container">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th width="50">序号</th>
-                                            <th>游戏名称</th>
-                                            <th>游戏平台</th>
-                                            <th>负责人</th>
-                                            <th>适配进展</th>
-                                            <th>问题备注</th>
-                                            <th>缺陷列表</th>
-                                            <th>操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="plan-games-table">
-                                        <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建</div></td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        <!-- 计划列表卡片 -->
+                        <div id="plan-cards-container" class="plan-cards-grid">
+                            <div class="empty-state-full"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建第一个计划</div></div>
                         </div>
                     </div>
+                    <!-- 计划详情视图 -->
+                    <div id="plan-detail-view" style="display:none;">
+                        <div class="detail-back-bar">
+                            <button class="tool-btn" onclick="backToPlanList()"><span class="tool-icon">←</span>返回计划列表</button>
+                            <span class="detail-plan-title" id="plan-detail-title"></span>
+                            <div style="margin-left:auto;display:flex;gap:8px;" id="plan-detail-actions"></div>
+                        </div>
+                        <div class="plan-detail-info" id="plan-detail-info-bar"></div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>游戏名称</th>
+                                        <th>游戏平台</th>
+                                        <th>负责人</th>
+                                        <th>适配状态</th>
+                                        <th width="140">适配进度</th>
+                                        <th>问题备注</th>
+                                        <th width="80">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plan-games-table">
+                                    <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无游戏</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="module-stats" id="plan-detail-stats">
+                            <div class="stats-items" id="plan-detail-stats-items"></div>
+                        </div>
+                    </div>
+                    <!-- 创建计划视图 -->
                     <div id="plan-create-view" style="display: none;">
                         <div class="toolbar">
                             <div class="toolbar-left">
@@ -578,9 +656,17 @@
                                         <button type="button" class="tool-btn tool-btn-primary" onclick="openPlanGameSelectModal()">+ 选择游戏</button>
                                     </div>
                                 </div>
+                                <div class="form-group">
+                                    <label>默认负责人</label>
+                                    <select id="plan-default-assignee" class="filter-select">
+                                        <option value="">不指定（后续逐个指派）</option>
+                                    </select>
+                                    <small class="form-hint">选中后，所有游戏将默认分配给此人；也可在计划详情中逐个修改</small>
+                                </div>
                                 <div class="form-actions">
                                     <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
-                                    <button type="submit" class="tool-btn tool-btn-primary">创建计划</button>
+                                    <button type="button" class="tool-btn" onclick="submitPlan(event, 'draft')">💾 保存草稿</button>
+                                    <button type="button" class="tool-btn tool-btn-primary" onclick="submitPlan(event, 'published')">🚀 创建并发布</button>
                                 </div>
                             </form>
                         </div>
