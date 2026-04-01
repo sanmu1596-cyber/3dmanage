@@ -1080,6 +1080,19 @@ body.col-resizing * {
     margin-top: 4px;
 }
 
+/* ========== 适配进展表格固定列宽（防止切换机型时列宽抖动） ========== */
+.progress-fixed-table {
+    table-layout: fixed;
+}
+.progress-fixed-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.progress-fixed-table td .progress-bar-container {
+    white-space: normal;
+}
+
 /* ========== 设备Tab ========== */
 .device-tabs {
     padding: 8px 16px;
