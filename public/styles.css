@@ -720,6 +720,11 @@ body.col-resizing * {
     border-right: none;
 }
 
+/* 通用居中工具类 */
+.text-center {
+    text-align: center !important;
+}
+
 /* ========== 蓝天/白云 隔行变色 ========== */
 .data-table tbody tr:nth-child(odd) {
     background: var(--row-cloud); /* 白云 — 半透明白 */
