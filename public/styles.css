@@ -653,7 +653,7 @@ body {
 
 .data-table th {
     padding: 10px 12px;
-    text-align: left;
+    text-align: center;
     font-family: var(--font-title);
     font-weight: 700;
     color: #ffffff;
