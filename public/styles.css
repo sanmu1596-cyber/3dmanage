@@ -874,74 +874,76 @@ body.col-resizing * {
     box-shadow: 0 0 6px rgba(255, 82, 82, 0.3);
 }
 
-/* ==================== 行内编辑样式 ==================== */
+/* ==================== 行内编辑样式（TAPD风格：原地编辑） ==================== */
 .editable-cell {
     cursor: pointer;
     position: relative;
     transition: background 0.15s;
 }
 .editable-cell:hover {
-    background: rgba(0, 162, 255, 0.08) !important;
-}
-.editable-cell:hover::after {
-    content: '✎';
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 11px;
-    color: var(--primary);
-    opacity: 0.6;
-}
-.editable-cell.editing {
-    padding: 4px;
     background: rgba(0, 162, 255, 0.06) !important;
+}
+/* 编辑图标已移除 — 直接双击编辑即可 */
+/* 编辑中：保持原始padding和背景不变，只隐藏✎图标 */
+.editable-cell.editing {
+    background: inherit !important;
 }
 .editable-cell.editing::after {
     display: none;
 }
-/* 通用输入框 */
+/* TAPD风格：继承文字颜色+透明背景+蓝色细边框包裹，编辑状态和显示状态几乎一样 */
 .inline-edit-input,
 .inline-edit-textarea,
-.inline-edit-select {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 10px;
-    font-size: 13px;
-    font-family: inherit;
-    color: #e0e0e0;
-    background: rgba(10, 20, 40, 0.95);
-    border: 1px solid var(--primary);
-    border-radius: 4px;
-    outline: none;
-    box-shadow: 0 0 6px var(--primary-glow);
+.inline-edit-select,
+.edit-select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 2px 4px !important;
+    margin: 0 !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+    background: transparent !important;
+    border: 1px solid var(--primary) !important;
+    border-radius: 2px !important;
+    outline: none !important;
+    box-shadow: none !important;
+    line-height: inherit !important;
+    height: auto;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 .inline-edit-input:focus,
 .inline-edit-textarea:focus,
-.inline-edit-select:focus {
-    border-color: #00d4ff;
-    box-shadow: 0 0 10px rgba(0, 162, 255, 0.4);
+.inline-edit-select:focus,
+.edit-select:focus {
+    border-color: #1a7fd4 !important;
+    box-shadow: none !important;
 }
-/* textarea 自适应高度 */
+/* textarea 自适应高度 — 允许换行 */
 .inline-edit-textarea {
     resize: none;
-    min-height: 60px;
-    line-height: 1.5;
-    overflow-y: hidden;
+    min-height: 24px;
+    white-space: pre-wrap !important;
+    overflow-y: hidden !important;
 }
-/* 数量 input 居中、较窄 */
+/* 数量 input 居中 */
 .inline-edit-qty {
     text-align: center;
-    max-width: 80px;
 }
 /* 下拉选择框 */
-.inline-edit-select {
-    cursor: pointer;
-    appearance: auto;
+.inline-edit-select,
+.edit-select {
+    cursor: pointer !important;
+    appearance: auto !important;
+    padding-right: 18px !important;
 }
-.inline-edit-select option {
-    background: #0a1428;
-    color: #e0e0e0;
+.inline-edit-select option,
+.edit-select option {
+    background: #ffffff;
+    color: var(--text-primary);
     padding: 4px 8px;
 }
 

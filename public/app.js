@@ -573,6 +573,8 @@ function startInlineEdit(td, deviceId, field, inputType) {
         td.innerHTML = '';
         td.appendChild(select);
         select.focus();
+        // 自动展开下拉选项
+        try { select.showPicker(); } catch(e) { select.click(); }
         // change 直接保存
         select.addEventListener('change', () => saveInlineEdit(td, deviceId, field, select.value));
         select.addEventListener('blur', () => {
@@ -585,25 +587,16 @@ function startInlineEdit(td, deviceId, field, inputType) {
             if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
         });
     }
-    // 设备需求：textarea（自适应高度）
+    // 设备需求：改用 input（保持单行，和显示状态一致）
     else if (field === 'requirements') {
-        const textarea = document.createElement('textarea');
-        textarea.className = 'inline-edit-textarea';
-        textarea.value = displayValue;
-        td.innerHTML = '';
-        td.appendChild(textarea);
-        // 自适应高度
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
-        textarea.focus();
-        textarea.select();
-        textarea.addEventListener('input', () => {
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
-        });
-        textarea.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, textarea.value));
-        textarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); textarea.blur(); }
+        td.innerHTML = `<input type="text" class="inline-edit-input" value="${escapeHtml(displayValue)}">`;
+        const input = td.querySelector('input');
+        input.focus();
+        // TAPD风格：光标定位到句尾
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
             if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
         });
     }
@@ -612,7 +605,8 @@ function startInlineEdit(td, deviceId, field, inputType) {
         td.innerHTML = `<input type="text" inputmode="numeric" class="inline-edit-input inline-edit-qty" value="${escapeHtml(displayValue)}">`;
         const input = td.querySelector('input');
         input.focus();
-        input.select();
+        // 光标定位到句尾
+        input.setSelectionRange(input.value.length, input.value.length);
         input.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, input.value));
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -624,7 +618,8 @@ function startInlineEdit(td, deviceId, field, inputType) {
         td.innerHTML = `<input type="text" class="inline-edit-input" value="${escapeHtml(displayValue)}">`;
         const input = td.querySelector('input');
         input.focus();
-        input.select();
+        // TAPD风格：光标定位到句尾，而不是全选
+        input.setSelectionRange(input.value.length, input.value.length);
         input.addEventListener('blur', () => saveInlineEdit(td, deviceId, field, input.value));
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -2165,15 +2160,12 @@ function renderProgressTable(deviceIndex) {
             </td>
             <td class="editable-cell" data-field="ownerName" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(gameData.ownerName || '-')}</span>
-                <span class="edit-icon">✎</span>
             </td>
             <td class="editable-cell" data-field="onlineStatus" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value"><span class="status-badge status-${gameData.onlineStatus}">${escapeHtml(onlineStatusMap[gameData.onlineStatus] || '-')}</span></span>
-                <span class="edit-icon">✎</span>
             </td>
             <td class="editable-cell" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(qualityMap[gameData.quality] || '-')}</span>
-                <span class="edit-icon">✎</span>
             </td>
             <td>
                 <button class="btn btn-small btn-delete" onclick="deleteProgressItem(${deviceIndex}, ${gameData.id})">删除</button>
@@ -2252,13 +2244,13 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
 
     // 隐藏原始值
     const cellValue = cell.querySelector('.cell-value');
-    const editIcon = cell.querySelector('.edit-icon');
     cellValue.style.display = 'none';
-    editIcon.style.display = 'none';
 
     // 添加下拉框
     cell.appendChild(select);
     select.focus();
+    // 单击直接展开选项列表
+    try { select.showPicker(); } catch(e) { select.click(); }
 
     // 保存更改的函数
     const saveChanges = async () => {
@@ -2280,7 +2272,6 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
         // 更新单元格显示
         cellValue.innerHTML = displayValue;
         cellValue.style.display = '';
-        editIcon.style.display = '';
 
         // 移除下拉框和编辑状态
         select.remove();
