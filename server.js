@@ -13,6 +13,48 @@ const PORT = 3000;
 // 中间件
 app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
+
+// ==================== GitHub Webhook 自动部署（需在 bodyParser 之前） ====================
+const crypto = require('crypto');
+const { exec } = require('child_process');
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+
+function verifyGitHubSignature(payload, signature) {
+  if (!WEBHOOK_SECRET) return true;
+  if (!signature) return false;
+  const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
+  hmac.update(payload);
+  const expected = 'sha256=' + hmac.digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+
+app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-hub-signature-256'];
+  const payload = req.body;
+  if (WEBHOOK_SECRET && !verifyGitHubSignature(payload, signature)) {
+    console.log('[Webhook] 签名验证失败');
+    return res.status(403).json({ error: '签名验证失败' });
+  }
+  const event = req.headers['x-github-event'];
+  if (event !== 'push') {
+    return res.json({ message: `忽略事件: ${event}` });
+  }
+  console.log('[Webhook] 收到 push 事件，开始自动部署...');
+  res.json({ message: '部署已触发' });
+
+  const deployCmd = 'git checkout -- . && git clean -fd && git pull origin master && pm2 restart 3dmanage';
+  exec(deployCmd, { cwd: __dirname, windowsHide: true }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('[Webhook] 部署失败:', error.message);
+      console.error('[Webhook] stderr:', stderr);
+      return;
+    }
+    console.log('[Webhook] 部署成功!');
+    console.log('[Webhook] stdout:', stdout);
+  });
+});
+// ==================== End Webhook ====================
+
 app.use(bodyParser.json({ limit: '2mb' }));
 // 静态文件：开发阶段禁用缓存，确保每次加载最新；生产环境可改回 maxAge: '1d'
 app.use(express.static('public', {
