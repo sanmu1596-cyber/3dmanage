@@ -579,6 +579,7 @@
                                     <option value="">全部状态</option>
                                     <option value="draft">草稿</option>
                                     <option value="published">已发布</option>
+                                    <option value="closed">已完成</option>
                                 </select>
                             </div>
                             <div class="toolbar-right">
@@ -649,14 +650,14 @@
                                     <div class="form-group"><label>客户端版本</label><input type="text" id="plan-client-version" placeholder="请输入客户端版本"></div>
                                 </div>
                                 <div class="form-group"><label>目标说明</label><textarea id="plan-goal" rows="3" placeholder="请输入目标说明"></textarea></div>
-                                <div class="form-group">
+                                <div class="form-group" id="plan-games-section">
                                     <label>游戏列表 *</label>
                                     <div class="tag-input-container">
                                         <div id="plan-games-tags" class="tag-list"></div>
                                         <button type="button" class="tool-btn tool-btn-primary" onclick="openPlanGameSelectModal()">+ 选择游戏</button>
                                     </div>
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group" id="plan-assignee-section">
                                     <label>默认负责人</label>
                                     <select id="plan-default-assignee" class="filter-select">
                                         <option value="">不指定（后续逐个指派）</option>

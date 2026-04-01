@@ -2747,28 +2747,30 @@ let planGameSelectTargetList = [];
 let planSelectedDevices = [];
 let planSelectedGames = [];
 
-// 假缺陷数据（用于调试）
-const mockBugsData = [
-    { id: 1, gameName: '原神', description: '角色模型在3D模式下渲染异常', bug_status: 'open', priority: 'high', owner: '张三' },
-    { id: 2, gameName: '原神', description: '切换场景时画面闪烁', bug_status: 'in_progress', priority: 'medium', owner: '李四' },
-    { id: 3, gameName: '王者荣耀', description: '技能特效深度显示错误', bug_status: 'fixed', priority: 'high', owner: '王五' },
-    { id: 4, gameName: '和平精英', description: '瞄准镜3D效果偏移', bug_status: 'open', priority: 'high', owner: '赵六' },
-    { id: 5, gameName: '和平精英', description: '载具模型穿透问题', bug_status: 'in_progress', priority: 'medium', owner: '张三' },
-    { id: 6, gameName: '崩坏：星穹铁道', description: 'UI界面在3D模式下层级错误', bug_status: 'open', priority: 'low', owner: '李四' },
-    { id: 7, gameName: '英雄联盟手游', description: '小地图3D显示重叠', bug_status: 'closed', priority: 'medium', owner: '王五' },
-    { id: 8, gameName: 'CSGO', description: '烟雾弹效果在3D模式异常', bug_status: 'open', priority: 'high', owner: '赵六' },
-    { id: 9, gameName: '使命召唤手游', description: '开镜时画面抖动', bug_status: 'in_progress', priority: 'high', owner: '张三' },
-    { id: 10, gameName: '暗黑破坏神：不朽', description: '装备界面3D模型失真', bug_status: 'open', priority: 'medium', owner: '李四' },
-    { id: 11, gameName: '阴阳师', description: '式神召唤动画3D效果缺失', bug_status: 'fixed', priority: 'low', owner: '王五' },
-    { id: 12, gameName: '明日方舟', description: '战斗画面帧率在3D模式下掉帧严重', bug_status: 'open', priority: 'high', owner: '赵六' },
-];
+// 编辑计划模式：null=创建，数字=编辑的计划ID
+let editingPlanId = null;
 
 // ========== 视图切换 ==========
 
 function showCreatePlanView() {
+    editingPlanId = null; // 创建模式
     document.getElementById('plan-list-view').style.display = 'none';
     document.getElementById('plan-detail-view').style.display = 'none';
     document.getElementById('plan-create-view').style.display = 'block';
+
+    // 更新标题
+    const titleEl = document.querySelector('#plan-create-view .toolbar-title');
+    if (titleEl) titleEl.textContent = '新增适配计划';
+
+    // 更新按钮
+    const actionsEl = document.querySelector('#plan-form .form-actions');
+    if (actionsEl) {
+        actionsEl.innerHTML = `
+            <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
+            <button type="button" class="tool-btn" onclick="submitPlan(event, 'draft')">💾 保存草稿</button>
+            <button type="button" class="tool-btn tool-btn-primary" onclick="submitPlan(event, 'published')">🚀 创建并发布</button>
+        `;
+    }
 
     // 重置表单
     document.getElementById('plan-form').reset();
@@ -2779,12 +2781,81 @@ function showCreatePlanView() {
 
     // 设置默认日期为今天
     document.getElementById('plan-date').value = new Date().toISOString().split('T')[0];
+
+    // 填充默认负责人下拉框
+    fillAssigneeSelect();
+}
+
+// 编辑已有计划
+function editPlan(planIndex) {
+    const plan = configPlans[planIndex];
+    if (!plan) return;
+    editingPlanId = plan.id;
+
+    document.getElementById('plan-list-view').style.display = 'none';
+    document.getElementById('plan-detail-view').style.display = 'none';
+    document.getElementById('plan-create-view').style.display = 'block';
+
+    // 更新标题
+    const titleEl = document.querySelector('#plan-create-view .toolbar-title');
+    if (titleEl) titleEl.textContent = '编辑适配计划';
+
+    // 更新按钮（编辑模式：保存 + 取消）
+    const actionsEl = document.querySelector('#plan-form .form-actions');
+    if (actionsEl) {
+        actionsEl.innerHTML = `
+            <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
+            <button type="button" class="tool-btn tool-btn-primary" onclick="submitPlan(event, '${plan.status || 'draft'}')">💾 保存修改</button>
+        `;
+    }
+
+    // 填充表单
+    document.getElementById('plan-title').value = plan.title || '';
+    document.getElementById('plan-date').value = plan.date || '';
+    document.getElementById('plan-interlace-version').value = plan.interlaceVersion || '';
+    document.getElementById('plan-client-version').value = plan.clientVersion || '';
+    document.getElementById('plan-goal').value = plan.goal || '';
+
+    // 填充已选机型
+    planSelectedDevices = (plan.devices || []).map(d => typeof d === 'string' ? { id: null, name: d } : { id: d.id, name: d.name });
+    renderPlanDeviceTags();
+
+    // 编辑计划时不重新选游戏（游戏在详情页管理），只填充机型和元信息
+    planSelectedGames = [];
+    renderPlanGameTags();
+
+    // 隐藏游戏选择区域（编辑时游戏在详情页管理）
+    const gameSection = document.getElementById('plan-games-section');
+    if (gameSection) gameSection.style.display = 'none';
+    const assigneeSection = document.getElementById('plan-assignee-section');
+    if (assigneeSection) assigneeSection.style.display = 'none';
+
+    // 填充默认负责人下拉框
+    fillAssigneeSelect();
+}
+
+// 填充默认负责人下拉框
+function fillAssigneeSelect() {
+    const select = document.getElementById('plan-default-assignee');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">不指定（后续逐个指派）</option>';
+    (allMembersData || []).forEach(m => {
+        select.innerHTML += `<option value="${m.id}">${escapeHtml(m.name)}</option>`;
+    });
+    if (currentVal) select.value = currentVal;
 }
 
 function showPlanListView() {
+    editingPlanId = null;
     document.getElementById('plan-create-view').style.display = 'none';
     document.getElementById('plan-detail-view').style.display = 'none';
     document.getElementById('plan-list-view').style.display = 'block';
+    // 恢复创建表单中被编辑模式隐藏的区域
+    const gameSection = document.getElementById('plan-games-section');
+    if (gameSection) gameSection.style.display = '';
+    const assigneeSection = document.getElementById('plan-assignee-section');
+    if (assigneeSection) assigneeSection.style.display = '';
 }
 
 function backToPlanList() {
@@ -2840,6 +2911,41 @@ async function submitPlan(event, planStatus) {
         return;
     }
 
+    // 编辑模式：只更新元信息（PUT）
+    if (editingPlanId) {
+        const tabName = planSelectedDevices.map(d => d.name).join('+') + ' ' + date;
+        const payload = {
+            title,
+            plan_date: date,
+            devices_json: planSelectedDevices,
+            interlace_version: interlaceVersion,
+            client_version: clientVersion,
+            goal,
+            tab_name: tabName
+        };
+        try {
+            const resp = await authFetch(`${API_BASE}/plans/${editingPlanId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('计划已更新', 'success');
+                editingPlanId = null;
+                await loadConfigPlans();
+                showPlanListView();
+            } else {
+                showToast('更新失败: ' + (result.error || '未知错误'), 'danger');
+            }
+        } catch (e) {
+            console.error('更新配置计划失败:', e);
+            showToast('更新失败，请重试', 'danger');
+        }
+        return;
+    }
+
+    // 创建模式（POST）
     if (planSelectedGames.length === 0) {
         showToast('请至少选择一个游戏', 'warning');
         return;
@@ -2979,7 +3085,7 @@ function renderPlanCards() {
         
         return `
         <div class="plan-card status-${plan.status}" onclick="openPlanDetail(${configPlans.indexOf(plan)})">
-            <span class="plan-card-status status-${plan.status}">${plan.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
+            <span class="plan-card-status status-${plan.status}">${plan.status === 'published' ? '✅ 已发布' : plan.status === 'closed' ? '🏁 已完成' : '📝 草稿'}</span>
             <div class="plan-card-header">
                 <span class="plan-card-title">${escapeHtml(plan.title)}</span>
             </div>
@@ -3004,6 +3110,7 @@ function renderPlanCards() {
                 ${plan.finishedCount > 0 ? `<span class="plan-card-stat stat-finished">✅ 已完成 ${plan.finishedCount}</span>` : ''}
             </div>
             <div class="plan-card-actions" onclick="event.stopPropagation()">
+                <button class="plan-card-action-btn" onclick="event.stopPropagation(); editPlan(${configPlans.indexOf(plan)})">✏️ 编辑</button>
                 ${plan.status === 'draft' ? `<button class="plan-card-action-btn btn-publish" onclick="event.stopPropagation(); publishPlan(${configPlans.indexOf(plan)})">🚀 发布</button>` : ''}
                 <button class="plan-card-action-btn" onclick="event.stopPropagation(); openPlanDetail(${configPlans.indexOf(plan)})">📋 详情</button>
                 <button class="plan-card-action-btn btn-danger" onclick="event.stopPropagation(); deletePlan(${configPlans.indexOf(plan)})">🗑️ 删除</button>
@@ -3029,15 +3136,20 @@ async function openPlanDetail(planIndex) {
     // 操作按钮
     const actionsEl = document.getElementById('plan-detail-actions');
     actionsEl.innerHTML = '';
+    actionsEl.innerHTML += `<button class="tool-btn" onclick="editPlan(${planIndex})">✏️ 编辑</button>`;
+    actionsEl.innerHTML += `<button class="tool-btn" onclick="addGamesToPlan(${planIndex})">＋ 添加游戏</button>`;
     if (plan.status === 'draft') {
         actionsEl.innerHTML += `<button class="tool-btn tool-btn-primary" onclick="publishPlan(${planIndex})">🚀 发布计划</button>`;
+    }
+    if (plan.status === 'published') {
+        actionsEl.innerHTML += `<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closePlan(${planIndex})">✅ 完成计划</button>`;
     }
     actionsEl.innerHTML += `<button class="btn btn-small btn-delete" onclick="deletePlan(${planIndex})">🗑️ 删除</button>`;
 
     // 信息条
     const infoBar = document.getElementById('plan-detail-info-bar');
     const deviceNames = plan.devices.map(d => escapeHtml(d.name || d)).join('、');
-    const statusLabel = plan.status === 'published' ? '<span class="status-badge status-online">已发布</span>' : '<span class="status-badge status-pending">草稿</span>';
+    const statusLabel = plan.status === 'published' ? '<span class="status-badge status-online">已发布</span>' : plan.status === 'closed' ? '<span class="status-badge status-offline">已完成</span>' : '<span class="status-badge status-pending">草稿</span>';
     
     infoBar.innerHTML = `
         <span class="info-tag"><span class="tag-label">状态：</span>${statusLabel}</span>
@@ -3085,29 +3197,6 @@ async function loadPlanDetail(planId) {
     } catch (e) {
         console.error('加载计划详情失败:', e);
     }
-}
-
-// 为游戏随机分配缺陷数据
-function getRandomBugsForGame(gameName) {
-    // 先找同名游戏的缺陷
-    const matchedBugs = mockBugsData.filter(b => b.gameName === gameName);
-    if (matchedBugs.length > 0) {
-        return matchedBugs;
-    }
-
-    // 随机决定是否有缺陷（60%概率有缺陷）
-    if (Math.random() > 0.6) {
-        return [];
-    }
-
-    // 随机选1-3条缺陷并修改游戏名
-    const count = Math.floor(Math.random() * 3) + 1;
-    const shuffled = [...mockBugsData].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count).map(b => ({
-        ...b,
-        id: Date.now() + Math.random(),
-        gameName: gameName
-    }));
 }
 
 // ========== 计划详情 - 游戏列表渲染 ==========
@@ -3218,52 +3307,6 @@ async function syncPlanGameChange(game, fields) {
     } catch (e) {
         console.error('同步计划游戏变更失败:', e);
     }
-}
-
-// 编辑负责人
-function editPlanGameOwner(planIndex, gameIndex, cell) {
-    if (cell.classList.contains('editing')) return;
-    cell.classList.add('editing');
-
-    const game = configPlans[planIndex].games[gameIndex];
-    const select = document.createElement('select');
-    select.className = 'edit-select';
-
-    // 添加默认选项
-    const defaultOpt = document.createElement('option');
-    defaultOpt.value = '-';
-    defaultOpt.textContent = '未分配';
-    select.appendChild(defaultOpt);
-
-    allMembersData.forEach(member => {
-        const opt = document.createElement('option');
-        opt.value = member.name;
-        opt.textContent = member.name;
-        if (member.name === game.ownerName) opt.selected = true;
-        select.appendChild(opt);
-    });
-
-    const cellValue = cell.querySelector('.cell-value');
-    const editIcon = cell.querySelector('.edit-icon');
-    cellValue.style.display = 'none';
-    editIcon.style.display = 'none';
-    cell.appendChild(select);
-    select.focus();
-
-    const save = () => {
-        game.ownerName = select.value;
-        cellValue.textContent = game.ownerName;
-        cellValue.style.display = '';
-        editIcon.style.display = '';
-        select.remove();
-        cell.classList.remove('editing');
-        // P0: 同步到后端
-        syncPlanGameChange(game, { owner_name: game.ownerName });
-    };
-
-    select.addEventListener('change', save);
-    select.addEventListener('blur', save);
-    select.addEventListener('click', e => e.stopPropagation());
 }
 
 // 更新适配进展状态
@@ -3643,11 +3686,53 @@ function filterPlanGameTargetList() {
     renderPlanGameTargetList(document.getElementById('plan-game-target-search').value);
 }
 
-function confirmPlanGameSelect() {
+async function confirmPlanGameSelect() {
     if (planGameSelectTargetList.length === 0) {
         alert('请先选择游戏');
         return;
     }
+
+    // 模式1：向已有计划添加游戏（从详情页触发）
+    if (addGamesToPlanIndex !== null) {
+        const plan = configPlans[addGamesToPlanIndex];
+        if (!plan || !plan.id) return;
+
+        const games = planGameSelectTargetList.map(g => ({
+            game_id: g.id,
+            game_name: g.name,
+            game_platform: g.platform || '-',
+            game_type: g.gameType || '-',
+            adapt_status: 'not_started',
+            adapt_progress: 0
+        }));
+
+        try {
+            const resp = await authFetch(`${API_BASE}/plans/${plan.id}/games`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ games })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                showToast(`已添加 ${result.count} 款游戏`, 'success');
+                // 重新加载计划详情
+                plan.games = []; // 清空缓存强制重载
+                await loadPlanDetail(plan.id);
+                renderPlanDetailGames(addGamesToPlanIndex);
+                // 更新卡片中的游戏数量
+                await loadConfigPlans();
+            } else {
+                showToast('添加失败: ' + (result.error || ''), 'danger');
+            }
+        } catch (e) {
+            showToast('添加失败，请重试', 'danger');
+        }
+        addGamesToPlanIndex = null;
+        closePlanGameSelectModal();
+        return;
+    }
+
+    // 模式2：创建计划时选择游戏（原逻辑）
     planSelectedGames = [...planSelectedGames, ...planGameSelectTargetList.map(g => ({
         id: g.id,
         name: g.name,
@@ -5546,6 +5631,69 @@ async function doPublishPlan(planIndex) {
 }
 
 // ==================== 更新计划游戏负责人 ====================
+
+// 完成计划（published → closed）
+async function closePlan(planIndex) {
+    const plan = configPlans[planIndex];
+    if (!plan || !plan.id) return;
+    showConfirm('确定将此计划标记为"已完成"吗？完成后计划仍可查看但不再显示在"我的任务"中。', async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/plans/${plan.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'closed' })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                plan.status = 'closed';
+                showToast('计划已标记为完成', 'success');
+                if (document.getElementById('plan-detail-view').style.display !== 'none') {
+                    openPlanDetail(planIndex);
+                } else {
+                    renderPlanCards();
+                }
+            } else {
+                showToast('操作失败: ' + (result.error || ''), 'danger');
+            }
+        } catch (e) {
+            showToast('操作失败，请重试', 'danger');
+        }
+    });
+}
+
+// 向已有计划添加游戏
+let addGamesToPlanIndex = null; // 记录当前要添加游戏的计划索引
+function addGamesToPlan(planIndex) {
+    const plan = configPlans[planIndex];
+    if (!plan) return;
+    addGamesToPlanIndex = planIndex;
+
+    // 获取当前计划已有的游戏ID
+    const existingGameIds = new Set((plan.games || []).map(g => g.gameId || g.game_id));
+
+    planGameSelectSourceList = allGamesForProgress
+        .filter(g => !existingGameIds.has(g.id))
+        .map(g => ({
+            id: g.id,
+            name: g.name,
+            platform: g.platform || '-',
+            gameType: g.game_type || '-',
+            ownerName: g.owner_name || '-',
+            checked: false
+        }));
+    planGameSelectTargetList = [];
+
+    renderPlanGameSourceList();
+    renderPlanGameTargetList();
+
+    document.getElementById('plan-game-select-search').value = '';
+    document.getElementById('plan-game-target-search').value = '';
+    if (document.getElementById('select-all-plan-games-src')) document.getElementById('select-all-plan-games-src').checked = false;
+    if (document.getElementById('select-all-plan-games-tgt')) document.getElementById('select-all-plan-games-tgt').checked = false;
+
+    document.getElementById('plan-game-select-modal').style.display = 'block';
+}
+
 async function updatePlanGameAssignee(planIndex, gameIndex, selectEl) {
     const plan = configPlans[planIndex];
     const game = plan.games[gameIndex];

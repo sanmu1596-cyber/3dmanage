@@ -769,6 +769,30 @@ plansRouter.put('/:id/assign', (req, res) => {
   });
 });
 
+// 向已有计划批量添加游戏
+plansRouter.post('/:id/games', (req, res) => {
+  const planId = req.params.id;
+  const { games } = req.body;
+  if (!games || !Array.isArray(games) || games.length === 0) {
+    return res.status(400).json({ error: 'games 不能为空' });
+  }
+  // 获取当前最大 sort_order
+  db.get('SELECT MAX(sort_order) as maxSort FROM plan_games WHERE plan_id = ?', [planId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    let sortStart = (row && row.maxSort != null ? row.maxSort : -1) + 1;
+    const stmt = db.prepare(`INSERT INTO plan_games (plan_id, game_id, game_name, game_platform, game_type, owner_name, assigned_to, adapt_status, adapt_progress, remark, bugs_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    let count = 0;
+    games.forEach((g, i) => {
+      stmt.run([planId, g.game_id || null, g.game_name, g.game_platform || '', g.game_type || '', g.owner_name || '', g.assigned_to || null, g.adapt_status || 'not_started', g.adapt_progress || 0, g.remark || '', JSON.stringify(g.bugs_json || []), sortStart + i]);
+      count++;
+    });
+    stmt.finalize(() => {
+      logActivity('update', 'plan', parseInt(planId), `添加 ${count} 款游戏`);
+      res.json({ success: true, count });
+    });
+  });
+});
+
 // 删除计划内单个游戏
 plansRouter.delete('/game/:gameId', (req, res) => {
   db.run('DELETE FROM plan_games WHERE id = ?', [req.params.gameId], function(err) {
