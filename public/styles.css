@@ -982,74 +982,72 @@ body.col-resizing * {
     cursor: not-allowed;
 }
 
-/* ========== 状态标签 ========== */
+/* ========== 状态标签 — 扁平色块风格 ========== */
 .status-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 4px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     white-space: nowrap;
+    letter-spacing: 0.3px;
 }
 
 .status-active, .status-available, .status-completed, .status-online {
-    background: rgba(0, 230, 118, 0.15);
-    color: var(--success);
-    border: 1px solid rgba(0, 230, 118, 0.3);
+    background: #e6f7ee;
+    color: #1a8a4a;
 }
 
 .status-inactive, .status-broken, .status-failed {
-    background: rgba(255, 82, 82, 0.15);
-    color: var(--danger);
-    border: 1px solid rgba(255, 82, 82, 0.3);
+    background: #fde8e8;
+    color: #c53030;
 }
 
 .status-assigned, .status-in_progress {
-    background: rgba(255, 171, 64, 0.15);
-    color: var(--warning);
-    border: 1px solid rgba(255, 171, 64, 0.3);
+    background: #fef3e2;
+    color: #c05621;
 }
 
 .status-pending, .status-open {
-    background: rgba(68, 138, 255, 0.15);
-    color: var(--info);
-    border: 1px solid rgba(68, 138, 255, 0.3);
+    background: #e8f0fe;
+    color: #2b6cb0;
 }
 
 .status-maintenance, .status-paused {
-    background: rgba(138, 148, 168, 0.15);
-    color: var(--text-secondary);
-    border: 1px solid rgba(138, 148, 168, 0.3);
+    background: #edf0f4;
+    color: #5a6577;
 }
 
-/* 优先级标签 */
+/* 优先级标签 — 扁平色块风格 */
 .priority-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 4px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
-.priority-low { background: rgba(0, 230, 118, 0.15); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
-.priority-medium { background: rgba(255, 171, 64, 0.15); color: var(--warning); border: 1px solid rgba(255, 171, 64, 0.3); }
-.priority-high { background: rgba(255, 82, 82, 0.15); color: var(--danger); border: 1px solid rgba(255, 82, 82, 0.3); }
-.priority-urgent { background: var(--danger); color: #fff; border: 1px solid var(--danger); }
+.priority-low { background: #e6f7ee; color: #1a8a4a; }
+.priority-medium { background: #fef3e2; color: #c05621; }
+.priority-high { background: #fde8e8; color: #c53030; }
+.priority-urgent { background: #c53030; color: #fff; }
 
-/* 严重程度标签 */
+/* 严重程度标签 — 扁平色块风格 */
 .severity-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 4px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
-.severity-advice { background: rgba(0, 230, 118, 0.15); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
-.severity-prompt { background: rgba(255, 171, 64, 0.15); color: var(--warning); border: 1px solid rgba(255, 171, 64, 0.3); }
-.severity-normal { background: rgba(68, 138, 255, 0.15); color: var(--info); border: 1px solid rgba(68, 138, 255, 0.3); }
-.severity-serious { background: rgba(255, 82, 82, 0.15); color: var(--danger); border: 1px solid rgba(255, 82, 82, 0.3); }
-.severity-fatal { background: var(--danger); color: #fff; border: 1px solid var(--danger); }
+.severity-advice { background: #e6f7ee; color: #1a8a4a; }
+.severity-prompt { background: #fef3e2; color: #c05621; }
+.severity-normal { background: #e8f0fe; color: #2b6cb0; }
+.severity-serious { background: #fde8e8; color: #c53030; }
+.severity-fatal { background: #c53030; color: #fff; }
 
 /* ========== 空状态 ========== */
 .empty-state {
@@ -1718,14 +1716,16 @@ body.col-resizing * {
 
 .adapt-status-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 4px;
     font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
-.adapt-status-not_started { background: rgba(138, 148, 168, 0.15); color: var(--text-secondary); border: 1px solid rgba(138, 148, 168, 0.3); }
-.adapt-status-adapting { background: rgba(68, 138, 255, 0.15); color: var(--info); border: 1px solid rgba(68, 138, 255, 0.3); }
-.adapt-status-finished { background: rgba(0, 230, 118, 0.15); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
+.adapt-status-not_started { background: #edf0f4; color: #5a6577; }
+.adapt-status-adapting { background: #e8f0fe; color: #2b6cb0; }
+.adapt-status-finished { background: #e6f7ee; color: #1a8a4a; }
 
 /* ========== 适配状态选择器（计划详情 & 我的任务） ========== */
 .adapt-status-select {
@@ -3019,22 +3019,52 @@ th .row-checkbox-all { width: 16px; height: 16px; cursor: pointer; accent-color:
 .summary-dot.dot-finished { background: var(--success); }
 .summary-dot.dot-not-started { background: var(--text-light); }
 
-/* 我的任务-计划卡片特化 */
+/* 我的任务-计划卡片特化 — 浅蓝底白字 */
 .my-task-plan-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-bottom: 2px solid rgba(47, 127, 187, 0.18);
+    background: linear-gradient(135deg, rgb(47, 127, 187) 0%, rgb(67, 145, 200) 100%);
+    border: 1px solid rgba(47, 127, 187, 0.3);
+    border-bottom: 2px solid rgba(29, 44, 77, 0.3);
     border-radius: var(--radius-md);
     padding: 18px 20px;
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    box-shadow: 2px 3px 8px rgba(29, 44, 77, 0.07), 0 1px 3px rgba(29, 44, 77, 0.04);
+    box-shadow: 2px 3px 8px rgba(29, 44, 77, 0.12), 0 1px 3px rgba(29, 44, 77, 0.06);
+    color: #ffffff;
 }
 .my-task-plan-card:hover {
-    border-color: var(--primary);
-    box-shadow: 3px 5px 14px rgba(29, 44, 77, 0.1), 0 2px 6px rgba(47, 127, 187, 0.1);
+    background: linear-gradient(135deg, rgb(57, 137, 197) 0%, rgb(77, 155, 210) 100%);
+    border-color: rgba(47, 127, 187, 0.5);
+    box-shadow: 3px 5px 18px rgba(29, 44, 77, 0.18), 0 2px 6px rgba(47, 127, 187, 0.15);
     transform: translateY(-2px);
+}
+/* 卡片内文字颜色覆盖 */
+.my-task-plan-card .plan-card-title {
+    color: #ffffff;
+}
+.my-task-plan-card .plan-card-no {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+}
+.my-task-plan-card .plan-card-meta {
+    color: rgba(255, 255, 255, 0.85);
+}
+.my-task-plan-card .plan-card-goal {
+    background: rgba(255, 255, 255, 0.12);
+    border-left-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+}
+.my-task-plan-card .plan-card-progress-bar {
+    background: rgba(255, 255, 255, 0.2);
+}
+.my-task-plan-card .plan-card-progress-fill {
+    background: linear-gradient(90deg, rgba(255,255,255,0.7), rgba(255,255,255,0.95)) !important;
+}
+.my-task-plan-card .stat-item {
+    color: rgba(255, 255, 255, 0.85);
+}
+.my-task-plan-card .stat-item strong {
+    color: #ffffff;
 }
 .my-task-plan-card-header {
     display: flex;

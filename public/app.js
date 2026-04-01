@@ -490,8 +490,8 @@ function renderMembersTable(data) {
                 <td>${escapeHtml(member.wechat_id || '-')}</td>
                 <td>${escapeHtml(member.role || '-')}</td>
                 <td>${escapeHtml(member.duty || '-')}</td>
-                <td><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
-                <td>
+                <td class="text-center"><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
+                <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editMember(${member.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteMember(${member.id})">删除</button>
                 </td>
@@ -544,7 +544,7 @@ function renderDevicesTable(data) {
                 <td>${escapeHtml(device.total_bugs || 0)}</td>
                 <td>${escapeHtml(device.completed_adaptations || 0)}</td>
                 <td>${getDeviceOnlineGameCount(device.name)}</td>
-                <td>
+                <td class="text-center">
                     <button class="btn btn-small btn-delete" onclick="deleteDevice(${device.id})">删除</button>
                 </td>
             </tr>
@@ -862,7 +862,7 @@ function renderGamesPage() {
             }
 
             rowHtml += `
-                <td>
+                <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editGame(${game.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteGame(${game.id})">删除</button>
                 </td>
@@ -1357,10 +1357,10 @@ function renderTestsTable(data) {
                 <td>${escapeHtml(test.device_name || '-')}</td>
                 <td>${escapeHtml(test.tester_name || '-')}</td>
                 <td>${escapeHtml(test.test_date || '-')}</td>
-                <td><span class="status-badge status-${test.status}">${getTestStatusText(test.status)}</span></td>
-                <td><span class="priority-badge priority-${test.priority}">${getPriorityText(test.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${test.status}">${getTestStatusText(test.status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${test.priority}">${getPriorityText(test.priority)}</span></td>
                 <td>${test.bugs_count || 0}</td>
-                <td>
+                <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editTest(${test.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteTest(${test.id})">删除</button>
                 </td>
@@ -1403,11 +1403,11 @@ function renderBugsTable(data) {
                 <td>${escapeHtml(bug.device_name || '-')}</td>
                 <td>${escapeHtml(bug.discovery_time || '-')}</td>
                 <td>${escapeHtml(bug.owner || '-')}</td>
-                <td><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
-                <td><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
                 <td>${escapeHtml(bug.problem_type || '-')}</td>
                 <td>${escapeHtml(bug.description || '-')}</td>
-                <td>
+                <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editBug(${bug.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteBug(${bug.id})">删除</button>
                 </td>
@@ -2418,13 +2418,13 @@ function renderProgressTable(deviceIndex) {
             <td class="editable-cell" data-field="ownerName" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(gameData.ownerName || '-')}</span>
             </td>
-            <td class="editable-cell" data-field="onlineStatus" data-row-index="${index}" data-device-index="${deviceIndex}">
+            <td class="editable-cell text-center" data-field="onlineStatus" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value"><span class="status-badge status-${gameData.onlineStatus}">${escapeHtml(onlineStatusMap[gameData.onlineStatus] || '-')}</span></span>
             </td>
-            <td class="editable-cell" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
+            <td class="editable-cell text-center" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(qualityMap[gameData.quality] || '-')}</span>
             </td>
-            <td>
+            <td class="text-center">
                 <button class="btn btn-small btn-delete" onclick="deleteProgressItem(${deviceIndex}, ${gameData.id})">删除</button>
             </td>
         </tr>
@@ -3512,7 +3512,7 @@ function renderPlanDetailGames(planIndex) {
                         placeholder="输入备注..."
                         onchange="updatePlanGameRemark(${planIndex}, ${idx}, this.value)">
                 </td>
-                <td>
+                <td class="text-center">
                     <button class="btn btn-small btn-delete" onclick="deletePlanGame(${planIndex}, ${idx})">删除</button>
                 </td>
             </tr>
@@ -3622,8 +3622,8 @@ function showPlanBugDetail(planIndex, gameIndex) {
             <tr>
                 <td class="text-center">${i + 1}</td>
                 <td>${escapeHtml(bug.description)}</td>
-                <td><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
-                <td><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
                 <td>${escapeHtml(bug.owner || '-')}</td>
             </tr>
         `).join('');
@@ -6230,7 +6230,7 @@ function renderMyTasksTable() {
                     data-task-id="${task.id}"
                     onchange="onMyTaskFieldChange(${index})">
             </td>
-            <td>
+            <td class="text-center">
                 <button class="tool-btn tool-btn-primary" style="padding:3px 10px;font-size:12px;" onclick="submitSingleTask(${index})">提交</button>
             </td>
         </tr>
