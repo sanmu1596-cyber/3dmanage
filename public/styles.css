@@ -879,6 +879,7 @@ body.col-resizing * {
     cursor: pointer;
     position: relative;
     transition: background 0.15s;
+    overflow: hidden;
 }
 .editable-cell:hover {
     background: rgba(0, 162, 255, 0.06) !important;
@@ -887,6 +888,8 @@ body.col-resizing * {
 /* 编辑中：保持原始padding和背景不变，只隐藏✎图标 */
 .editable-cell.editing {
     background: inherit !important;
+    padding: 0 !important;
+    overflow: hidden;
 }
 .editable-cell.editing::after {
     display: none;
@@ -897,8 +900,9 @@ body.col-resizing * {
 .inline-edit-select,
 .edit-select {
     width: 100% !important;
+    height: 100% !important;
     box-sizing: border-box !important;
-    padding: 2px 4px !important;
+    padding: 4px 8px !important;
     margin: 0 !important;
     font-size: inherit !important;
     font-family: inherit !important;

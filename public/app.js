@@ -511,13 +511,12 @@ function renderDevicesTable(data) {
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>
-                <td>${escapeHtml(device.notes || '-')}</td>
+                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>
                 <td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>
                 <td>${escapeHtml(device.total_bugs || 0)}</td>
                 <td>${escapeHtml(device.completed_adaptations || 0)}</td>
                 <td>${getDeviceOnlineGameCount(device.name)}</td>
                 <td>
-                    <button class="btn btn-small btn-edit" onclick="editDevice(${device.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteDevice(${device.id})">删除</button>
                 </td>
             </tr>
@@ -541,7 +540,7 @@ function renderDevicesTable(data) {
  * 双击单元格进入编辑模式
  * @param {HTMLElement} td - 被双击的<td>元素
  * @param {number} deviceId - 设备ID
- * @param {string} field - 字段名 (requirements/quantity/keeper)
+ * @param {string} field - 字段名 (requirements/quantity/keeper/notes)
  * @param {string} inputType - 输入类型 (text/number)
  */
 function startInlineEdit(td, deviceId, field, inputType) {
@@ -552,6 +551,14 @@ function startInlineEdit(td, deviceId, field, inputType) {
     const displayValue = currentValue === '-' ? '' : currentValue;
 
     td.classList.add('editing');
+
+    // 锁定单元格宽高，防止编辑态撑开引起抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
 
     // 保管者：下拉选择（从成员列表获取）
     if (field === 'keeper') {
@@ -650,16 +657,32 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
             // 更新本地数据
             const device = allDevicesData.find(d => d.id === deviceId);
             if (device) device[field] = body[field];
-            // 显示新值
+            // 只恢复当前单元格显示（不整表重渲染，避免抖动）
             td.textContent = trimmed || '-';
-            showToast('已保存', 'success');
+            // 解除宽高锁定
+            td.style.width = '';
+            td.style.minWidth = '';
+            td.style.maxWidth = '';
+            td.style.height = '';
+            // 异步刷新关联模块缓存（适配进展中的设备信息可能变化）
+            if (['keeper', 'notes', 'requirements', 'quantity'].includes(field)) {
+                window._progressDataStale = true; // 标记适配进展数据需刷新
+            }
         } else {
             td.textContent = trimmed || '-';
+            td.style.width = '';
+            td.style.minWidth = '';
+            td.style.maxWidth = '';
+            td.style.height = '';
             showToast('保存失败', 'danger');
         }
     } catch (error) {
         console.error('行内编辑保存失败:', error);
         td.textContent = trimmed || '-';
+        td.style.width = '';
+        td.style.minWidth = '';
+        td.style.maxWidth = '';
+        td.style.height = '';
         showToast('保存失败', 'danger');
     }
 }
@@ -669,6 +692,11 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
  */
 function cancelInlineEdit(td, originalValue) {
     td.classList.remove('editing');
+    // 解除宽高锁定
+    td.style.width = '';
+    td.style.minWidth = '';
+    td.style.maxWidth = '';
+    td.style.height = '';
     td.textContent = originalValue;
 }
 
@@ -1999,6 +2027,11 @@ function loadColumnSettings() {
 // 加载适配进展数据
 async function loadProgressData() {
     try {
+        // 如果设备数据被行内编辑修改过，强制刷新
+        if (window._progressDataStale) {
+            window._progressDataStale = false;
+            // allDevicesData 已在行内编辑时同步更新，这里直接用
+        }
         // 复用已加载的数据，仅在为空时才请求（避免重复请求）
         if (!allDevicesData || allDevicesData.length === 0) {
             const devicesResponse = await authFetch(`${API_BASE}/devices`);
@@ -2198,6 +2231,14 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     const gameData = progressData[deviceIndex].games[rowIndex];
     cell.classList.add('editing');
 
+    // 锁定单元格宽高，防止编辑态撑开引起抖动
+    const rect = cell.getBoundingClientRect();
+    cell.style.width = rect.width + 'px';
+    cell.style.minWidth = rect.width + 'px';
+    cell.style.maxWidth = rect.width + 'px';
+    cell.style.height = rect.height + 'px';
+    cell.style.boxSizing = 'border-box';
+
     // 创建下拉选择框
     const select = document.createElement('select');
     select.className = 'edit-select';
@@ -2253,7 +2294,10 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     try { select.showPicker(); } catch(e) { select.click(); }
 
     // 保存更改的函数
+    let _saved = false;
     const saveChanges = async () => {
+        if (_saved) return;
+        _saved = true;
         let newValue = select.value;
         let displayValue = newValue;
 
@@ -2276,6 +2320,11 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
         // 移除下拉框和编辑状态
         select.remove();
         cell.classList.remove('editing');
+        // 解除宽高锁定
+        cell.style.width = '';
+        cell.style.minWidth = '';
+        cell.style.maxWidth = '';
+        cell.style.height = '';
 
         // P0: 同步更新到后端
         try {
