@@ -27,8 +27,8 @@
 
 :root {
     /* 字体 */
-    --font-title: 'TencentSans', 'Microsoft YaHei', '微软雅黑', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-    --font-body: 'TencentSans', 'Microsoft YaHei', '微软雅黑', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    --font-title: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
 
     /* 主色调 — 深蓝体系 */
     --primary: rgb(47, 127, 187);          /* 浅蓝 */
