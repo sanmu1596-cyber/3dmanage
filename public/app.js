@@ -4555,6 +4555,18 @@ function initColumnResize() {
             // 跳过已有手柄的
             if (th.querySelector('.col-resize-handle')) return;
 
+            // 跳过 checkbox 列（不可拖拽）
+            if (th.classList.contains('batch-th')) return;
+
+            // 序号列：固定宽度，不可拖拽
+            const thText = th.textContent.trim();
+            if (thText === '序号') {
+                th.style.width = '50px';
+                th.style.minWidth = '50px';
+                th.style.maxWidth = '50px';
+                return;
+            }
+
             const handle = document.createElement('div');
             handle.className = 'col-resize-handle';
             th.appendChild(handle);
@@ -5196,7 +5208,9 @@ function injectBatchCheckboxes(tableId) {
     // 在序号列之前添加 checkbox 表头
     const th = document.createElement('th');
     th.className = 'batch-th';
-    th.setAttribute('width', '36');
+    th.style.width = '36px';
+    th.style.minWidth = '36px';
+    th.style.maxWidth = '36px';
     th.innerHTML = `<input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('${tableId}', this.checked)">`;
     theadRow.insertBefore(th, theadRow.firstChild);
     
@@ -5214,6 +5228,9 @@ function injectBatchCheckboxes(tableId) {
         if (rowId === null) return;
         
         const td = document.createElement('td');
+        td.style.width = '36px';
+        td.style.minWidth = '36px';
+        td.style.maxWidth = '36px';
         td.innerHTML = `<input type="checkbox" class="row-checkbox" data-id="${rowId}" data-resource="${resource}" onchange="batchToggleRow(this)">`;
         row.insertBefore(td, row.firstChild);
     });
