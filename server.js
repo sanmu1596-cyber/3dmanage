@@ -53,6 +53,7 @@ app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res
     console.log('[Webhook] stdout:', stdout);
   });
 });
+console.log('[Webhook] 自动部署端点已就绪: POST /webhook/deploy');
 // ==================== End Webhook ====================
 
 app.use(bodyParser.json({ limit: '2mb' }));
