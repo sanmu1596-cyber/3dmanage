@@ -310,12 +310,18 @@ function initTabs() {
 
 // 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数, 防抖动)
 let _tabSwitchCounter = 0; // 递增计数器，用于检测过时的tab切换
+let _revealTimer = null; // 恢复可见的定时器
 function switchTab(tabId, fromHash) {
     const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
+    clearTimeout(_revealTimer);
+
     // 移除所有激活状态
     document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.visibility = '';
+    });
 
     // 激活当前标签
     const sidebarItem = document.querySelector(`.sidebar-item[data-tab="${tabId}"]`);
@@ -326,7 +332,7 @@ function switchTab(tabId, fromHash) {
     
     const content = document.getElementById(tabId);
     if (content) {
-        // 防抖动：先让内容区不可见（保留布局占位），数据加载完再显示
+        // 防抖动：先让内容区不可见（保留布局占位），等所有DOM操作完成再显示
         content.style.visibility = 'hidden';
         content.classList.add('active');
     } else {
@@ -342,12 +348,27 @@ function switchTab(tabId, fromHash) {
         history.pushState(null, '', '#' + tabId);
     }
 
-    // 按需加载当前 tab 数据（避免每次 switchTab 全量刷新所有模块）
-    // 传入切换序号，loadTabData内部可检测是否已过时
+    // 按需加载当前 tab 数据
+    const noObserverTabs = ['dashboard', 'field-settings'];
     loadTabData(tabId, mySwitch).then(() => {
-        // 数据加载+渲染完成后，显示内容区
-        if (content && mySwitch === _tabSwitchCounter) {
-            content.style.visibility = '';
+        if (!content || mySwitch !== _tabSwitchCounter) return;
+        if (noObserverTabs.includes(tabId)) {
+            // 没有 MutationObserver 注入的 tab，直接用 rAF 显示
+            requestAnimationFrame(() => {
+                if (mySwitch === _tabSwitchCounter && content) {
+                    content.style.visibility = '';
+                }
+            });
+        } else {
+            // 有表格 Observer 注入的 tab，等 Observer 防抖(80ms)完成后再显示
+            _revealTimer = setTimeout(() => {
+                if (mySwitch !== _tabSwitchCounter) return;
+                requestAnimationFrame(() => {
+                    if (mySwitch === _tabSwitchCounter && content) {
+                        content.style.visibility = '';
+                    }
+                });
+            }, 150);
         }
     });
 }
@@ -363,7 +384,7 @@ async function loadTabData(tabId, switchId) {
     if (switchId !== undefined && switchId !== _tabSwitchCounter) return;
     switch (tabId) {
         case 'dashboard':
-            loadDashboard();
+            await loadDashboard();
             break;
         case 'games':
             await loadGames();
