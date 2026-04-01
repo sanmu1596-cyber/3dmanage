@@ -789,16 +789,16 @@ function renderGamesPage() {
                 rowHtml += `<td>${escapeHtml(game.english_name || '-')}</td>`;
             }
             if (visibleColumns.platform) {
-                rowHtml += `<td>${escapeHtml(game.platform || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
             }
             if (visibleColumns.game_id) {
                 rowHtml += `<td>${escapeHtml(game.game_id || '-')}</td>`;
             }
             if (visibleColumns.game_type) {
-                rowHtml += `<td>${escapeHtml(game.game_type || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${escapeHtml(game.game_type || '-')}</td>`;
             }
             if (visibleColumns.description) {
-                rowHtml += `<td>${escapeHtml(game.description || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
             }
             if (visibleColumns.developer) {
                 rowHtml += `<td>${escapeHtml(game.developer || '-')}</td>`;
@@ -816,18 +816,18 @@ function renderGamesPage() {
                 rowHtml += `<td>${escapeHtml(game.adapter_progress || '0%')}</td>`;
             }
             if (visibleColumns.owner) {
-                rowHtml += `<td>${escapeHtml(game.owner_name || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
             }
             if (visibleColumns.online_status) {
                 rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
             }
             if (visibleColumns.quality) {
-                rowHtml += `<td>${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
             }
             if (visibleColumns.game_account) {
                 const acctText = game.game_account || '-';
                 const acctHtml = acctText.split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
-                rowHtml += `<td style="white-space:nowrap;font-size:12px;">${acctHtml}</td>`;
+                rowHtml += `<td class="editable-cell" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
             }
             if (visibleColumns.storage_location) {
                 rowHtml += `<td>${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
@@ -858,6 +858,202 @@ function renderGamesPage() {
 
     // 更新分页信息和控件
     updatePaginationControls();
+}
+
+// ========== 游戏列表行内编辑 ==========
+
+// 双击文本编辑（游戏简介、游戏账号）
+function startGameTextEdit(td, gameId, field) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
+
+    // 锁定宽高防抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const game = allGamesData.find(g => g.id === gameId);
+    const originalValue = game ? (game[field] || '') : '';
+    const originalHtml = td.innerHTML;
+
+    // 游戏账号用 textarea（多行），简介用 input
+    let input;
+    if (field === 'game_account') {
+        input = document.createElement('textarea');
+        input.className = 'inline-edit-textarea';
+        input.value = originalValue;
+        input.rows = 2;
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'inline-edit-input';
+        input.value = originalValue;
+    }
+
+    td.innerHTML = '';
+    td.appendChild(input);
+    input.focus();
+    // 光标定位到句尾，不全选
+    if (input.tagName === 'TEXTAREA') {
+        input.selectionStart = input.selectionEnd = input.value.length;
+    } else {
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = input.value.trim();
+        // 无变化直接还原
+        if (newValue === originalValue) {
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            return;
+        }
+        try {
+            const response = await authFetch(`${API_BASE}/games/${gameId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: newValue })
+            });
+            if (response.ok) {
+                if (game) game[field] = newValue;
+                // 更新显示
+                if (field === 'game_account') {
+                    const lines = (newValue || '-').split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
+                    td.innerHTML = lines;
+                } else {
+                    td.textContent = newValue || '-';
+                }
+            } else {
+                td.innerHTML = originalHtml;
+                showToast('保存失败', 'danger');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    };
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && field !== 'game_account') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') {
+            saved = true;
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        }
+    });
+}
+
+// 点击下拉编辑（游戏平台、游戏类型、负责人、品质）
+function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
+
+    // 锁定宽高防抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const game = allGamesData.find(g => g.id === gameId);
+    const originalHtml = td.innerHTML;
+
+    const select = document.createElement('select');
+    select.className = 'inline-edit-select';
+
+    // 空选项
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '-- 请选择 --';
+    select.appendChild(emptyOpt);
+
+    // 填充选项
+    if (optionSource === 'members') {
+        // 负责人：从成员列表
+        (allMembersData || []).forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name;
+            if (String(game.owner_id) === String(m.id)) opt.selected = true;
+            select.appendChild(opt);
+        });
+    } else {
+        // 从字段设置获取选项
+        const options = getFieldOptionsByKey(optionSource);
+        const currentVal = game ? (game[field] || '') : '';
+        options.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.value;
+            opt.textContent = o.label;
+            if (o.value === currentVal) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    td.innerHTML = '';
+    td.appendChild(select);
+    select.focus();
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = select.value;
+        const patchBody = { [field]: newValue || null };
+
+        try {
+            const response = await authFetch(`${API_BASE}/games/${gameId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patchBody)
+            });
+            if (response.ok) {
+                const result = await response.json();
+                if (game) game[field] = newValue || null;
+                // 更新显示文本
+                if (optionSource === 'members') {
+                    const memberName = result.owner_name || '-';
+                    if (game) game.owner_name = memberName;
+                    td.textContent = memberName;
+                } else if (optionSource === 'quality') {
+                    td.textContent = getFieldOptionLabel('quality', newValue) || '-';
+                } else {
+                    td.textContent = newValue || '-';
+                }
+            } else {
+                td.innerHTML = originalHtml;
+                showToast('保存失败', 'danger');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    };
+
+    select.addEventListener('change', save);
+    select.addEventListener('blur', () => {
+        // blur时如果还没保存（用户没选就点别处），还原
+        if (!saved) {
+            saved = true;
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        }
+    });
 }
 
 // 更新分页控件

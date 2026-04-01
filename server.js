@@ -289,6 +289,34 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
   });
 });
 
+// 单字段行内编辑（PATCH）
+gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
+  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality'];
+  const updates = [];
+  const values = [];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowedFields.includes(key)) {
+      updates.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+  values.push(req.params.id);
+  const sql = `UPDATE games SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '游戏不存在' });
+    // 如果更新了 owner_id，返回关联的 owner_name
+    if (req.body.owner_id !== undefined) {
+      db.get('SELECT u.real_name as owner_name FROM games g LEFT JOIN users u ON g.owner_id = u.id WHERE g.id = ?', [req.params.id], (e, row) => {
+        res.json({ success: true, owner_name: row ? row.owner_name : null });
+      });
+    } else {
+      res.json({ success: true });
+    }
+  });
+});
+
 gamesRouter.delete('/:id', auth.checkPermission('games', 'delete'), (req, res) => {
   db.get('SELECT name FROM games WHERE id = ?', [req.params.id], (e, row) => {
     const sql = 'DELETE FROM games WHERE id = ?';
