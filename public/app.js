@@ -830,7 +830,7 @@ function renderGamesPage() {
                 rowHtml += `<td class="editable-cell" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
             }
             if (visibleColumns.storage_location) {
-                rowHtml += `<td>${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'storage_location', 'storage_location')" title="点击选择">${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
             }
 
             rowHtml += `

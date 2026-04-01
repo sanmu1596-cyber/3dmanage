@@ -291,7 +291,7 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
-  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality'];
+  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location'];
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {
