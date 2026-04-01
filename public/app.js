@@ -5208,9 +5208,7 @@ function injectBatchCheckboxes(tableId) {
     // 在序号列之前添加 checkbox 表头
     const th = document.createElement('th');
     th.className = 'batch-th';
-    th.style.width = '36px';
-    th.style.minWidth = '36px';
-    th.style.maxWidth = '36px';
+    th.style.cssText = 'width:36px;min-width:36px;max-width:36px;overflow:hidden;text-overflow:clip;padding:4px 2px;text-align:center;';
     th.innerHTML = `<input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('${tableId}', this.checked)">`;
     theadRow.insertBefore(th, theadRow.firstChild);
     
@@ -5228,9 +5226,7 @@ function injectBatchCheckboxes(tableId) {
         if (rowId === null) return;
         
         const td = document.createElement('td');
-        td.style.width = '36px';
-        td.style.minWidth = '36px';
-        td.style.maxWidth = '36px';
+        td.style.cssText = 'width:36px;min-width:36px;max-width:36px;overflow:hidden;text-overflow:clip;padding:4px 2px;text-align:center;';
         td.innerHTML = `<input type="checkbox" class="row-checkbox" data-id="${rowId}" data-resource="${resource}" onchange="batchToggleRow(this)">`;
         row.insertBefore(td, row.firstChild);
     });
