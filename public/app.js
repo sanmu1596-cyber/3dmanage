@@ -308,7 +308,7 @@ function initTabs() {
     });
 }
 
-// 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数)
+// 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数, 防抖动)
 let _tabSwitchCounter = 0; // 递增计数器，用于检测过时的tab切换
 function switchTab(tabId, fromHash) {
     const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
@@ -326,6 +326,8 @@ function switchTab(tabId, fromHash) {
     
     const content = document.getElementById(tabId);
     if (content) {
+        // 防抖动：先让内容区不可见（保留布局占位），数据加载完再显示
+        content.style.visibility = 'hidden';
         content.classList.add('active');
     } else {
         // fallback: 如果找不到对应 tab，跳到 dashboard
@@ -342,7 +344,12 @@ function switchTab(tabId, fromHash) {
 
     // 按需加载当前 tab 数据（避免每次 switchTab 全量刷新所有模块）
     // 传入切换序号，loadTabData内部可检测是否已过时
-    loadTabData(tabId, mySwitch);
+    loadTabData(tabId, mySwitch).then(() => {
+        // 数据加载+渲染完成后，显示内容区
+        if (content && mySwitch === _tabSwitchCounter) {
+            content.style.visibility = '';
+        }
+    });
 }
 
 // 按需加载当前Tab数据
@@ -4562,15 +4569,17 @@ function initColumnResize() {
     });
 }
 
-// 用 MutationObserver 自动监测表格变化，补全 resize 手柄
+// 用 MutationObserver 自动监测表格变化，补全 resize 手柄（防抖合并）
+let _resizeTimer = null;
 const _resizeObserver = new MutationObserver(() => {
-    initColumnResize();
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(initColumnResize, 80);
 });
 
 // 在 DOM 加载完成后启动 observer
 document.addEventListener('DOMContentLoaded', () => {
     // 初始化一次
-    setTimeout(initColumnResize, 500);
+    setTimeout(initColumnResize, 300);
 
     // 监测所有 table-container 区域的子树变化
     document.querySelectorAll('.table-container, .tab-content').forEach(container => {
@@ -4882,10 +4891,10 @@ function addTableTooltips() {
     });
 }
 
-// 在 MutationObserver 中也触发 tooltip
+// 在 MutationObserver 中也触发 tooltip（延迟足够长，让其他DOM操作先完成）
 const _tooltipObserver = new MutationObserver(() => {
     clearTimeout(window._tooltipTimer);
-    window._tooltipTimer = setTimeout(addTableTooltips, 200);
+    window._tooltipTimer = setTimeout(addTableTooltips, 500);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -5286,20 +5295,25 @@ async function batchDelete() {
     });
 }
 
-// 在表格渲染后自动注入checkbox（使用 MutationObserver）
+// 在表格渲染后自动注入checkbox（使用 MutationObserver + 防抖合并）
+let _batchTimers = {};
 const _batchObserver = new MutationObserver((mutations) => {
     mutations.forEach(m => {
         const tbody = m.target;
         if (tbody.id && tableToBatchResource[tbody.id]) {
-            // 先清除全选状态
-            batchState.selected.clear();
-            updateBatchBar();
-            // 移除旧的 checkbox 列头
-            const theadRow = tbody.closest('table')?.querySelector('thead tr');
-            const oldTh = theadRow?.querySelector('.batch-th');
-            if (oldTh) oldTh.remove();
-            // 重新注入
-            setTimeout(() => injectBatchCheckboxes(tbody.id), 50);
+            // 防抖：合并同一 tbody 的多次变更
+            clearTimeout(_batchTimers[tbody.id]);
+            _batchTimers[tbody.id] = setTimeout(() => {
+                // 先清除全选状态
+                batchState.selected.clear();
+                updateBatchBar();
+                // 移除旧的 checkbox 列头
+                const theadRow = tbody.closest('table')?.querySelector('thead tr');
+                const oldTh = theadRow?.querySelector('.batch-th');
+                if (oldTh) oldTh.remove();
+                // 重新注入
+                injectBatchCheckboxes(tbody.id);
+            }, 80);
         }
     });
 });
