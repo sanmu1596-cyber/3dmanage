@@ -664,45 +664,7 @@ body {
     border-right: none;
 }
 
-/* ====== 冻结前两列（序号 + 名称）—— 全局生效 ====== */
-.data-table th:nth-child(1),
-.data-table td:nth-child(1) {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    min-width: 50px;
-}
-.data-table th:nth-child(2),
-.data-table td:nth-child(2) {
-    position: sticky;
-    left: 50px;
-    z-index: 2;
-    min-width: 100px;
-    border-right: 2px solid rgba(47, 127, 187, 0.3);
-}
-/* 表头冻结列：z-index 更高（行列交叉点） */
-.data-table th:nth-child(1),
-.data-table th:nth-child(2) {
-    z-index: 12;
-}
-/* 冻结列 td 背景色：不透明覆盖，避免滚动穿透 */
-.data-table tbody tr:nth-child(odd) td:nth-child(1),
-.data-table tbody tr:nth-child(odd) td:nth-child(2) {
-    background: #f5f9fc;
-}
-.data-table tbody tr:nth-child(even) td:nth-child(1),
-.data-table tbody tr:nth-child(even) td:nth-child(2) {
-    background: #e8f2fa;
-}
-.data-table tbody tr:hover td:nth-child(1),
-.data-table tbody tr:hover td:nth-child(2) {
-    background: #d6e9f5;
-}
-/* 选中行的冻结列背景 */
-.data-table tbody tr.selected td:nth-child(1),
-.data-table tbody tr.selected td:nth-child(2) {
-    background: #cce2f0;
-}
+
 
 /* 列宽拖拽手柄 */
 .col-resize-handle {

@@ -802,7 +802,9 @@ function renderGamesPage() {
                 rowHtml += `<td>${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
             }
             if (visibleColumns.game_account) {
-                rowHtml += `<td>${escapeHtml(game.game_account || '-')}</td>`;
+                const acctText = game.game_account || '-';
+                const acctHtml = acctText.split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
+                rowHtml += `<td style="white-space:nowrap;font-size:12px;">${acctHtml}</td>`;
             }
             if (visibleColumns.storage_location) {
                 rowHtml += `<td>${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
