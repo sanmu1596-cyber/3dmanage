@@ -2312,7 +2312,8 @@ async function loadAdaptationRecords() {
                 adapterProgress: r.adapter_progress || 0,
                 ownerName: r.owner_name || '-',
                 onlineStatus: r.online_status || 'pending',
-                quality: r.quality || 'normal'
+                quality: r.quality || 'normal',
+                updatedAt: r.updated_at || null
             }));
 
             progressData.push({
@@ -2380,7 +2381,7 @@ function renderProgressTable(deviceIndex) {
     if (!progressData[deviceIndex] || progressData[deviceIndex].games.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="empty-state">
+                <td colspan="10" class="empty-state">
                     <div class="empty-icon">📊</div>
                     <div class="empty-text">暂无适配数据</div>
                     <div class="empty-sub">该设备暂无游戏适配记录</div>
@@ -2424,6 +2425,7 @@ function renderProgressTable(deviceIndex) {
             <td class="editable-cell text-center" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(qualityMap[gameData.quality] || '-')}</span>
             </td>
+            <td class="text-center">${gameData.updatedAt ? formatDate(gameData.updatedAt) : '-'}</td>
             <td class="text-center">
                 <button class="btn btn-small btn-delete" onclick="deleteProgressItem(${deviceIndex}, ${gameData.id})">删除</button>
             </td>
