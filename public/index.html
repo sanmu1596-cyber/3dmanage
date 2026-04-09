@@ -174,7 +174,6 @@
                             <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>添加一行</button>
                             <span class="toolbar-divider"></span>
                             <button class="tool-btn" onclick="toggleColumnSettings()"><span class="tool-icon">⚙</span>字段设置</button>
-                            <button class="tool-btn" onclick="document.getElementById('filter-panel').classList.toggle('show')"><span class="tool-icon">🔍</span>筛选</button>
                             <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
                             <button class="tool-btn" onclick="document.getElementById('excel-upload').click()"><span class="tool-icon">📥</span>导入</button>
                             <button class="tool-btn" onclick="exportToExcel('games')"><span class="tool-icon">📤</span>导出</button>
@@ -193,8 +192,8 @@
                         </div>
                     </div>
 
-                    <!-- 筛选面板（可折叠） -->
-                    <div id="filter-panel" class="filter-panel">
+                    <!-- 筛选面板（常驻） -->
+                    <div id="filter-panel" class="filter-panel show">
                         <div class="filter-row">
                             <div class="filter-group">
                                 <label>搜索</label>
