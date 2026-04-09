@@ -427,6 +427,9 @@ async function loadTabData(tabId, switchId) {
             await loadFieldOptions();
             renderFieldCards();
             break;
+        case 'test-cases':
+            await loadTestCases();
+            break;
         case 'user-management':
             await umLoadData();
             break;
@@ -6365,5 +6368,390 @@ showCreatePlanView = function() {
             allMembersData.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
     }
 };
+
+
+// ==================== 测试用例模块 ====================
+let allTestCasesData = [];
+let filteredTestCasesData = [];
+let selectedTestCaseIds = new Set();
+
+// 加载测试用例列表
+async function loadTestCases() {
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases`);
+        const result = await resp.json();
+        if (result.success) {
+            allTestCasesData = result.data || [];
+            filteredTestCasesData = [...allTestCasesData];
+            renderTestCases();
+            updateTestCaseStats();
+        }
+    } catch (e) {
+        console.error('加载测试用例失败:', e);
+        showToast('加载测试用例失败', 'danger');
+    }
+}
+
+// 渲染测试用例表格
+function renderTestCases() {
+    const tbody = document.getElementById('test-cases-table');
+    if (!tbody) return;
+    
+    if (filteredTestCasesData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📝</div><div>暂无测试用例</div><div class="empty-sub">点击"新增用例"创建第一个测试用例</div></td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = filteredTestCasesData.map((tc, i) => `
+        <tr data-id="${tc.id}" class="${selectedTestCaseIds.has(tc.id) ? 'tc-selected' : ''}">
+            <td><input type="checkbox" class="tc-checkbox" data-id="${tc.id}" ${selectedTestCaseIds.has(tc.id) ? 'checked' : ''} onchange="toggleTestCaseSelect(${tc.id})"></td>
+            <td>${i + 1}</td>
+            <td><span class="tc-code">${escapeHtml(tc.code || '-')}</span></td>
+            <td><strong>${escapeHtml(tc.name)}</strong></td>
+            <td><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
+            <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+            <td><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
+            <td><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
+            <td><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
+            <td><span class="tc-type-tag ${tc.is_template ? 'template' : 'normal'}">${tc.is_template ? '模板' : '普通'}</span></td>
+            <td>
+                <div class="action-btns">
+                    <button class="action-btn edit-btn" onclick="editTestCase(${tc.id})" title="编辑">✏️</button>
+                    <button class="action-btn" onclick="copyTestCase(${tc.id})" title="复制">📋</button>
+                    <button class="action-btn delete-btn" onclick="deleteTestCase(${tc.id})" title="删除">🗑️</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// 获取优先级标签文本
+function getPriorityLabel(priority) {
+    const labels = { high: '高', medium: '中', low: '低' };
+    return labels[priority] || '中';
+}
+
+// 更新测试用例统计
+function updateTestCaseStats() {
+    const total = allTestCasesData.length;
+    const highCount = allTestCasesData.filter(tc => tc.priority === 'high').length;
+    const templateCount = allTestCasesData.filter(tc => tc.is_template).length;
+    
+    const statTotal = document.getElementById('tc-stat-total');
+    const statHigh = document.getElementById('tc-stat-high');
+    const statTemplate = document.getElementById('tc-stat-template');
+    
+    if (statTotal) statTotal.textContent = total;
+    if (statHigh) statHigh.textContent = highCount;
+    if (statTemplate) statTemplate.textContent = templateCount;
+}
+
+// 筛选测试用例
+function filterTestCases() {
+    const search = (document.getElementById('tc-search')?.value || '').toLowerCase();
+    const category = document.getElementById('tc-category-filter')?.value || '';
+    const priority = document.getElementById('tc-priority-filter')?.value || '';
+    const templateFilter = document.getElementById('tc-template-filter')?.value || '';
+    
+    filteredTestCasesData = allTestCasesData.filter(tc => {
+        if (search && !tc.name.toLowerCase().includes(search) && 
+            !(tc.code || '').toLowerCase().includes(search) &&
+            !(tc.tags || '').toLowerCase().includes(search)) {
+            return false;
+        }
+        if (category && tc.category !== category) return false;
+        if (priority && tc.priority !== priority) return false;
+        if (templateFilter !== '' && String(tc.is_template) !== templateFilter) return false;
+        return true;
+    });
+    
+    renderTestCases();
+}
+
+// 重置筛选
+function resetTestCaseFilters() {
+    const search = document.getElementById('tc-search');
+    const category = document.getElementById('tc-category-filter');
+    const priority = document.getElementById('tc-priority-filter');
+    const template = document.getElementById('tc-template-filter');
+    
+    if (search) search.value = '';
+    if (category) category.value = '';
+    if (priority) priority.value = '';
+    if (template) template.value = '';
+    
+    filteredTestCasesData = [...allTestCasesData];
+    renderTestCases();
+}
+
+// 打开新增/编辑弹窗
+function openTestCaseModal(tc = null) {
+    const modal = document.getElementById('test-case-modal');
+    const title = document.getElementById('test-case-modal-title');
+    const form = document.getElementById('test-case-form');
+    
+    form.reset();
+    document.getElementById('tc-id').value = '';
+    
+    if (tc) {
+        title.textContent = '编辑测试用例';
+        document.getElementById('tc-id').value = tc.id;
+        document.getElementById('tc-name').value = tc.name || '';
+        document.getElementById('tc-code').value = tc.code || '';
+        document.getElementById('tc-category').value = tc.category || '功能测试';
+        document.getElementById('tc-priority').value = tc.priority || 'medium';
+        document.getElementById('tc-precondition').value = tc.precondition || '';
+        document.getElementById('tc-steps').value = tc.steps || '';
+        document.getElementById('tc-expected').value = tc.expected_result || '';
+        document.getElementById('tc-tags').value = tc.tags || '';
+        document.getElementById('tc-is-template').checked = !!tc.is_template;
+    } else {
+        title.textContent = '新增测试用例';
+    }
+    
+    openModal('test-case-modal');
+}
+
+// 编辑测试用例
+function editTestCase(id) {
+    const tc = allTestCasesData.find(t => t.id === id);
+    if (tc) openTestCaseModal(tc);
+}
+
+// 提交测试用例表单
+async function submitTestCaseForm(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('tc-id').value;
+    const payload = {
+        name: document.getElementById('tc-name').value.trim(),
+        code: document.getElementById('tc-code').value.trim(),
+        category: document.getElementById('tc-category').value,
+        priority: document.getElementById('tc-priority').value,
+        precondition: document.getElementById('tc-precondition').value.trim(),
+        steps: document.getElementById('tc-steps').value.trim(),
+        expected_result: document.getElementById('tc-expected').value.trim(),
+        tags: document.getElementById('tc-tags').value.trim(),
+        is_template: document.getElementById('tc-is-template').checked ? 1 : 0
+    };
+    
+    if (!payload.name) {
+        showToast('用例名称不能为空', 'warning');
+        return;
+    }
+    
+    try {
+        const url = id ? `${API_BASE}/test-cases/${id}` : `${API_BASE}/test-cases`;
+        const method = id ? 'PUT' : 'POST';
+        
+        const resp = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            showToast(id ? '用例已更新' : '用例已创建', 'success');
+            closeModal('test-case-modal');
+            await loadTestCases();
+        } else {
+            showToast('保存失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('保存失败，请重试', 'danger');
+    }
+}
+
+// 删除测试用例
+function deleteTestCase(id) {
+    const tc = allTestCasesData.find(t => t.id === id);
+    showConfirm(`确定删除用例「${tc?.name || ''}」吗？`, async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/test-cases/${id}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('用例已删除', 'success');
+                await loadTestCases();
+            } else {
+                showToast('删除失败: ' + (result.error || ''), 'danger');
+            }
+        } catch (e) {
+            showToast('删除失败，请重试', 'danger');
+        }
+    });
+}
+
+// 复制测试用例
+async function copyTestCase(id) {
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/${id}/copy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast('用例已复制', 'success');
+            await loadTestCases();
+        } else {
+            showToast('复制失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('复制失败，请重试', 'danger');
+    }
+}
+
+// 全选/取消全选
+function toggleSelectAllTestCases() {
+    const checkbox = document.getElementById('tc-select-all');
+    const isChecked = checkbox?.checked;
+    
+    if (isChecked) {
+        filteredTestCasesData.forEach(tc => selectedTestCaseIds.add(tc.id));
+    } else {
+        selectedTestCaseIds.clear();
+    }
+    
+    renderTestCases();
+}
+
+// 单选
+function toggleTestCaseSelect(id) {
+    if (selectedTestCaseIds.has(id)) {
+        selectedTestCaseIds.delete(id);
+    } else {
+        selectedTestCaseIds.add(id);
+    }
+    renderTestCases();
+}
+
+// 批量删除
+async function batchDeleteTestCases() {
+    if (selectedTestCaseIds.size === 0) {
+        showToast('请先选择要删除的用例', 'warning');
+        return;
+    }
+    
+    showConfirm(`确定删除选中的 ${selectedTestCaseIds.size} 条用例吗？`, async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/test-cases/batch-delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedTestCaseIds) })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                showToast(`已删除 ${result.deleted} 条用例`, 'success');
+                selectedTestCaseIds.clear();
+                await loadTestCases();
+            } else {
+                showToast('批量删除失败', 'danger');
+            }
+        } catch (e) {
+            showToast('批量删除失败', 'danger');
+        }
+    });
+}
+
+// 打开批量添加弹窗
+function openBatchTestCaseModal() {
+    const textarea = document.getElementById('batch-tc-input');
+    if (textarea) textarea.value = '';
+    openModal('batch-test-case-modal');
+}
+
+// 加载批量添加模板
+function loadBatchTestCaseTemplate() {
+    const template = `游戏启动正常 | 功能测试 | high | 1. 点击游戏图标启动 2. 等待加载完成 | 游戏正常进入主界面
+画面无撕裂 | 性能测试 | medium | 1. 进入游戏场景 2. 快速移动视角 | 画面流畅无撕裂
+3D效果开启 | 适配验收 | high | 1. 进入设置 2. 开启3D效果 | 3D效果正常显示
+安装流程正常 | 安装卸载 | high | 1. 下载安装包 2. 执行安装 | 安装成功，无报错
+卸载流程正常 | 安装卸载 | medium | 1. 进入应用管理 2. 卸载游戏 | 卸载成功，无残留文件
+存档功能 | 功能测试 | medium | 1. 进入游戏 2. 保存进度 3. 退出重进 | 存档正常加载
+声音正常 | 功能测试 | low | 1. 进入游戏 2. 检查BGM和音效 | 音频播放正常
+UI显示正确 | UI测试 | medium | 1. 进入各界面 2. 检查UI元素 | UI显示完整无错位`;
+    
+    const textarea = document.getElementById('batch-tc-input');
+    if (textarea) textarea.value = template;
+}
+
+// 提交批量添加
+async function submitBatchTestCases() {
+    const textarea = document.getElementById('batch-tc-input');
+    const input = textarea?.value.trim();
+    
+    if (!input) {
+        showToast('请输入用例数据', 'warning');
+        return;
+    }
+    
+    const lines = input.split('\n').filter(line => line.trim());
+    const cases = [];
+    
+    for (const line of lines) {
+        const parts = line.split('|').map(p => p.trim());
+        if (parts.length < 1 || !parts[0]) continue;
+        
+        cases.push({
+            name: parts[0],
+            category: parts[1] || '功能测试',
+            priority: parts[2] || 'medium',
+            steps: parts[3] || '',
+            expected_result: parts[4] || ''
+        });
+    }
+    
+    if (cases.length === 0) {
+        showToast('未解析到有效用例', 'warning');
+        return;
+    }
+    
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cases })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast(`成功添加 ${result.created} 条用例`, 'success');
+            closeModal('batch-test-case-modal');
+            await loadTestCases();
+        } else {
+            showToast('批量添加失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('批量添加失败', 'danger');
+    }
+}
+
+// 导出测试用例到Excel
+function exportTestCasesToExcel() {
+    if (allTestCasesData.length === 0) {
+        showToast('没有可导出的数据', 'warning');
+        return;
+    }
+    
+    const data = allTestCasesData.map((tc, i) => ({
+        '序号': i + 1,
+        '用例编号': tc.code || '',
+        '用例名称': tc.name,
+        '分类': tc.category || '',
+        '优先级': getPriorityLabel(tc.priority),
+        '前置条件': tc.precondition || '',
+        '测试步骤': tc.steps || '',
+        '预期结果': tc.expected_result || '',
+        '类型': tc.is_template ? '模板' : '普通',
+        '标签': tc.tags || ''
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '测试用例');
+    XLSX.writeFile(wb, `测试用例_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast('导出成功', 'success');
+}
+
 
 

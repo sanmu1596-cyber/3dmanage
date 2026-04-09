@@ -1015,6 +1015,211 @@ function syncPlanGamesToAdaptation(planGameIds, callback) {
   });
 }
 
+// ==================== 测试用例 API ====================
+const testCasesRouter = express.Router();
+testCasesRouter.use(auth.verifyToken);
+
+// 初始化测试用例表（使用 serialize 确保同步执行）
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS test_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT,
+    category TEXT DEFAULT '功能测试',
+    game_type TEXT,
+    priority TEXT DEFAULT 'medium',
+    precondition TEXT,
+    steps TEXT,
+    expected_result TEXT,
+    is_template INTEGER DEFAULT 0,
+    tags TEXT,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // 初始化计划-用例关联表
+  db.run(`CREATE TABLE IF NOT EXISTS plan_test_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    plan_game_id INTEGER,
+    test_case_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    executor_id INTEGER,
+    executed_at DATETIME,
+    remark TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plan_id) REFERENCES plans(id),
+    FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+  )`);
+
+  // 添加索引
+  db.run('CREATE INDEX IF NOT EXISTS idx_test_cases_category ON test_cases(category)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_test_cases_priority ON test_cases(priority)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_plan_test_cases_plan ON plan_test_cases(plan_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_plan_test_cases_status ON plan_test_cases(status)');
+});
+
+// 获取所有测试用例
+testCasesRouter.get('/', (req, res) => {
+  const { category, priority, game_type, is_template, search } = req.query;
+  let sql = `SELECT tc.*, u.real_name as creator_name FROM test_cases tc 
+             LEFT JOIN users u ON tc.created_by = u.id WHERE 1=1`;
+  const params = [];
+  
+  if (category) { sql += ' AND tc.category = ?'; params.push(category); }
+  if (priority) { sql += ' AND tc.priority = ?'; params.push(priority); }
+  if (game_type) { sql += ' AND tc.game_type = ?'; params.push(game_type); }
+  if (is_template !== undefined) { sql += ' AND tc.is_template = ?'; params.push(is_template); }
+  if (search) { 
+    sql += ' AND (tc.name LIKE ? OR tc.code LIKE ? OR tc.tags LIKE ?)'; 
+    const like = `%${search}%`;
+    params.push(like, like, like); 
+  }
+  
+  sql += ' ORDER BY tc.created_at DESC';
+  
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 获取单个测试用例
+testCasesRouter.get('/:id', (req, res) => {
+  db.get(`SELECT tc.*, u.real_name as creator_name FROM test_cases tc 
+          LEFT JOIN users u ON tc.created_by = u.id WHERE tc.id = ?`, [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '用例不存在' });
+    res.json({ success: true, data: row });
+  });
+});
+
+// 创建测试用例
+testCasesRouter.post('/', (req, res) => {
+  const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags } = req.body;
+  if (!name) return res.status(400).json({ error: '用例名称不能为空' });
+  
+  const creatorId = req.user ? req.user.id : null;
+  const sql = `INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, created_by) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [name, code || '', category || '功能测试', game_type || '', priority || 'medium', 
+               precondition || '', steps || '', expected_result || '', is_template || 0, tags || '', creatorId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('create', 'test_case', this.lastID, name);
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+// 批量创建测试用例
+testCasesRouter.post('/batch', (req, res) => {
+  const { cases } = req.body;
+  if (!cases || !Array.isArray(cases) || cases.length === 0) {
+    return res.status(400).json({ error: 'cases 必须是非空数组' });
+  }
+  
+  const creatorId = req.user ? req.user.id : null;
+  const stmt = db.prepare(`INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, created_by) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  let count = 0;
+  let errors = 0;
+  
+  cases.forEach(c => {
+    if (!c.name) { errors++; return; }
+    stmt.run([c.name, c.code || '', c.category || '功能测试', c.game_type || '', c.priority || 'medium',
+              c.precondition || '', c.steps || '', c.expected_result || '', c.is_template || 0, c.tags || '', creatorId], (err) => {
+      if (err) errors++; else count++;
+    });
+  });
+  
+  stmt.finalize(() => {
+    res.json({ success: true, created: count, errors });
+  });
+});
+
+// 更新测试用例
+testCasesRouter.put('/:id', (req, res) => {
+  const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags } = req.body;
+  const sql = `UPDATE test_cases SET name = COALESCE(?, name), code = COALESCE(?, code), 
+               category = COALESCE(?, category), game_type = COALESCE(?, game_type),
+               priority = COALESCE(?, priority), precondition = COALESCE(?, precondition),
+               steps = COALESCE(?, steps), expected_result = COALESCE(?, expected_result),
+               is_template = COALESCE(?, is_template), tags = COALESCE(?, tags),
+               updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '用例不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 删除测试用例
+testCasesRouter.delete('/:id', (req, res) => {
+  db.run('DELETE FROM test_cases WHERE id = ?', [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 批量删除测试用例
+testCasesRouter.post('/batch-delete', (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids 必须是非空数组' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  db.run(`DELETE FROM test_cases WHERE id IN (${placeholders})`, ids, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+// 复制测试用例（用于从模板创建）
+testCasesRouter.post('/:id/copy', (req, res) => {
+  db.get('SELECT * FROM test_cases WHERE id = ?', [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '用例不存在' });
+    
+    const creatorId = req.user ? req.user.id : null;
+    const newName = req.body.name || `${row.name} (副本)`;
+    const sql = `INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`;
+    db.run(sql, [newName, row.code, row.category, row.game_type, row.priority, row.precondition, row.steps, row.expected_result, row.tags, creatorId], function(e) {
+      if (e) return res.status(500).json({ error: e.message });
+      res.json({ success: true, id: this.lastID });
+    });
+  });
+});
+
+// 获取用例分类统计
+testCasesRouter.get('/stats/summary', (req, res) => {
+  const queries = [
+    { key: 'total', sql: 'SELECT COUNT(*) as count FROM test_cases' },
+    { key: 'by_category', sql: 'SELECT category, COUNT(*) as count FROM test_cases GROUP BY category' },
+    { key: 'by_priority', sql: 'SELECT priority, COUNT(*) as count FROM test_cases GROUP BY priority' },
+    { key: 'templates', sql: 'SELECT COUNT(*) as count FROM test_cases WHERE is_template = 1' },
+  ];
+  
+  const stats = {};
+  let completed = 0;
+  
+  queries.forEach(q => {
+    if (q.key === 'total' || q.key === 'templates') {
+      db.get(q.sql, [], (err, row) => {
+        stats[q.key] = err ? 0 : (row ? row.count : 0);
+        completed++;
+        if (completed === queries.length) res.json({ success: true, data: stats });
+      });
+    } else {
+      db.all(q.sql, [], (err, rows) => {
+        stats[q.key] = err ? [] : rows;
+        completed++;
+        if (completed === queries.length) res.json({ success: true, data: stats });
+      });
+    }
+  });
+});
+
 // ==================== 设备适配统计自动计算 API ====================
 // 重新计算某设备的适配统计（基于 adaptation_records）
 function recalcDeviceStats(deviceId) {
@@ -1181,6 +1386,7 @@ app.use('/api/field-options', fieldOptionsRouter);
 app.use('/api/adaptations', adaptationRouter);
 app.use('/api/plans', plansRouter);
 app.use('/api/my-tasks', myTasksRouter);
+app.use('/api/test-cases', testCasesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/batch', batchRouter);
 
