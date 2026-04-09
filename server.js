@@ -887,12 +887,60 @@ myTasksRouter.get('/', (req, res) => {
   
   db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const data = rows.map(r => ({
-      ...r,
-      devices_json: JSON.parse(r.devices_json || '[]'),
-      bugs_json: JSON.parse(r.bugs_json || '[]')
-    }));
-    res.json({ success: true, data });
+    
+    // 获取每个 plan_game 的测试用例统计
+    const planGameIds = rows.map(r => r.id);
+    if (planGameIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const placeholders = planGameIds.map(() => '?').join(',');
+    const tcStatsSql = `SELECT plan_game_id,
+      COUNT(*) as tc_total,
+      SUM(CASE WHEN status = 'pass' THEN 1 ELSE 0 END) as tc_pass,
+      SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as tc_fail,
+      SUM(CASE WHEN status = 'block' THEN 1 ELSE 0 END) as tc_block,
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as tc_pending
+      FROM plan_test_cases WHERE plan_game_id IN (${placeholders}) GROUP BY plan_game_id`;
+    
+    db.all(tcStatsSql, planGameIds, (tcErr, tcStats) => {
+      const tcStatsMap = {};
+      if (!tcErr && tcStats) {
+        tcStats.forEach(s => { tcStatsMap[s.plan_game_id] = s; });
+      }
+      
+      const data = rows.map(r => {
+        const tcStat = tcStatsMap[r.id] || { tc_total: 0, tc_pass: 0, tc_fail: 0, tc_block: 0, tc_pending: 0 };
+        return {
+          ...r,
+          devices_json: JSON.parse(r.devices_json || '[]'),
+          bugs_json: JSON.parse(r.bugs_json || '[]'),
+          tc_total: tcStat.tc_total,
+          tc_pass: tcStat.tc_pass,
+          tc_fail: tcStat.tc_fail,
+          tc_block: tcStat.tc_block,
+          tc_pending: tcStat.tc_pending,
+          tc_progress: tcStat.tc_total > 0 ? Math.round((tcStat.tc_total - tcStat.tc_pending) / tcStat.tc_total * 100) : 0
+        };
+      });
+      res.json({ success: true, data });
+    });
+  });
+});
+
+// 获取某任务关联的测试用例列表（用于 Checklist 展示）
+myTasksRouter.get('/:planGameId/test-cases', (req, res) => {
+  const sql = `SELECT ptc.id, ptc.test_case_id, ptc.status, ptc.remark, ptc.executed_at,
+               tc.name, tc.code, tc.category, tc.priority, tc.steps, tc.expected_result, tc.precondition
+               FROM plan_test_cases ptc
+               JOIN test_cases tc ON ptc.test_case_id = tc.id
+               WHERE ptc.plan_game_id = ?
+               ORDER BY 
+                 CASE tc.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+                 tc.id`;
+  db.all(sql, [req.params.planGameId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
   });
 });
 
@@ -1217,6 +1265,98 @@ testCasesRouter.get('/stats/summary', (req, res) => {
         if (completed === queries.length) res.json({ success: true, data: stats });
       });
     }
+  });
+});
+
+// ==================== 计划-游戏-用例关联 API ====================
+// 获取某个 plan_game 关联的测试用例
+testCasesRouter.get('/plan-game/:planGameId', (req, res) => {
+  const sql = `SELECT ptc.*, tc.name, tc.code, tc.category, tc.priority, tc.steps, tc.expected_result
+               FROM plan_test_cases ptc
+               JOIN test_cases tc ON ptc.test_case_id = tc.id
+               WHERE ptc.plan_game_id = ?
+               ORDER BY tc.priority DESC, ptc.id`;
+  db.all(sql, [req.params.planGameId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 为 plan_game 关联测试用例（批量）
+testCasesRouter.post('/plan-game/:planGameId/link', (req, res) => {
+  const { plan_id, test_case_ids } = req.body;
+  const planGameId = req.params.planGameId;
+  
+  if (!test_case_ids || !Array.isArray(test_case_ids) || test_case_ids.length === 0) {
+    return res.status(400).json({ error: 'test_case_ids 必须是非空数组' });
+  }
+  
+  // 先删除已有关联，再批量插入
+  db.run('DELETE FROM plan_test_cases WHERE plan_game_id = ?', [planGameId], function(delErr) {
+    if (delErr) return res.status(500).json({ error: delErr.message });
+    
+    const stmt = db.prepare(`INSERT INTO plan_test_cases (plan_id, plan_game_id, test_case_id, status) VALUES (?, ?, ?, 'pending')`);
+    let count = 0;
+    test_case_ids.forEach(tcId => {
+      stmt.run([plan_id, planGameId, tcId], (err) => { if (!err) count++; });
+    });
+    stmt.finalize(() => {
+      res.json({ success: true, linked: count });
+    });
+  });
+});
+
+// 更新单条 plan_test_case 的执行状态 (pass/fail/block/pending)
+testCasesRouter.put('/execution/:ptcId', (req, res) => {
+  const { status, remark } = req.body;
+  const executorId = req.user ? req.user.id : null;
+  const executedAt = (status && status !== 'pending') ? new Date().toISOString() : null;
+  
+  db.run(`UPDATE plan_test_cases SET status = ?, remark = ?, executor_id = ?, executed_at = ? WHERE id = ?`,
+    [status, remark || '', executorId, executedAt, req.params.ptcId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '记录不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 批量更新用例执行状态
+testCasesRouter.post('/execution/batch', (req, res) => {
+  const { updates } = req.body; // [{id, status, remark}]
+  if (!updates || !Array.isArray(updates)) {
+    return res.status(400).json({ error: 'updates 必须是数组' });
+  }
+  
+  const executorId = req.user ? req.user.id : null;
+  const stmt = db.prepare(`UPDATE plan_test_cases SET status = ?, remark = ?, executor_id = ?, executed_at = ? WHERE id = ?`);
+  let count = 0;
+  
+  updates.forEach(u => {
+    const executedAt = (u.status && u.status !== 'pending') ? new Date().toISOString() : null;
+    stmt.run([u.status, u.remark || '', executorId, executedAt, u.id], (err) => { if (!err) count++; });
+  });
+  
+  stmt.finalize(() => {
+    res.json({ success: true, updated: count });
+  });
+});
+
+// 获取 plan_game 的用例执行进度统计
+testCasesRouter.get('/plan-game/:planGameId/progress', (req, res) => {
+  const sql = `SELECT 
+    COUNT(*) as total,
+    SUM(CASE WHEN status = 'pass' THEN 1 ELSE 0 END) as passed,
+    SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as failed,
+    SUM(CASE WHEN status = 'block' THEN 1 ELSE 0 END) as blocked,
+    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+    FROM plan_test_cases WHERE plan_game_id = ?`;
+  db.get(sql, [req.params.planGameId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const total = row?.total || 0;
+    const executed = total - (row?.pending || 0);
+    const passRate = total > 0 ? Math.round((row?.passed || 0) / total * 100) : 0;
+    const progress = total > 0 ? Math.round(executed / total * 100) : 0;
+    res.json({ success: true, data: { ...row, progress, passRate } });
   });
 });
 

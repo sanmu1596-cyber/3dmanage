@@ -3518,6 +3518,7 @@ function renderPlanDetailGames(planIndex) {
                         onchange="updatePlanGameRemark(${planIndex}, ${idx}, this.value)">
                 </td>
                 <td class="text-center">
+                    <button class="btn btn-small" onclick="openLinkTestCaseModal(${planIndex}, ${idx})" title="关联测试用例">📝用例</button>
                     <button class="btn btn-small btn-delete" onclick="deletePlanGame(${planIndex}, ${idx})">删除</button>
                 </td>
             </tr>
@@ -6208,10 +6209,26 @@ function renderMyTasksTable() {
         return;
     }
 
-    tbody.innerHTML = myTasksFiltered.map((task, index) => `
+
+    tbody.innerHTML = myTasksFiltered.map((task, index) => {
+        // 用例统计信息
+        const tcTotal = task.tc_total || 0;
+        const tcProgress = task.tc_progress || 0;
+        const tcBadgeClass = tcTotal > 0 ? 'has-cases' : '';
+        const tcBadge = tcTotal > 0 
+            ? `<span class="tc-count-badge ${tcBadgeClass}" onclick="openExecTestCaseModal(${index})" title="点击执行测试用例">
+                 📝 ${tcTotal}条
+                 <span class="tc-progress-mini"><span class="tc-progress-mini-fill" style="width:${tcProgress}%"></span></span>
+               </span>`
+            : `<span class="tc-count-badge" style="opacity:0.5">无用例</span>`;
+        
+        return `
         <tr>
             <td class="text-center"><strong>${index + 1}</strong></td>
-            <td>${escapeHtml(task.game_name || '')}</td>
+            <td>
+                ${escapeHtml(task.game_name || '')}
+                <div style="margin-top:4px;">${tcBadge}</div>
+            </td>
             <td>${escapeHtml(task.game_platform || task.game_platform_full || '-')}</td>
             <td>
                 <select class="adapt-status-select" data-task-id="${task.id}" onchange="onMyTaskFieldChange(${index})">
@@ -6239,7 +6256,7 @@ function renderMyTasksTable() {
                 <button class="tool-btn tool-btn-primary" style="padding:3px 10px;font-size:12px;" onclick="submitSingleTask(${index})">提交</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // 统计
     if (statsItems) {
@@ -6752,6 +6769,341 @@ function exportTestCasesToExcel() {
     XLSX.writeFile(wb, `测试用例_${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast('导出成功', 'success');
 }
+
+
+// ==================== 关联测试用例（配置计划用） ====================
+let linkTcAllCases = [];          // 所有可选用例
+let linkTcFilteredCases = [];     // 筛选后
+let linkTcSelectedIds = new Set(); // 已选中的用例ID
+let linkTcContext = null;          // {planId, planGameId, planIndex, gameIndex}
+
+// 打开关联用例弹窗
+async function openLinkTestCaseModal(planIndex, gameIndex) {
+    const plan = configPlans[planIndex];
+    const game = plan?.games[gameIndex];
+    if (!plan || !game) return;
+    
+    linkTcContext = {
+        planId: plan.id,
+        planGameId: game.id,
+        planIndex,
+        gameIndex
+    };
+    
+    document.getElementById('link-tc-modal-title').textContent = `关联测试用例 - ${game.name}`;
+    
+    // 加载所有测试用例
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases`);
+        const result = await resp.json();
+        linkTcAllCases = result.data || [];
+    } catch (e) {
+        linkTcAllCases = [];
+    }
+    
+    // 加载已关联的用例
+    try {
+        const linkedResp = await authFetch(`${API_BASE}/test-cases/plan-game/${game.id}`);
+        const linkedResult = await linkedResp.json();
+        const linkedIds = (linkedResult.data || []).map(tc => tc.test_case_id);
+        linkTcSelectedIds = new Set(linkedIds);
+    } catch (e) {
+        linkTcSelectedIds = new Set();
+    }
+    
+    linkTcFilteredCases = [...linkTcAllCases];
+    renderLinkTestCaseTable();
+    updateLinkTcSelectedCount();
+    
+    document.getElementById('link-tc-search').value = '';
+    document.getElementById('link-tc-category').value = '';
+    
+    openModal('link-test-case-modal');
+}
+
+// 渲染关联用例表格
+function renderLinkTestCaseTable() {
+    const tbody = document.getElementById('link-tc-table');
+    if (!tbody) return;
+    
+    if (linkTcFilteredCases.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">暂无测试用例</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = linkTcFilteredCases.map(tc => {
+        const isSelected = linkTcSelectedIds.has(tc.id);
+        return `
+            <tr class="${isSelected ? 'selected' : ''}" onclick="toggleLinkTcSelect(${tc.id})">
+                <td><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleLinkTcSelect(${tc.id})"></td>
+                <td>${escapeHtml(tc.code || '-')}</td>
+                <td>${escapeHtml(tc.name)}</td>
+                <td><span class="tc-category-tag">${escapeHtml(tc.category || '')}</span></td>
+                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 筛选关联用例
+function filterLinkTestCases() {
+    const search = (document.getElementById('link-tc-search')?.value || '').toLowerCase();
+    const category = document.getElementById('link-tc-category')?.value || '';
+    
+    linkTcFilteredCases = linkTcAllCases.filter(tc => {
+        if (search && !tc.name.toLowerCase().includes(search) && !(tc.code || '').toLowerCase().includes(search)) {
+            return false;
+        }
+        if (category && tc.category !== category) return false;
+        return true;
+    });
+    
+    renderLinkTestCaseTable();
+}
+
+// 切换选择
+function toggleLinkTcSelect(id) {
+    if (linkTcSelectedIds.has(id)) {
+        linkTcSelectedIds.delete(id);
+    } else {
+        linkTcSelectedIds.add(id);
+    }
+    renderLinkTestCaseTable();
+    updateLinkTcSelectedCount();
+}
+
+// 全选
+function toggleLinkTcSelectAll() {
+    const checkbox = document.getElementById('link-tc-select-all');
+    if (checkbox?.checked) {
+        linkTcFilteredCases.forEach(tc => linkTcSelectedIds.add(tc.id));
+    } else {
+        linkTcFilteredCases.forEach(tc => linkTcSelectedIds.delete(tc.id));
+    }
+    renderLinkTestCaseTable();
+    updateLinkTcSelectedCount();
+}
+
+// 更新已选数量
+function updateLinkTcSelectedCount() {
+    const el = document.getElementById('link-tc-selected-count');
+    if (el) el.textContent = linkTcSelectedIds.size;
+}
+
+// 确认关联
+async function confirmLinkTestCases() {
+    if (!linkTcContext) return;
+    
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/plan-game/${linkTcContext.planGameId}/link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan_id: linkTcContext.planId,
+                test_case_ids: Array.from(linkTcSelectedIds)
+            })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast(`已关联 ${result.linked} 条用例`, 'success');
+            closeModal('link-test-case-modal');
+            // 刷新计划详情
+            await loadPlanDetail(linkTcContext.planId);
+            renderPlanDetailGames(linkTcContext.planIndex);
+        } else {
+            showToast('关联失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('关联失败，请重试', 'danger');
+    }
+}
+
+
+// ==================== 执行测试用例（我的任务 Checklist） ====================
+let execTcList = [];          // 当前任务关联的测试用例
+let execTcContext = null;     // {taskId, taskIndex, gameName}
+let execTcChanges = {};       // 变更记录 {ptcId: {status, remark}}
+
+// 打开执行用例弹窗
+async function openExecTestCaseModal(taskIndex) {
+    const task = myTasksFiltered[taskIndex];
+    if (!task) return;
+    
+    execTcContext = {
+        taskId: task.id,
+        taskIndex,
+        gameName: task.game_name
+    };
+    execTcChanges = {};
+    
+    document.getElementById('exec-tc-modal-title').textContent = `执行测试用例 - ${task.game_name}`;
+    
+    // 加载关联的测试用例
+    try {
+        const resp = await authFetch(`${API_BASE}/my-tasks/${task.id}/test-cases`);
+        const result = await resp.json();
+        execTcList = result.data || [];
+    } catch (e) {
+        execTcList = [];
+        showToast('加载测试用例失败', 'danger');
+    }
+    
+    renderExecTestCaseTable();
+    updateExecTcProgress();
+    
+    openModal('exec-test-case-modal');
+}
+
+// 渲染执行用例表格
+function renderExecTestCaseTable() {
+    const tbody = document.getElementById('exec-tc-table');
+    if (!tbody) return;
+    
+    if (execTcList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-icon">📝</div><div>该任务暂未关联测试用例</div><div class="empty-sub">请在配置计划中为游戏关联测试用例</div></td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = execTcList.map((tc, i) => {
+        const currentStatus = execTcChanges[tc.id]?.status ?? tc.status;
+        const currentRemark = execTcChanges[tc.id]?.remark ?? tc.remark ?? '';
+        const statusClass = currentStatus !== 'pending' ? `status-${currentStatus}` : '';
+        
+        return `
+            <tr>
+                <td class="text-center">${i + 1}</td>
+                <td>${escapeHtml(tc.code || '-')}</td>
+                <td>
+                    <strong>${escapeHtml(tc.name)}</strong>
+                    ${tc.precondition ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">前置: ${escapeHtml(tc.precondition)}</div>` : ''}
+                </td>
+                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+                <td><span class="tc-cell-text">${escapeHtml(tc.steps || '-')}</span></td>
+                <td><span class="tc-cell-text">${escapeHtml(tc.expected_result || '-')}</span></td>
+                <td>
+                    <select class="exec-status-select ${statusClass}" data-ptc-id="${tc.id}" onchange="onExecStatusChange(${tc.id}, this)">
+                        <option value="pending" ${currentStatus === 'pending' ? 'selected' : ''}>⏳ 待执行</option>
+                        <option value="pass" ${currentStatus === 'pass' ? 'selected' : ''}>✅ Pass</option>
+                        <option value="fail" ${currentStatus === 'fail' ? 'selected' : ''}>❌ Fail</option>
+                        <option value="block" ${currentStatus === 'block' ? 'selected' : ''}>⏸️ Block</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="text" class="exec-remark-input" data-ptc-id="${tc.id}" value="${escapeHtml(currentRemark)}" 
+                        placeholder="备注..." onchange="onExecRemarkChange(${tc.id}, this.value)">
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 执行状态变更
+function onExecStatusChange(ptcId, selectEl) {
+    const status = selectEl.value;
+    if (!execTcChanges[ptcId]) execTcChanges[ptcId] = {};
+    execTcChanges[ptcId].status = status;
+    
+    // 更新样式
+    selectEl.className = 'exec-status-select ' + (status !== 'pending' ? `status-${status}` : '');
+    
+    updateExecTcProgress();
+}
+
+// 执行备注变更
+function onExecRemarkChange(ptcId, remark) {
+    if (!execTcChanges[ptcId]) execTcChanges[ptcId] = {};
+    execTcChanges[ptcId].remark = remark;
+}
+
+// 更新执行进度
+function updateExecTcProgress() {
+    const total = execTcList.length;
+    let pass = 0, fail = 0, block = 0, pending = 0;
+    
+    execTcList.forEach(tc => {
+        const status = execTcChanges[tc.id]?.status ?? tc.status;
+        if (status === 'pass') pass++;
+        else if (status === 'fail') fail++;
+        else if (status === 'block') block++;
+        else pending++;
+    });
+    
+    const executed = total - pending;
+    const rate = total > 0 ? Math.round(executed / total * 100) : 0;
+    
+    document.getElementById('exec-tc-total').textContent = total;
+    document.getElementById('exec-tc-pass').textContent = pass;
+    document.getElementById('exec-tc-fail').textContent = fail;
+    document.getElementById('exec-tc-block').textContent = block;
+    document.getElementById('exec-tc-pending').textContent = pending;
+    document.getElementById('exec-tc-rate').textContent = rate + '%';
+}
+
+// 保存执行结果
+async function saveExecTestCases() {
+    const updates = Object.keys(execTcChanges).map(ptcId => ({
+        id: parseInt(ptcId),
+        status: execTcChanges[ptcId].status,
+        remark: execTcChanges[ptcId].remark || ''
+    })).filter(u => u.status !== undefined);
+    
+    if (updates.length === 0) {
+        showToast('没有需要保存的变更', 'info');
+        return;
+    }
+    
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/execution/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ updates })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast(`已保存 ${result.updated} 条执行结果`, 'success');
+            
+            // 计算并自动更新任务进度
+            await autoUpdateTaskProgress();
+            
+            closeModal('exec-test-case-modal');
+            // 刷新我的任务
+            await loadMyTasks();
+        } else {
+            showToast('保存失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('保存失败，请重试', 'danger');
+    }
+}
+
+// 自动更新任务进度（基于用例执行情况）
+async function autoUpdateTaskProgress() {
+    if (!execTcContext) return;
+    
+    // 计算当前进度
+    const total = execTcList.length;
+    if (total === 0) return;
+    
+    let executed = 0;
+    execTcList.forEach(tc => {
+        const status = execTcChanges[tc.id]?.status ?? tc.status;
+        if (status !== 'pending') executed++;
+    });
+    
+    const progress = Math.round(executed / total * 100);
+    
+    // 自动更新任务的 adapt_progress
+    try {
+        await authFetch(`${API_BASE}/my-tasks/${execTcContext.taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adapt_progress: progress })
+        });
+    } catch (e) {
+        console.error('自动更新进度失败:', e);
+    }
+}
+
 
 
 

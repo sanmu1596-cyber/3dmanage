@@ -980,6 +980,92 @@
         </div>
     </div>
 
+    <!-- 关联测试用例弹窗（配置计划用） -->
+    <div id="link-test-case-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 80vh;">
+            <div class="modal-header">
+                <h3 id="link-tc-modal-title">关联测试用例</h3>
+                <span class="close-btn" onclick="closeModal('link-test-case-modal')">&times;</span>
+            </div>
+            <div style="padding: 16px;">
+                <div class="filter-row" style="margin-bottom: 12px;">
+                    <input type="text" id="link-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:200px;" oninput="filterLinkTestCases()">
+                    <select id="link-tc-category" class="filter-select" onchange="filterLinkTestCases()">
+                        <option value="">全部分类</option>
+                        <option value="功能测试">功能测试</option>
+                        <option value="性能测试">性能测试</option>
+                        <option value="兼容性测试">兼容性测试</option>
+                        <option value="UI测试">UI测试</option>
+                        <option value="安装卸载">安装卸载</option>
+                        <option value="适配验收">适配验收</option>
+                    </select>
+                    <span style="margin-left:auto;color:var(--text-muted);font-size:13px;">已选 <strong id="link-tc-selected-count">0</strong> 条</span>
+                </div>
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th width="40"><input type="checkbox" id="link-tc-select-all" onchange="toggleLinkTcSelectAll()"></th>
+                                <th width="80">编号</th>
+                                <th>用例名称</th>
+                                <th width="90">分类</th>
+                                <th width="70">优先级</th>
+                            </tr>
+                        </thead>
+                        <tbody id="link-tc-table"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('link-test-case-modal')">取消</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmLinkTestCases()">确定关联</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 执行测试用例弹窗（我的任务 Checklist） -->
+    <div id="exec-test-case-modal" class="modal">
+        <div class="modal-content" style="max-width: 950px; max-height: 85vh;">
+            <div class="modal-header">
+                <h3 id="exec-tc-modal-title">执行测试用例</h3>
+                <span class="close-btn" onclick="closeModal('exec-test-case-modal')">&times;</span>
+            </div>
+            <div style="padding: 16px;">
+                <!-- 进度概览 -->
+                <div class="exec-tc-progress-bar" id="exec-tc-progress-bar">
+                    <span class="exec-progress-item total">总计: <strong id="exec-tc-total">0</strong></span>
+                    <span class="exec-progress-item pass">✅ Pass: <strong id="exec-tc-pass">0</strong></span>
+                    <span class="exec-progress-item fail">❌ Fail: <strong id="exec-tc-fail">0</strong></span>
+                    <span class="exec-progress-item block">⏸️ Block: <strong id="exec-tc-block">0</strong></span>
+                    <span class="exec-progress-item pending">⏳ 待执行: <strong id="exec-tc-pending">0</strong></span>
+                    <span class="exec-progress-rate">完成率: <strong id="exec-tc-rate">0%</strong></span>
+                </div>
+                <!-- 用例列表 -->
+                <div class="table-container" style="max-height: 450px; overflow-y: auto;">
+                    <table class="data-table exec-tc-table">
+                        <thead>
+                            <tr>
+                                <th width="40">序号</th>
+                                <th width="80">编号</th>
+                                <th>用例名称</th>
+                                <th width="80">优先级</th>
+                                <th width="200">测试步骤</th>
+                                <th width="150">预期结果</th>
+                                <th width="130">执行结果</th>
+                                <th width="120">备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exec-tc-table"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('exec-test-case-modal')">关闭</button>
+                <button class="tool-btn tool-btn-primary" onclick="saveExecTestCases()">保存执行结果</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 游戏选择弹窗（适配进展用） -->
     <div id="game-select-modal" class="modal">
         <div class="modal-content game-select-modal-content">

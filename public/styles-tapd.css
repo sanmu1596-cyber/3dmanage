@@ -2887,3 +2887,124 @@ body.col-resizing * {
     color: var(--primary);
     font-weight: 500;
 }
+
+/* ========== 执行测试用例弹窗样式 ========== */
+.exec-tc-progress-bar {
+    display: flex;
+    gap: 16px;
+    padding: 12px 16px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.exec-progress-item {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.exec-progress-item.total { color: var(--text-main); }
+.exec-progress-item.pass { color: #38a169; }
+.exec-progress-item.fail { color: #e53e3e; }
+.exec-progress-item.block { color: #d69e2e; }
+.exec-progress-item.pending { color: #718096; }
+
+.exec-progress-rate {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.exec-tc-table .tc-cell-text {
+    max-width: 180px;
+    white-space: pre-wrap;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* 执行结果选择器 */
+.exec-status-select {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    border: 1px solid var(--border-main);
+    background: var(--bg-white);
+    cursor: pointer;
+    min-width: 90px;
+}
+
+.exec-status-select.status-pass {
+    background: rgba(56, 161, 105, 0.1);
+    border-color: #38a169;
+    color: #38a169;
+}
+
+.exec-status-select.status-fail {
+    background: rgba(229, 62, 62, 0.1);
+    border-color: #e53e3e;
+    color: #e53e3e;
+}
+
+.exec-status-select.status-block {
+    background: rgba(214, 158, 46, 0.1);
+    border-color: #d69e2e;
+    color: #d69e2e;
+}
+
+/* 执行备注输入框 */
+.exec-remark-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* 关联用例行悬停 */
+#link-tc-table tr:hover {
+    background: var(--bg-hover);
+}
+
+#link-tc-table tr.selected {
+    background: var(--primary-light);
+}
+
+/* 我的任务 - 用例数量徽章 */
+.tc-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.tc-count-badge:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.tc-count-badge.has-cases {
+    background: rgba(66, 153, 225, 0.1);
+    color: #3182ce;
+}
+
+.tc-count-badge .tc-progress-mini {
+    width: 40px;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.tc-count-badge .tc-progress-mini-fill {
+    height: 100%;
+    background: #38a169;
+    border-radius: 2px;
+}
