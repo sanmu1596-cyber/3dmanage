@@ -19,6 +19,10 @@
                 <span class="app-title">裸眼3D游戏适配项目管理</span>
             </div>
             <div class="top-bar-right" id="user-info">
+                <button class="icon-btn notification-btn" id="notification-btn" onclick="toggleNotificationPanel()" title="通知">
+                    🔔
+                    <span class="notification-badge" id="notification-badge" style="display:none">0</span>
+                </button>
                 <span class="user-avatar">👤</span>
                 <span class="user-name">管理员</span>
             </div>
@@ -1426,6 +1430,23 @@
                     <button type="submit" class="tool-btn tool-btn-primary">创建</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ===== 通知面板 ===== -->
+    <div id="notification-panel" class="notification-panel" style="display:none">
+        <div class="notification-header">
+            <h4>🔔 通知</h4>
+            <div class="notification-actions">
+                <button class="btn-link" onclick="markAllNotificationsRead()">全部已读</button>
+                <button class="close-btn" onclick="closeNotificationPanel()">&times;</button>
+            </div>
+        </div>
+        <div class="notification-list" id="notification-list">
+            <div class="empty-state" style="padding: 40px 20px;">
+                <div class="empty-icon">🔔</div>
+                <div>暂无通知</div>
+            </div>
         </div>
     </div>
 

@@ -7105,5 +7105,204 @@ async function autoUpdateTaskProgress() {
 }
 
 
+// ==================== 通知提醒功能 ====================
+let notificationsData = [];
+let notificationsPanelOpen = false;
+
+// 初始化通知功能
+function initNotifications() {
+    loadUnreadCount();
+    // 每 60 秒刷新一次未读数量
+    setInterval(loadUnreadCount, 60000);
+}
+
+// 获取未读通知数量
+async function loadUnreadCount() {
+    try {
+        const response = await authFetch(`${API_BASE}/notifications/unread-count`);
+        const result = await response.json();
+        if (result.success) {
+            updateNotificationBadge(result.count);
+        }
+    } catch (e) {
+        console.error('获取通知数量失败:', e);
+    }
+}
+
+// 更新通知徽章
+function updateNotificationBadge(count) {
+    const badge = document.getElementById('notification-badge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// 打开/关闭通知面板
+function toggleNotificationPanel() {
+    const panel = document.getElementById('notification-panel');
+    if (!panel) return;
+    
+    if (notificationsPanelOpen) {
+        closeNotificationPanel();
+    } else {
+        openNotificationPanel();
+    }
+}
+
+// 打开通知面板
+async function openNotificationPanel() {
+    const panel = document.getElementById('notification-panel');
+    if (!panel) return;
+    
+    panel.style.display = 'flex';
+    notificationsPanelOpen = true;
+    
+    // 加载通知列表
+    await loadNotifications();
+    
+    // 点击外部关闭
+    setTimeout(() => {
+        document.addEventListener('click', handleNotificationOutsideClick);
+    }, 100);
+}
+
+// 关闭通知面板
+function closeNotificationPanel() {
+    const panel = document.getElementById('notification-panel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+    notificationsPanelOpen = false;
+    document.removeEventListener('click', handleNotificationOutsideClick);
+}
+
+// 处理点击外部关闭
+function handleNotificationOutsideClick(e) {
+    const panel = document.getElementById('notification-panel');
+    const btn = document.getElementById('notification-btn');
+    if (panel && !panel.contains(e.target) && !btn.contains(e.target)) {
+        closeNotificationPanel();
+    }
+}
+
+// 加载通知列表
+async function loadNotifications() {
+    try {
+        const response = await authFetch(`${API_BASE}/notifications?limit=30`);
+        const result = await response.json();
+        if (result.success) {
+            notificationsData = result.data || [];
+            renderNotificationList();
+        }
+    } catch (e) {
+        console.error('加载通知失败:', e);
+    }
+}
+
+// 渲染通知列表
+function renderNotificationList() {
+    const list = document.getElementById('notification-list');
+    if (!list) return;
+    
+    if (notificationsData.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                <div class="empty-icon" style="font-size: 40px; margin-bottom: 10px;">🔔</div>
+                <div style="color: var(--text-light);">暂无通知</div>
+            </div>
+        `;
+        return;
+    }
+    
+    list.innerHTML = notificationsData.map(n => {
+        const icon = getNotificationIcon(n.type);
+        const timeAgo = formatTimeAgo(n.created_at);
+        const unreadClass = n.is_read ? '' : 'unread';
+        
+        return `
+            <div class="notification-item ${unreadClass}" data-id="${n.id}" onclick="handleNotificationClick(${n.id}, '${n.related_type || ''}', ${n.related_id || 0})">
+                <div class="notification-icon type-${n.type}">${icon}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${escapeHtml(n.title)}</div>
+                    <div class="notification-text">${escapeHtml(n.content || '')}</div>
+                    <div class="notification-time">${timeAgo}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 获取通知图标
+function getNotificationIcon(type) {
+    const icons = {
+        'deadline_warning': '⏰',
+        'deadline_today': '🚨',
+        'bug_assigned': '🐛',
+        'bug_high_priority': '⚠️',
+        'plan_published': '📋',
+        'task_assigned': '✅'
+    };
+    return icons[type] || '📢';
+}
+
+// 处理通知点击
+async function handleNotificationClick(notificationId, relatedType, relatedId) {
+    // 标记为已读
+    try {
+        await authFetch(`${API_BASE}/notifications/${notificationId}/read`, { method: 'PUT' });
+        loadUnreadCount();
+    } catch (e) {
+        console.error('标记已读失败:', e);
+    }
+    
+    // 跳转到相关页面
+    if (relatedType === 'plan' && relatedId) {
+        closeNotificationPanel();
+        switchTab('config-plan');
+    } else if (relatedType === 'bug' && relatedId) {
+        closeNotificationPanel();
+        switchTab('bugs');
+    }
+    
+    // 更新 UI
+    const item = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
+    if (item) {
+        item.classList.remove('unread');
+    }
+}
+
+// 全部标记已读
+async function markAllNotificationsRead() {
+    try {
+        const response = await authFetch(`${API_BASE}/notifications/read-all`, { method: 'PUT' });
+        const result = await response.json();
+        if (result.success) {
+            showToast(`已标记 ${result.updated} 条通知为已读`, 'success');
+            loadUnreadCount();
+            // 更新 UI
+            document.querySelectorAll('.notification-item.unread').forEach(item => {
+                item.classList.remove('unread');
+            });
+        }
+    } catch (e) {
+        showToast('操作失败', 'danger');
+    }
+}
+
+// 初始化时调用
+document.addEventListener('DOMContentLoaded', () => {
+    // 延迟初始化通知功能
+    setTimeout(initNotifications, 1000);
+});
+
+
+
+
+
 
 

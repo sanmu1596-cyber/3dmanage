@@ -414,7 +414,18 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'), (req, res) => {
       res.status(500).json({ error: err.message });
       return;
     }
-    res.json({ success: true, id: this.lastID });
+    const bugId = this.lastID;
+    // 如果指定了负责人，生成通知
+    if (assignee_id) {
+      const shortDesc = (description || '').slice(0, 50);
+      createNotification(assignee_id, 'bug_assigned', '新缺陷分配给您', `缺陷「${shortDesc}...」已分配给您处理`, 'bug', bugId);
+    }
+    // 高优先级缺陷通知所有人
+    if (priority === '高' || priority === 'high' || priority === '紧急') {
+      const shortDesc = (description || '').slice(0, 50);
+      createNotification(null, 'bug_high_priority', '高优先级缺陷', `发现高优先级缺陷「${shortDesc}...」，请关注`, 'bug', bugId);
+    }
+    res.json({ success: true, id: bugId });
   });
 });
 
@@ -759,10 +770,31 @@ plansRouter.put('/:id', (req, res) => {
 
 // 发布计划（状态从 draft 改为 published）
 plansRouter.post('/:id/publish', (req, res) => {
-  db.run("UPDATE plans SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], function(err) {
+  const planId = req.params.id;
+  
+  db.run("UPDATE plans SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [planId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: '计划不存在' });
-    logActivity('publish', 'plan', parseInt(req.params.id), '发布计划');
+    
+    logActivity('publish', 'plan', parseInt(planId), '发布计划');
+    
+    // 获取计划信息并通知所有负责人
+    db.get("SELECT title, plan_date FROM plans WHERE id = ?", [planId], (err2, plan) => {
+      if (!err2 && plan) {
+        // 通知全体
+        createNotification(null, 'plan_published', '配置计划已发布', `配置计划「${plan.title}」已发布，请及时查看并完成任务`, 'plan', parseInt(planId));
+        
+        // 查找所有负责人并单独通知
+        db.all("SELECT DISTINCT assigned_to, game_name FROM plan_games WHERE plan_id = ? AND assigned_to IS NOT NULL", [planId], (err3, games) => {
+          if (!err3 && games) {
+            games.forEach(g => {
+              createNotification(g.assigned_to, 'task_assigned', '新任务分配', `您被分配到配置计划「${plan.title}」的游戏「${g.game_name}」适配任务`, 'plan', parseInt(planId));
+            });
+          }
+        });
+      }
+    });
+    
     res.json({ success: true });
   });
 });
@@ -1493,6 +1525,128 @@ statsRouter.get('/search', (req, res) => {
   });
 });
 
+// ==================== 通知提醒 API ====================
+// 创建通知表
+db.run(`CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT,
+  related_type TEXT,
+  related_id INTEGER,
+  is_read INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+const notificationsRouter = express.Router();
+notificationsRouter.use(auth.verifyToken);
+
+// 获取通知列表
+notificationsRouter.get('/', (req, res) => {
+  const { unread_only, limit = 20 } = req.query;
+  const userId = req.user?.id || 0;
+  
+  let sql = `SELECT * FROM notifications WHERE (user_id = ? OR user_id IS NULL OR user_id = 0)`;
+  const params = [userId];
+  
+  if (unread_only === 'true') {
+    sql += ` AND is_read = 0`;
+  }
+  
+  sql += ` ORDER BY created_at DESC LIMIT ?`;
+  params.push(parseInt(limit) || 20);
+  
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 获取未读通知数量
+notificationsRouter.get('/unread-count', (req, res) => {
+  const userId = req.user?.id || 0;
+  db.get(`SELECT COUNT(*) as count FROM notifications WHERE (user_id = ? OR user_id IS NULL OR user_id = 0) AND is_read = 0`, [userId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, count: row?.count || 0 });
+  });
+});
+
+// 标记通知已读
+notificationsRouter.put('/:id/read', (req, res) => {
+  db.run(`UPDATE notifications SET is_read = 1 WHERE id = ?`, [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 全部标记已读
+notificationsRouter.put('/read-all', (req, res) => {
+  const userId = req.user?.id || 0;
+  db.run(`UPDATE notifications SET is_read = 1 WHERE (user_id = ? OR user_id IS NULL OR user_id = 0) AND is_read = 0`, [userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, updated: this.changes });
+  });
+});
+
+// 删除通知
+notificationsRouter.delete('/:id', (req, res) => {
+  db.run(`DELETE FROM notifications WHERE id = ?`, [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 创建通知的辅助函数
+function createNotification(userId, type, title, content, relatedType = null, relatedId = null) {
+  db.run(
+    `INSERT INTO notifications (user_id, type, title, content, related_type, related_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    [userId, type, title, content, relatedType, relatedId],
+    (err) => { if (err) console.error('创建通知失败:', err.message); }
+  );
+}
+
+// 检查计划截止日期的定时任务（每小时执行一次）
+function checkPlanDeadlines() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  
+  // 查找明天到期的计划
+  db.all(`SELECT id, name, end_date FROM plans WHERE end_date = ? AND status != 'completed'`, [tomorrowStr], (err, plans) => {
+    if (!err && plans && plans.length > 0) {
+      plans.forEach(plan => {
+        // 检查是否已有相同通知
+        db.get(`SELECT id FROM notifications WHERE related_type = 'plan' AND related_id = ? AND type = 'deadline_warning' AND DATE(created_at) = ?`, 
+          [plan.id, today], (err2, existing) => {
+          if (!err2 && !existing) {
+            createNotification(null, 'deadline_warning', `计划即将到期`, `配置计划「${plan.name}」将于明天(${plan.end_date})到期，请及时完成！`, 'plan', plan.id);
+          }
+        });
+      });
+    }
+  });
+  
+  // 查找今天到期但未完成的计划
+  db.all(`SELECT id, name, end_date FROM plans WHERE end_date = ? AND status != 'completed'`, [today], (err, plans) => {
+    if (!err && plans && plans.length > 0) {
+      plans.forEach(plan => {
+        db.get(`SELECT id FROM notifications WHERE related_type = 'plan' AND related_id = ? AND type = 'deadline_today' AND DATE(created_at) = ?`,
+          [plan.id, today], (err2, existing) => {
+          if (!err2 && !existing) {
+            createNotification(null, 'deadline_today', `计划今日到期`, `配置计划「${plan.name}」今天(${plan.end_date})到期！`, 'plan', plan.id);
+          }
+        });
+      });
+    }
+  });
+}
+
+// 启动时执行一次，然后每小时执行
+setTimeout(checkPlanDeadlines, 5000);
+setInterval(checkPlanDeadlines, 60 * 60 * 1000);
+
 // ==================== 通用批量删除 API ====================
 const batchRouter = express.Router();
 batchRouter.use(auth.verifyToken);
@@ -1529,6 +1683,7 @@ app.use('/api/my-tasks', myTasksRouter);
 app.use('/api/test-cases', testCasesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/batch', batchRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // 定期清理过期session（每小时执行一次）
 setInterval(() => {
