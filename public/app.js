@@ -561,7 +561,7 @@ function renderDevicesTable(data) {
     const tbody = document.getElementById('devices-table');
     if (data && data.length > 0) {
         tbody.innerHTML = data.map((device, index) => `
-            <tr>
+            <tr class="clickable" data-id="${device.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
                 <td>${escapeHtml(device.manufacturer || '-')}</td>
                 <td>${escapeHtml(device.device_type || '-')}</td>
@@ -898,7 +898,7 @@ function renderGamesPage() {
                 </td>
             `;
 
-            return `<tr>${rowHtml}</tr>`;
+            return `<tr class="clickable" data-id="${game.id}">${rowHtml}</tr>`;
         }).join('');
     } else {
         // 计算显示的列数（包括序号和操作列）
@@ -7325,6 +7325,415 @@ async function markAllNotificationsRead() {
 document.addEventListener('DOMContentLoaded', () => {
     // 延迟初始化通知功能
     setTimeout(initNotifications, 1000);
+});
+
+
+// ==================== 详情侧边面板 ====================
+let currentDetailData = null;
+let currentDetailType = null;
+
+// 打开详情面板
+function openDetailPanel(type, data) {
+    currentDetailType = type;
+    currentDetailData = data;
+    
+    const overlay = document.getElementById('detail-panel-overlay');
+    const panel = document.getElementById('detail-panel');
+    const titleEl = document.getElementById('detail-title');
+    const iconEl = document.getElementById('detail-type-icon');
+    const bodyEl = document.getElementById('detail-panel-body');
+    const editBtn = document.getElementById('detail-edit-btn');
+    const deleteBtn = document.getElementById('detail-delete-btn');
+    
+    // 设置标题和图标
+    const config = getDetailConfig(type);
+    iconEl.textContent = config.icon;
+    titleEl.textContent = data[config.nameField] || config.defaultTitle;
+    
+    // 生成详情内容
+    bodyEl.innerHTML = renderDetailContent(type, data);
+    
+    // 绑定按钮事件
+    editBtn.onclick = () => {
+        closeDetailPanel();
+        config.editFn(data.id);
+    };
+    deleteBtn.onclick = () => {
+        closeDetailPanel();
+        config.deleteFn(data.id);
+    };
+    
+    // 显示面板
+    overlay.classList.add('show');
+    panel.classList.add('show');
+    
+    // ESC 关闭
+    document.addEventListener('keydown', handleDetailPanelEsc);
+}
+
+// 关闭详情面板
+function closeDetailPanel() {
+    const overlay = document.getElementById('detail-panel-overlay');
+    const panel = document.getElementById('detail-panel');
+    
+    overlay.classList.remove('show');
+    panel.classList.remove('show');
+    
+    document.removeEventListener('keydown', handleDetailPanelEsc);
+    currentDetailData = null;
+    currentDetailType = null;
+}
+
+// ESC 键处理
+function handleDetailPanelEsc(e) {
+    if (e.key === 'Escape') {
+        closeDetailPanel();
+    }
+}
+
+// 获取详情配置
+function getDetailConfig(type) {
+    const configs = {
+        game: {
+            icon: '🎮',
+            nameField: 'name',
+            defaultTitle: '游戏详情',
+            editFn: editGame,
+            deleteFn: deleteGame
+        },
+        device: {
+            icon: '📱',
+            nameField: 'name',
+            defaultTitle: '设备详情',
+            editFn: editDevice,
+            deleteFn: deleteDevice
+        },
+        member: {
+            icon: '👤',
+            nameField: 'nickname',
+            defaultTitle: '成员详情',
+            editFn: editMember,
+            deleteFn: deleteMember
+        },
+        bug: {
+            icon: '🐛',
+            nameField: 'title',
+            defaultTitle: '缺陷详情',
+            editFn: editBug,
+            deleteFn: deleteBug
+        },
+        test: {
+            icon: '🧪',
+            nameField: 'name',
+            defaultTitle: '测试详情',
+            editFn: editTest,
+            deleteFn: deleteTest
+        }
+    };
+    return configs[type] || configs.game;
+}
+
+// 渲染详情内容
+function renderDetailContent(type, data) {
+    switch (type) {
+        case 'game':
+            return renderGameDetail(data);
+        case 'device':
+            return renderDeviceDetail(data);
+        case 'member':
+            return renderMemberDetail(data);
+        case 'bug':
+            return renderBugDetail(data);
+        case 'test':
+            return renderTestDetail(data);
+        default:
+            return '<div class="empty-state">暂无详情</div>';
+    }
+}
+
+// 渲染游戏详情
+function renderGameDetail(game) {
+    const statusMap = {
+        online: { text: '已上线', class: 'status-online' },
+        adapting: { text: '适配中', class: 'status-in_progress' },
+        pending: { text: '待上线', class: 'status-pending' }
+    };
+    const qualityMap = {
+        high: { text: '高', class: 'priority-high' },
+        normal: { text: '普通', class: 'priority-medium' },
+        low: { text: '低', class: 'priority-low' }
+    };
+    
+    const status = statusMap[game.online_status] || { text: game.online_status || '-', class: '' };
+    const quality = qualityMap[game.quality] || { text: game.quality || '-', class: '' };
+    
+    return `
+        <div class="detail-section">
+            <div class="detail-section-title">基本信息</div>
+            ${detailField('游戏名称', game.name)}
+            ${detailField('英文名称', game.english_name)}
+            ${detailField('游戏平台', game.platform)}
+            ${detailField('游戏类型', game.game_type)}
+            ${detailField('游戏ID', game.game_id)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">发行信息</div>
+            ${detailField('开发商', game.developer)}
+            ${detailField('运营商', game.operator)}
+            ${detailField('上线日期', game.release_date)}
+            ${detailField('版本', game.version)}
+            ${detailField('包体大小', game.package_size)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">适配状态</div>
+            ${detailField('上线状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`)}
+            ${detailField('适配进度', game.adapter_progress ? game.adapter_progress + '%' : '-')}
+            ${detailField('负责人', game.owner_name || '-')}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">其他信息</div>
+            ${detailField('游戏账号', game.game_account)}
+            ${detailField('存储位置', game.storage_location)}
+            ${detailField('配置路径', game.config_path)}
+            ${detailField('适配备注', game.adaptation_notes)}
+        </div>
+    `;
+}
+
+// 渲染设备详情
+function renderDeviceDetail(device) {
+    const statusMap = {
+        available: { text: '可用', class: 'status-available' },
+        in_use: { text: '使用中', class: 'status-in_progress' },
+        maintenance: { text: '维护中', class: 'status-maintenance' },
+        broken: { text: '已损坏', class: 'status-broken' }
+    };
+    const status = statusMap[device.status] || { text: device.status || '-', class: '' };
+    
+    return `
+        <div class="detail-section">
+            <div class="detail-section-title">设备信息</div>
+            ${detailField('设备名称', device.name)}
+            ${detailField('设备类型', device.device_type)}
+            ${detailField('厂商', device.manufacturer)}
+            ${detailField('型号', device.model)}
+            ${detailField('操作系统', device.os_version)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">状态信息</div>
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('保管者', device.custodian_name || '-')}
+            ${detailField('存放位置', device.location)}
+            ${detailField('适配游戏数', device.adapted_games_count || 0)}
+            ${detailField('适配完成率', device.adaptation_rate ? device.adaptation_rate + '%' : '-')}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">其他信息</div>
+            ${detailField('设备序列号', device.serial_number)}
+            ${detailField('分辨率', device.resolution)}
+            ${detailField('购买日期', device.purchase_date)}
+            ${detailField('备注', device.notes)}
+        </div>
+    `;
+}
+
+// 渲染成员详情
+function renderMemberDetail(member) {
+    const statusMap = {
+        active: { text: '在职', class: 'status-active' },
+        inactive: { text: '离职', class: 'status-inactive' }
+    };
+    const status = statusMap[member.status] || { text: member.status || '-', class: '' };
+    
+    return `
+        <div class="detail-section">
+            <div class="detail-section-title">基本信息</div>
+            ${detailField('姓名', member.nickname || member.name)}
+            ${detailField('用户名', member.username)}
+            ${detailField('企业微信ID', member.wechat_id)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">角色与职责</div>
+            ${detailField('项目角色', member.project_role)}
+            ${detailField('职责', member.duty)}
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+        </div>
+    `;
+}
+
+// 渲染缺陷详情
+function renderBugDetail(bug) {
+    const statusMap = {
+        open: { text: '待处理', class: 'status-open' },
+        in_progress: { text: '处理中', class: 'status-in_progress' },
+        resolved: { text: '已解决', class: 'status-completed' },
+        closed: { text: '已关闭', class: 'status-completed' }
+    };
+    const priorityMap = {
+        urgent: { text: '紧急', class: 'priority-urgent' },
+        high: { text: '高', class: 'priority-high' },
+        medium: { text: '中', class: 'priority-medium' },
+        low: { text: '低', class: 'priority-low' }
+    };
+    const severityMap = {
+        fatal: { text: '致命', class: 'severity-fatal' },
+        serious: { text: '严重', class: 'severity-serious' },
+        normal: { text: '一般', class: 'severity-normal' },
+        prompt: { text: '提示', class: 'severity-prompt' },
+        advice: { text: '建议', class: 'severity-advice' }
+    };
+    
+    const status = statusMap[bug.status] || { text: bug.status || '-', class: '' };
+    const priority = priorityMap[bug.priority] || { text: bug.priority || '-', class: '' };
+    const severity = severityMap[bug.severity] || { text: bug.severity || '-', class: '' };
+    
+    return `
+        <div class="detail-section">
+            <div class="detail-section-title">缺陷信息</div>
+            ${detailField('标题', bug.title)}
+            ${detailField('关联游戏', bug.game_name || '-')}
+            ${detailField('关联设备', bug.device_name || '-')}
+            ${detailField('涉及版本', bug.affected_version)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">状态与优先级</div>
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`)}
+            ${detailField('严重程度', `<span class="severity-badge ${severity.class}">${severity.text}</span>`)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">人员与时间</div>
+            ${detailField('发现人', bug.reporter_name || '-')}
+            ${detailField('负责人', bug.assignee_name || '-')}
+            ${detailField('发现时间', bug.found_date)}
+            ${detailField('解决时间', bug.resolved_date)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">详细描述</div>
+            <div class="detail-field-value" style="padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);white-space:pre-wrap;font-size:13px;">${escapeHtml(bug.description || '暂无描述')}</div>
+        </div>
+    `;
+}
+
+// 渲染测试详情
+function renderTestDetail(test) {
+    const statusMap = {
+        pending: { text: '待测试', class: 'status-pending' },
+        in_progress: { text: '测试中', class: 'status-in_progress' },
+        completed: { text: '已完成', class: 'status-completed' },
+        failed: { text: '失败', class: 'status-failed' }
+    };
+    const priorityMap = {
+        urgent: { text: '紧急', class: 'priority-urgent' },
+        high: { text: '高', class: 'priority-high' },
+        medium: { text: '中', class: 'priority-medium' },
+        low: { text: '低', class: 'priority-low' }
+    };
+    
+    const status = statusMap[test.status] || { text: test.status || '-', class: '' };
+    const priority = priorityMap[test.priority] || { text: test.priority || '-', class: '' };
+    
+    return `
+        <div class="detail-section">
+            <div class="detail-section-title">测试信息</div>
+            ${detailField('测试名称', test.name)}
+            ${detailField('关联游戏', test.game_name || '-')}
+            ${detailField('测试设备', test.device_name || '-')}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">状态与结果</div>
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`)}
+            ${detailField('测试结果', test.result || '-')}
+            ${detailField('发现缺陷数', test.bugs_count || 0)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">执行信息</div>
+            ${detailField('测试人员', test.tester_name || '-')}
+            ${detailField('测试日期', test.test_date)}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">测试描述</div>
+            <div class="detail-field-value" style="padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);white-space:pre-wrap;font-size:13px;">${escapeHtml(test.description || '暂无描述')}</div>
+        </div>
+    `;
+}
+
+// 详情字段辅助函数
+function detailField(label, value) {
+    const isEmpty = !value || value === '-' || value === 'undefined' || value === 'null';
+    return `
+        <div class="detail-field">
+            <span class="detail-field-label">${label}</span>
+            <span class="detail-field-value${isEmpty ? ' empty' : ''}">${isEmpty ? '-' : value}</span>
+        </div>
+    `;
+}
+
+// 为游戏表格行添加点击事件
+function enableGameRowClick() {
+    const tbody = document.getElementById('games-table');
+    if (!tbody) return;
+    
+    tbody.addEventListener('click', (e) => {
+        // 如果点击的是按钮、链接、输入框或可编辑单元格，不处理
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
+            return;
+        }
+        // 如果点击的是可编辑单元格，不处理（让原有的编辑逻辑生效）
+        if (e.target.classList.contains('editable-cell')) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (!row || !row.classList.contains('clickable')) return;
+        
+        const gameId = row.dataset.id;
+        if (!gameId) return;
+        
+        // 从已加载的数据中找到对应的游戏
+        const game = allGamesData.find(g => g.id == gameId);
+        if (game) {
+            openDetailPanel('game', game);
+        }
+    });
+}
+
+// 为设备表格行添加点击事件
+function enableDeviceRowClick() {
+    const tbody = document.getElementById('devices-table');
+    if (!tbody) return;
+    
+    tbody.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
+            return;
+        }
+        // 如果点击的是可编辑单元格，不处理
+        if (e.target.classList.contains('editable-cell')) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (!row || !row.classList.contains('clickable')) return;
+        
+        const deviceId = row.dataset.id;
+        if (!deviceId) return;
+        
+        // 从已加载的数据中找到对应的设备
+        const device = allDevicesData.find(d => d.id == deviceId);
+        if (device) {
+            openDetailPanel('device', device);
+        }
+    });
+}
+
+// 在页面初始化时启用行点击
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        enableGameRowClick();
+        enableDeviceRowClick();
+    }, 500);
 });
 
 

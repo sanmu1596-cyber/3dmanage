@@ -1470,7 +1470,26 @@
         </div>
     </div>
 
+    <!-- ===== 详情侧边面板 ===== -->
+    <div id="detail-panel-overlay" class="detail-panel-overlay" onclick="closeDetailPanel()"></div>
+    <div id="detail-panel" class="detail-panel">
+        <div class="detail-panel-header">
+            <div class="detail-panel-title">
+                <span class="type-icon" id="detail-type-icon">🎮</span>
+                <span id="detail-title">详情</span>
+            </div>
+            <button class="detail-panel-close" onclick="closeDetailPanel()">&times;</button>
+        </div>
+        <div class="detail-panel-body" id="detail-panel-body">
+            <!-- 动态内容 -->
+        </div>
+        <div class="detail-panel-footer" id="detail-panel-footer">
+            <button class="btn btn-edit" id="detail-edit-btn">✏️ 编辑</button>
+            <button class="btn btn-delete" id="detail-delete-btn">🗑️ 删除</button>
+        </div>
+    </div>
+
     <script src="gameAccountsData.js"></script>
-    <script src="app.js?v=20260401k"></script>
+    <script src="app.js?v=20260410"></script>
 </body>
 </html>
