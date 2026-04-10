@@ -1,6 +1,33 @@
 // API 基础 URL
 const API_BASE = '/api';
 
+// ========== 主题切换 ==========
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+    showToast(newTheme === 'dark' ? '已切换到深色模式' : '已切换到浅色模式', 'info', 1500);
+}
+
+function updateThemeIcon(theme) {
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+        btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+        btn.title = theme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
+    }
+}
+
+// 页面加载时初始化主题
+document.addEventListener('DOMContentLoaded', initTheme);
+
 // ========== Toast 通知 ==========
 function showToast(message, type = 'info', duration = 3000) {
     let container = document.getElementById('toast-container');
