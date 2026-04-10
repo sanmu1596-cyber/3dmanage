@@ -974,19 +974,33 @@ body.col-resizing * {
     color: var(--text-light);
 }
 .empty-state .empty-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-    opacity: 0.5;
+    font-size: 56px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+    display: block;
+    line-height: 1;
 }
 .empty-state .empty-text {
-    font-size: 15px;
+    font-size: 16px;
+    font-weight: 500;
     color: var(--text-secondary);
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 .empty-state .empty-sub {
     font-size: 13px;
     color: var(--text-light);
     margin-top: 4px;
+    line-height: 1.5;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.empty-state .empty-action {
+    margin-top: 20px;
+}
+.empty-state .empty-action .btn {
+    padding: 10px 24px;
+    font-size: 14px;
 }
 
 .empty-icon {

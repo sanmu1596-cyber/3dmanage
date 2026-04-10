@@ -532,8 +532,11 @@ function renderMembersTable(data) {
             <tr>
                 <td colspan="7" class="empty-state">
                     <div class="empty-icon">👥</div>
-                    <div class="empty-text">暂无成员</div>
-                    <div class="empty-sub">点击上方按钮添加第一个成员</div>
+                    <div class="empty-text">还没有项目成员</div>
+                    <div class="empty-sub">添加团队成员以便分配任务和跟踪工作进度</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openModal('member-modal')">➕ 添加第一个成员</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -584,8 +587,11 @@ function renderDevicesTable(data) {
             <tr>
                 <td colspan="13" class="empty-state">
                     <div class="empty-icon">📱</div>
-                    <div class="empty-text">暂无设备</div>
-                    <div class="empty-sub">点击上方按钮添加第一个设备</div>
+                    <div class="empty-text">还没有测试设备</div>
+                    <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openModal('device-modal')">➕ 添加第一个设备</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -906,9 +912,13 @@ function renderGamesPage() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="${visibleCount}" class="empty-state">
-                    <div class="empty-icon">🎯</div>
-                    <div class="empty-text">暂无游戏</div>
-                    <div class="empty-sub">点击上方按钮添加第一个游戏</div>
+                    <div class="empty-icon">🎮</div>
+                    <div class="empty-text">还没有游戏数据</div>
+                    <div class="empty-sub">添加游戏以开始管理裸眼3D适配工作</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openModal('game-modal')">➕ 添加第一个游戏</button>
+                        <button class="btn" onclick="document.getElementById('excel-import-input').click()" style="margin-left:8px">📥 导入Excel</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -1401,8 +1411,11 @@ function renderTestsTable(data) {
             <tr>
                 <td colspan="10" class="empty-state">
                     <div class="empty-icon">🧪</div>
-                    <div class="empty-text">暂无测试</div>
-                    <div class="empty-sub">点击上方按钮添加第一个测试</div>
+                    <div class="empty-text">还没有测试记录</div>
+                    <div class="empty-sub">创建测试记录以追踪游戏在各设备上的表现</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openModal('test-modal')">➕ 创建第一个测试</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -1448,8 +1461,11 @@ function renderBugsTable(data) {
             <tr>
                 <td colspan="10" class="empty-state">
                     <div class="empty-icon">🐛</div>
-                    <div class="empty-text">暂无缺陷</div>
-                    <div class="empty-sub">测试完成后记录发现的缺陷</div>
+                    <div class="empty-text">暂无缺陷记录</div>
+                    <div class="empty-sub">测试过程中发现的问题会记录在这里</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openModal('bug-modal')">➕ 报告一个缺陷</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -2413,8 +2429,11 @@ function renderProgressTable(deviceIndex) {
             <tr>
                 <td colspan="10" class="empty-state">
                     <div class="empty-icon">📊</div>
-                    <div class="empty-text">暂无适配数据</div>
-                    <div class="empty-sub">该设备暂无游戏适配记录</div>
+                    <div class="empty-text">该设备暂无适配记录</div>
+                    <div class="empty-sub">请先在「配置计划」中添加游戏，或点击下方按钮手动添加</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="showAddGameModal(${deviceIndex})">➕ 添加游戏适配</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -3369,7 +3388,12 @@ function renderPlanCards() {
     }
 
     if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📋</div><div>${configPlans.length === 0 ? '暂无适配计划' : '没有符合筛选条件的计划'}</div><div class="empty-sub">${configPlans.length === 0 ? '点击"新增适配计划"创建第一个计划' : '请调整筛选条件'}</div></div>`;
+        container.innerHTML = `<div class="empty-state-full">
+            <div class="empty-icon">📋</div>
+            <div class="empty-text">${configPlans.length === 0 ? '还没有适配计划' : '没有符合筛选条件的计划'}</div>
+            <div class="empty-sub">${configPlans.length === 0 ? '创建配置计划以组织和管理团队的适配工作' : '请调整筛选条件'}</div>
+            ${configPlans.length === 0 ? '<div class="empty-action"><button class="btn btn-primary" onclick="showPlanForm()">➕ 新增适配计划</button></div>' : ''}
+        </div>`;
         return;
     }
 
