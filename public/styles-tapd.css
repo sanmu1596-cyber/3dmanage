@@ -2427,6 +2427,65 @@ body.col-resizing * {
     padding: 20px 0;
 }
 
+/* 卡片头部：标题行（状态+标题+编号） */
+.plan-card-top {
+    margin-bottom: 12px;
+}
+.plan-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* 状态标签 — 从 absolute 改为 inline */
+.plan-card-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.plan-card-status.status-draft {
+    background: #fff3e0;
+    color: var(--warning);
+}
+.plan-card-status.status-published {
+    background: #e8f5e9;
+    color: var(--success);
+}
+
+/* 卡片主体区域（进度 + 统计） */
+.plan-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 0;
+    margin: 0 -24px;
+    padding-left: 24px;
+    padding-right: 24px;
+    border-top: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
+}
+
+/* 进度条行：进度条+百分比内联 */
+.plan-card-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 0;
+}
+.plan-card-pct {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    white-space: nowrap;
+    min-width: 40px;
+}
+
 .empty-state-full {
     grid-column: 1 / -1;
     text-align: center;
@@ -2675,27 +2734,46 @@ body.col-resizing * {
     box-shadow: var(--shadow-lg);
     transform: translateY(-2px);
 }
+.my-task-plan-card .plan-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
 .my-task-plan-card .plan-card-title {
     color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
 }
 .my-task-plan-card .plan-card-no {
     background: rgba(255, 255, 255, 0.2);
     color: rgba(255, 255, 255, 0.9);
 }
-.my-task-plan-card .plan-card-meta {
-    color: rgba(255, 255, 255, 0.85);
+.my-task-plan-card .plan-card-goal {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 10px;
+    line-height: 1.4;
 }
-.my-task-plan-card .plan-card-progress-bar {
-    background: rgba(255, 255, 255, 0.3);
+
+/* 我的任务卡片 meta 和底部区域 */
+.my-task-card-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
-.my-task-plan-card .plan-card-progress-fill {
-    background: rgba(255, 255, 255, 0.9) !important;
+.my-task-card-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-.my-task-plan-card .stat-item {
-    color: rgba(255, 255, 255, 0.85);
-}
-.my-task-plan-card .stat-item strong {
-    color: #ffffff;
+.my-task-stats {
+    justify-content: flex-start !important;
+    gap: 6px !important;
 }
 
 .plan-card-actions {
@@ -3838,6 +3916,9 @@ body.col-resizing * {
     box-shadow: var(--shadow-lg), inset 0 0 20px rgba(0,0,0,0.1);
 }
 [data-theme="dark"] .plan-card-actions { border-top-color: var(--border); }
+[data-theme="dark"] .plan-card-body { border-top-color: var(--border-light); border-bottom-color: var(--border-light); }
+[data-theme="dark"] .plan-card-progress-bar { background: var(--bg-elevated); }
+[data-theme="dark"] .plan-card-stat.stat-not-started { background: rgba(110, 118, 129, 0.15); color: #8b949e; }
 
 /* 滚动条补充 */
 [data-theme="dark"] ::-webkit-scrollbar-track-piece { background: var(--bg-deep); }

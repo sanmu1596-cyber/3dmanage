@@ -3492,6 +3492,13 @@ function renderPlanCards() {
         filtered = filtered.filter(p => p.status === planStatusFilter);
     }
 
+    // 排序：从新到旧（按创建时间/日期降序）
+    filtered.sort((a, b) => {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+        return db - da;
+    });
+
     // 汇总
     const totalCount = configPlans.length;
     const draftCount = configPlans.filter(p => p.status === 'draft').length;
@@ -3522,29 +3529,30 @@ function renderPlanCards() {
         
         return `
         <div class="plan-card status-${plan.status}" onclick="openPlanDetail(${configPlans.indexOf(plan)})">
-            <span class="plan-card-status status-${plan.status}">${plan.status === 'published' ? '✅ 已发布' : plan.status === 'closed' ? '🏁 已完成' : '📝 草稿'}</span>
-            <div class="plan-card-header">
-                <span class="plan-card-title">${escapeHtml(plan.title)}</span>
+            <div class="plan-card-top">
+                <div class="plan-card-title-row">
+                    <span class="plan-card-status status-${plan.status}">${plan.status === 'published' ? '✅ 已发布' : plan.status === 'closed' ? '🏁 已完成' : '📝 草稿'}</span>
+                    <span class="plan-card-title">${escapeHtml(plan.title)}</span>
+                    <span class="plan-card-no">${escapeHtml(plan.planNo)}</span>
+                </div>
             </div>
-            <span class="plan-card-no">${escapeHtml(plan.planNo)}</span>
             <div class="plan-card-meta">
                 <span class="plan-card-meta-item"><span class="meta-icon">📅</span>${dateDisplay}</span>
                 <span class="plan-card-meta-item"><span class="meta-icon">💻</span>${escapeHtml(deviceNames) || '未选机型'}</span>
                 <span class="plan-card-meta-item"><span class="meta-icon">👤</span>${plan.assigneeCount} 人参与</span>
                 ${plan.creatorName ? `<span class="plan-card-meta-item"><span class="meta-icon">✍️</span>${escapeHtml(plan.creatorName)}</span>` : ''}
             </div>
-            <div class="plan-card-progress">
-                <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progressPercent}%"></div></div>
-                <div class="plan-card-progress-label">
-                    <span>整体进度</span>
-                    <span>${progressPercent}%</span>
+            <div class="plan-card-body">
+                <div class="plan-card-progress">
+                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progressPercent}%"></div></div>
+                    <span class="plan-card-pct">${progressPercent}%</span>
                 </div>
-            </div>
-            <div class="plan-card-stats">
-                <span class="plan-card-stat stat-total">🎮 ${plan.gameCount} 款游戏</span>
-                ${notStartedCount > 0 ? `<span class="plan-card-stat stat-not-started">⏳ 未开始 ${notStartedCount}</span>` : ''}
-                ${plan.adaptingCount > 0 ? `<span class="plan-card-stat stat-adapting">🔄 适配中 ${plan.adaptingCount}</span>` : ''}
-                ${plan.finishedCount > 0 ? `<span class="plan-card-stat stat-finished">✅ 已完成 ${plan.finishedCount}</span>` : ''}
+                <div class="plan-card-stats">
+                    <span class="plan-card-stat stat-total">🎮 ${plan.gameCount} 款游戏</span>
+                    ${notStartedCount > 0 ? `<span class="plan-card-stat stat-not-started">⏳ ${notStartedCount}</span>` : ''}
+                    ${plan.adaptingCount > 0 ? `<span class="plan-card-stat stat-adapting">🔄 ${plan.adaptingCount}</span>` : ''}
+                    ${plan.finishedCount > 0 ? `<span class="plan-card-stat stat-finished">✅ ${plan.finishedCount}</span>` : ''}
+                </div>
             </div>
             <div class="plan-card-actions" onclick="event.stopPropagation()">
                 <button class="plan-card-action-btn" onclick="event.stopPropagation(); editPlan(${configPlans.indexOf(plan)})">✏️ 编辑</button>
@@ -6282,6 +6290,13 @@ function renderMyTaskPlanCards() {
         filteredPlans = myTaskPlans.filter(p => p.tasks.some(t => t.adapt_status === statusFilter));
     }
 
+    // 排序：从新到旧（按计划日期降序）
+    filteredPlans.sort((a, b) => {
+        const da = a.planDate ? new Date(a.planDate).getTime() : 0;
+        const db = b.planDate ? new Date(b.planDate).getTime() : 0;
+        return db - da;
+    });
+
     if (filteredPlans.length === 0) {
         container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📌</div><div>没有符合筛选条件的计划</div></div>`;
         return;
@@ -6302,24 +6317,28 @@ function renderMyTaskPlanCards() {
 
         return `
         <div class="plan-card my-task-plan-card" onclick="openMyTaskPlan(${plan.planId})" style="cursor:pointer;">
-            <div class="plan-card-header">
+            <div class="plan-card-top">
                 <span class="plan-card-title">${escapeHtml(plan.planTitle)}</span>
                 <span class="plan-card-no">${escapeHtml(plan.planNo)}</span>
             </div>
-            <div class="plan-card-meta">
+            ${plan.planGoal ? `<div class="plan-card-goal">${escapeHtml(plan.planGoal)}</div>` : ''}
+            <div class="my-task-card-meta">
                 <span>📅 ${plan.planDate || '-'}</span>
                 <span>📱 ${deviceNames}${deviceMore || ''}</span>
             </div>
-            ${plan.planGoal ? `<div class="plan-card-goal">${escapeHtml(plan.planGoal)}</div>` : ''}
-            <div class="plan-card-progress-bar">
-                <div class="plan-card-progress-fill" style="width:${avgProgress}%;background:${progressColor};"></div>
-            </div>
-            <div class="plan-card-stats">
-                <span class="stat-item">🎮 <strong>${total}</strong> 游戏</span>
-                <span class="stat-item" style="color:#718096;">⏳ ${notStarted}</span>
-                <span class="stat-item" style="color:#d69e2e;">🔧 ${adapting}</span>
-                <span class="stat-item" style="color:#38a169;">✅ ${finished}</span>
-                <span style="margin-left:auto;font-weight:600;color:${progressColor};">${avgProgress}%</span>
+            <div class="my-task-card-bottom">
+                <div class="plan-card-progress">
+                    <div class="plan-card-progress-bar">
+                        <div class="plan-card-progress-fill" style="width:${avgProgress}%;background:${progressColor};"></div>
+                    </div>
+                    <span class="plan-card-pct" style="color:#fff;">${avgProgress}%</span>
+                </div>
+                <div class="plan-card-stats my-task-stats">
+                    <span>🎮 <strong>${total}</strong></span>
+                    <span style="color:rgba(255,255,255,0.75)">⏳ ${notStarted}</span>
+                    <span style="color:rgba(255,255,255,0.85)">🔧 ${adapting}</span>
+                    <span style="color:rgba(255,255,255,0.95)">✅ ${finished}</span>
+                </div>
             </div>
         </div>`;
     }).join('');
