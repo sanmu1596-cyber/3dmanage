@@ -768,6 +768,14 @@
                                     </select>
                                     <small class="form-hint">选中后，所有游戏将默认分配给此人；也可在计划详情中逐个修改</small>
                                 </div>
+                                <div class="form-group" id="plan-tc-template-section">
+                                    <label>关联测试用例模板</label>
+                                    <select id="plan-tc-template" class="filter-select" onchange="onPlanTcTemplateChange()">
+                                        <option value="">不关联（后续手动添加）</option>
+                                        <option value="__all__">📋 关联全部测试用例</option>
+                                    </select>
+                                    <small class="form-hint">选择后，创建计划时会自动将所选模板/用例关联到每个游戏</small>
+                                </div>
                                 <div class="form-actions">
                                     <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
                                     <button type="button" class="tool-btn" onclick="submitPlan(event, 'draft')">💾 保存草稿</button>

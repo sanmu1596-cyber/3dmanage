@@ -3110,6 +3110,9 @@ function showCreatePlanView() {
 
     // 填充默认负责人下拉框
     fillAssigneeSelect();
+
+    // 填充测试用例模板下拉框
+    fillPlanTcTemplateSelect();
 }
 
 // 编辑已有计划
@@ -3170,6 +3173,95 @@ function fillAssigneeSelect() {
         select.innerHTML += `<option value="${m.id}">${escapeHtml(m.name)}</option>`;
     });
     if (currentVal) select.value = currentVal;
+}
+
+// 填充测试用例模板下拉框
+async function fillPlanTcTemplateSelect() {
+    const select = document.getElementById('plan-tc-template');
+    if (!select) return;
+    
+    // 先加载测试用例数据（如果还没有）
+    if (!allTestCasesData) {
+        try {
+            const resp = await authFetch(`${API_BASE}/test-cases`);
+            const result = await resp.json();
+            if (result.success && result.data) {
+                allTestCasesData = result.data;
+            }
+        } catch (e) { console.error('加载用例失败:', e); }
+    }
+
+    const templates = (allTestCasesData || []).filter(tc => tc.is_template);
+    templates.forEach(tc => {
+        select.innerHTML += `<option value="${tc.id}">📋 ${escapeHtml(tc.name)} (${tc.category || '未分类'})</option>`;
+    });
+}
+
+// 模板选择变化时的提示
+function onPlanTcTemplateChange() {
+    const val = document.getElementById('plan-tc-template').value;
+    if (val === '__all__') {
+        planSelectedTcMode = 'all';
+    } else if (val) {
+        planSelectedTcMode = 'template';
+    } else {
+        planSelectedTcMode = null;
+    }
+}
+
+// 测试用例关联模式: null=不关联, 'all'=全部, 'template'=特定模板
+let planSelectedTcMode = null;
+
+// 创建计划后自动关联测试用例
+async function autoLinkTestCasesToPlan(planId) {
+    // 先获取该计划的所有游戏ID
+    const gamesResp = await authFetch(`${API_BASE}/plans/${planId}`);
+    const planResult = await gamesResp.json();
+    if (!planResult.success || !planResult.data?.games) return;
+
+    const planGames = planResult.data.games;
+    if (planGames.length === 0) return;
+
+    // 确定要关联哪些测试用例
+    let tcIds = [];
+    
+    if (planSelectedTcMode === 'all') {
+        // 关联所有测试用例
+        const allTcResp = await authFetch(`${API_BASE}/test-cases`);
+        const allTcResult = await allTcResp.json();
+        if (allTcResult.success && allTcResult.data) {
+            tcIds = allTcResult.data.map(tc => tc.id);
+        }
+    } else if (planSelectedTcMode === 'template') {
+        // 获取选中的模板ID
+        const templateSelect = document.getElementById('plan-tc-template');
+        const templateId = parseInt(templateSelect.value);
+        tcIds = [templateId];
+        
+        // 如果是模板，也查找同分类下的其他模板/用例（可选，这里先只关联模板本身）
+    }
+
+    if (tcIds.length === 0) return;
+
+    // 为每个游戏批量关联测试用例
+    let linkedCount = 0;
+    for (const pg of planGames) {
+        try {
+            const linkResp = await authFetch(`${API_BASE}/test-cases/link`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    plan_id: planId,
+                    plan_game_id: pg.id,
+                    test_case_ids: tcIds
+                })
+            });
+            const linkResult = await linkResp.json();
+            if (linkResult.success) linkedCount++;
+        } catch (e) { console.error('游戏', pg.game_name, '关联失败:', e); }
+    }
+
+    console.log(`测试用例已关联：${tcIds.length}个用例 × ${linkedCount}个游戏`);
 }
 
 function showPlanListView() {
@@ -3317,6 +3409,18 @@ async function submitPlan(event, planStatus) {
         const result = await resp.json();
 
         if (result.success) {
+            const planId = result.data?.id;
+            
+            // 如果选择了测试用例模板，自动关联
+            if (planSelectedTcMode && planId) {
+                try {
+                    await autoLinkTestCasesToPlan(planId);
+                } catch (tcErr) {
+                    console.error('关联测试用例失败:', tcErr);
+                    showToast('计划创建成功，但测试用例关联可能不完整', 'warning');
+                }
+            }
+
             const statusText = planStatus === 'published' ? '创建并发布' : '保存草稿';
             showToast(`配置计划${statusText}成功`, 'success');
             await loadConfigPlans();
