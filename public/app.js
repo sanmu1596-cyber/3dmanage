@@ -255,20 +255,31 @@ function updateUserInfo() {
     const user = getCurrentUser();
     const userInfoEl = document.getElementById('user-info');
     if (userInfoEl) {
+        // 保留主题切换和通知按钮，只更新用户信息部分
+        const themeBtn = '<button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>';
+        const notifyBtn = '<button class="icon-btn notification-btn" id="notification-btn" onclick="toggleNotificationPanel()" title="通知">🔔<span class="notification-badge" id="notification-badge" style="display:none">0</span></button>';
+
         if (IS_DEV_MODE) {
             userInfoEl.innerHTML = `
+                ${themeBtn}
+                ${notifyBtn}
                 <span class="user-avatar">👤</span>
                 <span class="user-name">${escapeHtml(user.realName || user.username)}</span>
                 <span style="color:var(--text-light);font-size:12px;margin-left:6px;">(开发模式)</span>
             `;
         } else {
             userInfoEl.innerHTML = `
+                ${themeBtn}
+                ${notifyBtn}
                 <span class="user-avatar">👤</span>
                 <span class="user-name">${escapeHtml(user.realName || user.username)}</span>
                 <span class="user-role-badge" style="font-size:11px;margin-left:6px;color:var(--text-light);">${escapeHtml(user.role || '')}</span>
                 <button class="logout-btn" onclick="logout()" title="退出登录">🚪 退出</button>
             `;
         }
+
+        // 刷新主题图标
+        refreshThemeIcon();
     }
 }
 
