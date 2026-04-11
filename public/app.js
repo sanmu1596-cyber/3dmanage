@@ -3294,7 +3294,7 @@ function renderPlanDeviceTags() {
 function renderPlanGameTags() {
     const container = document.getElementById('plan-games-tags');
     container.innerHTML = planSelectedGames.map((game, i) =>
-        `<span class="tag-item">${escapeHtml(game.name)} <span class="tag-remove" onclick="removePlanGame(${i})">×</span></span>`
+        `<span class="tag-item">${escapeHtml(game.name)}${game.ownerName ? `<span style="opacity:0.6;font-size:11px;margin-left:4px;">👤${escapeHtml(game.ownerName)}</span>` : ''} <span class="tag-remove" onclick="removePlanGame(${i})">×</span></span>`
     ).join('');
 }
 
@@ -3391,8 +3391,10 @@ async function submitPlan(event, planStatus) {
             game_name: game.name,
             game_platform: game.platform || '-',
             game_type: game.game_type || '-',
-            owner_name: defaultAssigneeName || '',
-            assigned_to: defaultAssigneeId ? parseInt(defaultAssigneeId) : null,
+            // 优先用游戏自身负责人，没有则用默认负责人兜底
+            owner_name: game.ownerName || defaultAssigneeName || '',
+            assigned_to: (game.ownerId && !defaultAssigneeId) ? parseInt(game.ownerId)
+                        : (defaultAssigneeId ? parseInt(defaultAssigneeId) : null),
             adapt_status: 'not_started',
             adapt_progress: 0,
             remark: '',
@@ -3978,7 +3980,8 @@ function openPlanGameSelectModal() {
             name: g.name,
             platform: g.platform || '-',
             gameType: g.game_type || '-',
-            ownerName: g.owner_name || '-',
+            ownerName: g.owner_name || '',
+            ownerId: g.owner_id || null,
             checked: false
         }));
     planGameSelectTargetList = [];
@@ -4014,7 +4017,7 @@ function renderPlanGameSourceList(filterText) {
                 <input type="checkbox" ${g.checked ? 'checked' : ''} onclick="event.stopPropagation(); togglePlanGameSrc(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(g.name)}</span>
-                    <span class="game-select-item-meta">${escapeHtml(g.platform)} · ${escapeHtml(g.gameType)}</span>
+                    <span class="game-select-item-meta">${escapeHtml(g.platform)} · ${escapeHtml(g.gameType)}${g.ownerName ? ` · 👤 ${escapeHtml(g.ownerName)}` : ''}</span>
                 </div>
             </div>`;
         }).join('');
@@ -4051,7 +4054,7 @@ function renderPlanGameTargetList(filterText) {
                 <input type="checkbox" ${g.checked ? 'checked' : ''} onclick="event.stopPropagation(); togglePlanGameTgt(${ri})">
                 <div class="game-select-item-info">
                     <span class="game-select-item-name">${escapeHtml(g.name)}</span>
-                    <span class="game-select-item-meta">${escapeHtml(g.platform)} · ${escapeHtml(g.gameType)}</span>
+                    <span class="game-select-item-meta">${escapeHtml(g.platform)} · ${escapeHtml(g.gameType)}${g.ownerName ? ` · 👤 ${escapeHtml(g.ownerName)}` : ''}</span>
                 </div>
             </div>`;
         }).join('');
@@ -4174,7 +4177,8 @@ async function confirmPlanGameSelect() {
         name: g.name,
         platform: g.platform,
         gameType: g.gameType,
-        ownerName: g.ownerName
+        ownerName: g.ownerName || '',
+        ownerId: g.ownerId || null
     }))];
     renderPlanGameTags();
     closePlanGameSelectModal();
@@ -6370,7 +6374,7 @@ function renderMyTasksTable() {
     const statsItems = document.getElementById('my-tasks-stats-items');
 
     if (!myTasksFiltered || myTasksFiltered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📌</div><div>该计划下暂无符合条件的任务</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-icon">📌</div><div>该计划下暂无符合条件的任务</div></td></tr>`;
         if (statsItems) statsItems.innerHTML = '';
         return;
     }
@@ -6395,6 +6399,7 @@ function renderMyTasksTable() {
                 ${escapeHtml(task.game_name || '')}
                 <div style="margin-top:4px;">${tcBadge}</div>
             </td>
+            <td>${escapeHtml(task.assigned_name || task.owner_name || '-')}</td>
             <td>${escapeHtml(task.game_platform || task.game_platform_full || '-')}</td>
             <td>
                 <select class="adapt-status-select" data-task-id="${task.id}" onchange="onMyTaskFieldChange(${index})">
