@@ -3677,3 +3677,172 @@ body.col-resizing * {
 [data-theme="dark"] .detail-panel-footer {
     background: var(--bg-surface);
 }
+
+/* ========== 深色主题全面补齐 ========== */
+
+/* 通用白色背景组件 */
+[data-theme="dark"] .column-settings-panel,
+[data-theme="dark"] .checkbox-label,
+[data-theme="dark"] .plan-form-container,
+[data-theme="dark"] .tag-input-container,
+[data-theme="dark"] .device-tabs,
+[data-theme="dark"] .um-sub-tabs,
+[data-theme="dark"] .um-role-sidebar,
+[data-theme="dark"] .um-perm-header {
+    background: var(--bg-card) !important;
+}
+
+/* 字段相关 */
+[data-theme="dark"] .field-card-title .field-key {
+    background: var(--bg-elevated);
+}
+[data-theme="dark"] .field-add-option input,
+[data-theme="dark"] .game-select-search input,
+[data-theme="dark"] .adapt-status-select,
+[data-theme="dark"] .remark-input,
+[data-theme="dark"] .exec-remark-input {
+    background: var(--bg-input);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+[data-theme="dark"] .exec-status-select {
+    background: var(--bg-input);
+    border-color: var(--border);
+}
+
+/* 按钮变体 */
+[data-theme="dark"] .btn-secondary {
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--bg-elevated);
+    color: var(--primary);
+}
+[data-theme="dark"] .btn-success:hover {
+    background: rgba(63, 185, 80, 0.15);
+}
+[data-theme="dark"] .btn-delete:hover {
+    background: rgba(248, 81, 73, 0.15);
+}
+
+/* 进度条/滑块轨道 */
+[data-theme="dark"] .progress-bar-track,
+[data-theme="dark"] .progress-slider,
+[data-theme="dark"] .plan-card-progress-bar {
+    background: var(--bg-elevated);
+}
+[data-theme="dark"] .tc-progress-mini {
+    background: var(--bg-elevated);
+}
+
+/* 全局搜索面板内部元素 */
+[data-theme="dark"] .gs-input-wrap {
+    border-bottom-color: var(--border);
+}
+[data-theme="dark"] .gs-kbd,
+[data-theme="dark"] .gs-item-badge,
+[data-theme="dark"] .gs-footer kbd {
+    background: var(--bg-elevated);
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+[data-theme="dark"] .gs-footer {
+    border-top-color: var(--border);
+}
+
+/* 矩阵视图 */
+[data-theme="dark"] .matrix-table tbody td:first-child {
+    background: var(--bg-card);
+}
+[data-theme="dark"] .legend-pending { background: #484f58; }
+[data-theme="dark"] .matrix-cell[data-status="pending"] { background: #484f58; }
+[data-theme="dark"] .matrix-cell[data-status="none"] { background: var(--bg-card); border-color: var(--border); }
+
+/* 状态标签深色适配 */
+[data-theme="dark"] .status-maintenance,
+[data-theme="dark"] .status-paused {
+    background: rgba(110, 118, 129, 0.2);
+    color: #8b949e;
+}
+[data-theme="dark"] .adapt-status-not_started { background: rgba(110, 118, 129, 0.15); color: #8b949e; }
+
+/* 优先级/严重程度标签 */
+[data-theme="dark"] .priority-low { background: rgba(56, 139, 253, 0.1); color: #58a6ff; }
+[data-theme="dark"] .priority-medium { background: rgba(210, 153, 34, 0.1); color: #d29922; }
+[data-theme="dark"] .priority-high { background: rgba(248, 81, 73, 0.1); color: #f85149; }
+[data-theme="dark"] .severity-advice { background: rgba(63, 185, 80, 0.1); color: #3fb950; }
+[data-theme="dark"] .severity-prompt { background: rgba(210, 153, 34, 0.1); color: #d29922; }
+[data-theme="dark"] .severity-normal { background: rgba(88, 166, 255, 0.1); color: #58a6ff; }
+[data-theme="dark"] .severity-serious { background: rgba(248, 81, 73, 0.1); color: #f85149; }
+
+/* 计划卡片统计标签 */
+[data-theme="dark"] .plan-card-stat.stat-adapting { background: rgba(210, 153, 34, 0.15); }
+[data-theme="dark"] .plan-card-stat.stat-finished { background: rgba(63, 185, 80, 0.15); }
+[data-theme="dark"] .plan-card-stat.stat-not-started { background: rgba(110, 118, 129, 0.15); color: #8b949e; }
+[data-theme="dark"] .plan-card-status.status-draft { background: rgba(210, 153, 34, 0.15); }
+[data-theme="dark"] .plan-card-status.status-published { background: rgba(63, 185, 80, 0.15); }
+[data-theme="dark"] .plan-card-goal { background: var(--bg-surface); }
+
+/* 缺陷徽章 */
+[data-theme="dark"] .bug-count-badge { background: rgba(248, 81, 73, 0.15); }
+[data-theme="dark"] .bug-count-badge.no-bugs { background: rgba(63, 185, 80, 0.1); }
+[data-theme="dark"] .bug-count-badge:hover { background: rgba(248, 81, 73, 0.25); }
+
+/* 计划卡片操作按钮 */
+[data-theme="dark"] .plan-card-action-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+[data-theme="dark"] .plan-card-action-btn.btn-danger:hover {
+    background: rgba(248, 81, 73, 0.15);
+}
+[data-theme="dark"] .plan-card-action-btn.btn-publish:hover {
+    background: rgba(63, 185, 80, 0.15);
+}
+
+/* 游戏选择项选中态 */
+[data-theme="dark"] .game-select-item.selected {
+    background: rgba(56, 139, 253, 0.15);
+}
+
+/* 通知图标背景 */
+[data-theme="dark"] .notification-icon.type-deadline_warning,
+[data-theme="dark"] .notification-icon.type-deadline_today {
+    background: rgba(210, 153, 34, 0.15);
+}
+[data-theme="dark"] .notification-icon.type-bug_assigned,
+[data-theme="dark"] .notification-icon.type-bug_high_priority {
+    background: rgba(248, 81, 73, 0.15);
+}
+[data-theme="dark"] .notification-icon.type-plan_published,
+[data-theme="dark"] .notification-icon.type-task_assigned {
+    background: rgba(56, 139, 253, 0.15);
+}
+
+/* 测试用例模块 */
+[data-theme="dark"] .tc-stats-bar { background: var(--bg-card); border-bottom-color: var(--border); }
+[data-theme="dark"] .tc-stat-card { background: var(--bg-surface); }
+[data-theme="dark"] .tc-batch-bar { background: var(--primary-light); border-bottom-color: var(--border-light); }
+[data-theme="dark"] .exec-tc-progress-bar { background: var(--bg-surface); }
+[data-theme="dark"] .tc-count-badge.has-cases { background: rgba(56, 139, 253, 0.08); }
+
+/* 详情返回栏 */
+[data-theme="dark"] .detail-back-bar { border-bottom-color: var(--border); }
+[data-theme="dark"] .plan-detail-info { background: var(--bg-surface); border-color: var(--border); }
+
+/* 我的任务计划卡片（保持渐变但调整透明度） */
+[data-theme="dark"] .my-task-plan-card {
+    box-shadow: var(--shadow-lg), inset 0 0 20px rgba(0,0,0,0.1);
+}
+[data-theme="dark"] .plan-card-actions { border-top-color: var(--border); }
+
+/* 滚动条补充 */
+[data-theme="dark"] ::-webkit-scrollbar-track-piece { background: var(--bg-deep); }
+
+/* 表格隔行（确保覆盖） */
+[data-theme="dark"] .data-table td {
+    border-bottom-color: var(--border-light);
+}
