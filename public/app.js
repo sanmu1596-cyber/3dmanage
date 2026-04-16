@@ -430,6 +430,7 @@ async function loadTabData(tabId, switchId) {
             break;
         case 'members':
             await loadMembers();
+            refreshAllSelectsFromFieldOptions();
             break;
         case 'devices':
             await loadDevices();
@@ -460,6 +461,10 @@ async function loadTabData(tabId, switchId) {
         case 'my-tasks':
             if (!allMembersData || allMembersData.length === 0) await loadMembers();
             await loadMyTasks();
+            break;
+        case 'requirements':
+            if (!allMembersData || allMembersData.length === 0) await loadMembers();
+            await loadRequirements();
             break;
         case 'field-settings':
             await loadFieldOptions();
@@ -3386,6 +3391,7 @@ async function submitPlan(event, planStatus) {
         goal,
         tab_name: tabName,
         status: planStatus,
+        requirement_id: window._pendingReqId || null,
         games: planSelectedGames.map((game, i) => ({
             game_id: game.id,
             game_name: game.name,
@@ -3425,6 +3431,7 @@ async function submitPlan(event, planStatus) {
 
             const statusText = planStatus === 'published' ? '创建并发布' : '保存草稿';
             showToast(`配置计划${statusText}成功`, 'success');
+            window._pendingReqId = null; // 清除需求关联
             await loadConfigPlans();
             showPlanListView();
         } else {
@@ -3455,6 +3462,9 @@ async function loadConfigPlans() {
                 tabName: p.tab_name || p.title,
                 status: p.status || 'draft',
                 creatorName: p.creator_name || '',
+                requirementId: p.requirement_id || null,
+                requirementTitle: p.requirement_title || '',
+                requirementNo: p.requirement_no || '',
                 createdAt: p.created_at,
                 gameCount: p.game_count || 0,
                 finishedCount: p.finished_count || 0,
@@ -3479,6 +3489,52 @@ let planStatusFilter = '';
 function filterPlans() {
     planStatusFilter = document.getElementById('plan-status-filter').value;
     renderPlanCards();
+}
+
+// 配置计划视图模式切换
+let planViewMode = 'card'; // 'card' or 'list'
+
+function togglePlanView(mode) {
+    planViewMode = mode;
+    document.querySelectorAll('#plan-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#plan-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    renderPlanCards();
+}
+
+// 渲染计划列表表格
+function renderPlanListTable(filtered) {
+    const tbody = document.getElementById('plan-list-table');
+    if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📋</div><div>${configPlans.length === 0 ? '暂无配置计划' : '没有符合筛选条件的计划'}</div></td></tr>`;
+        return;
+    }
+    tbody.innerHTML = filtered.map((plan, i) => {
+        const statusLabel = { published: '✅ 已发布', closed: '🏁 已完成', draft: '📝 草稿' }[plan.status] || plan.status;
+        const progress = plan.avgProgress || 0;
+        const idx = configPlans.indexOf(plan);
+        return `<tr>
+            <td class="text-center"><strong>${i + 1}</strong></td>
+            <td style="font-size:12px;color:var(--text-muted);">${escapeHtml(plan.planNo)}</td>
+            <td><a href="javascript:void(0)" onclick="openPlanDetail(${idx})" style="color:var(--primary);font-weight:500;">${escapeHtml(plan.title)}</a></td>
+            <td>${statusLabel}</td>
+            <td>${plan.date || '-'}</td>
+            <td class="text-center">${plan.gameCount}</td>
+            <td class="text-center">${plan.assigneeCount}</td>
+            <td>
+                <div class="plan-card-progress" style="margin:0;">
+                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
+                    <span class="plan-card-pct" style="font-size:11px;">${progress}%</span>
+                </div>
+            </td>
+            <td>${plan.requirementTitle ? `<a href="javascript:void(0)" onclick="switchTab('requirements');setTimeout(()=>openReqDetail(${plan.requirementId}),300);" style="color:var(--primary);font-size:12px;">${escapeHtml(plan.requirementTitle)}</a>` : '-'}</td>
+            <td style="font-size:12px;">${escapeHtml(plan.creatorName || '-')}</td>
+            <td>
+                <button class="btn btn-small btn-edit" onclick="editPlan(${idx})">编辑</button>
+                ${plan.status === 'draft' ? `<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishPlan(${idx})">发布</button>` : ''}
+                <button class="btn btn-small btn-delete" onclick="deletePlan(${idx})">删除</button>
+            </td>
+        </tr>`;
+    }).join('');
 }
 
 // 渲染计划卡片列表
@@ -3511,6 +3567,18 @@ function renderPlanCards() {
         `;
     }
 
+    // 视图模式分流
+    const tableContainer = document.getElementById('plan-table-container');
+    if (planViewMode === 'list') {
+        container.style.display = 'none';
+        if (tableContainer) tableContainer.style.display = '';
+        renderPlanListTable(filtered);
+        return;
+    } else {
+        container.style.display = '';
+        if (tableContainer) tableContainer.style.display = 'none';
+    }
+
     if (filtered.length === 0) {
         container.innerHTML = `<div class="empty-state-full">
             <div class="empty-icon">📋</div>
@@ -3541,6 +3609,7 @@ function renderPlanCards() {
                 <span class="plan-card-meta-item"><span class="meta-icon">💻</span>${escapeHtml(deviceNames) || '未选机型'}</span>
                 <span class="plan-card-meta-item"><span class="meta-icon">👤</span>${plan.assigneeCount} 人参与</span>
                 ${plan.creatorName ? `<span class="plan-card-meta-item"><span class="meta-icon">✍️</span>${escapeHtml(plan.creatorName)}</span>` : ''}
+                ${plan.requirementTitle ? `<span class="plan-card-meta-item"><span class="meta-icon">📄</span><a href="javascript:void(0)" onclick="event.stopPropagation(); switchTab('requirements'); setTimeout(()=>openReqDetail(${plan.requirementId}),300);" style="color:var(--primary);text-decoration:none;">${escapeHtml(plan.requirementTitle)}</a></span>` : ''}
             </div>
             <div class="plan-card-body">
                 <div class="plan-card-progress">
@@ -4580,6 +4649,8 @@ function populateFilterFromFieldOptions(selectId, fieldKey) {
 
 // 刷新所有表单中的动态下拉框
 function refreshAllSelectsFromFieldOptions() {
+    // 成员管理 - 角色
+    populateSelectFromFieldOptions('member-role', 'member_role', '', true, '请选择角色');
     // 成员管理 - 状态
     populateSelectFromFieldOptions('member-status', 'member_status', 'active');
     
@@ -6184,6 +6255,396 @@ async function updatePlanGameAssignee(planIndex, gameIndex, selectEl) {
     }
 }
 
+// ==================== 需求管理模块 ====================
+let requirementsData = [];
+let reqViewMode = 'list'; // 'list' or 'card'
+
+// 加载需求列表
+async function loadRequirements() {
+    try {
+        const resp = await authFetch(`${API_BASE}/requirements`);
+        const result = await resp.json();
+        requirementsData = result.success ? (result.data || []) : [];
+        renderRequirements();
+    } catch (e) {
+        console.error('加载需求失败:', e);
+        requirementsData = [];
+    }
+}
+
+// 筛选需求
+function filterRequirements() {
+    renderRequirements();
+}
+
+// 视图切换
+function toggleReqView(mode) {
+    reqViewMode = mode;
+    document.querySelectorAll('#req-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#req-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    renderRequirements();
+}
+
+// 渲染需求（列表 + 卡片双模式）
+function renderRequirements() {
+    const statusFilter = document.getElementById('req-status-filter')?.value || '';
+    const priorityFilter = document.getElementById('req-priority-filter')?.value || '';
+    const summaryBar = document.getElementById('req-summary-bar');
+
+    let filtered = requirementsData;
+    if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+    if (priorityFilter) filtered = filtered.filter(r => r.priority === priorityFilter);
+
+    // 汇总
+    const totalCount = requirementsData.length;
+    const draftCount = requirementsData.filter(r => r.status === 'draft').length;
+    const publishedCount = requirementsData.filter(r => r.status === 'published').length;
+    const closedCount = requirementsData.filter(r => r.status === 'closed').length;
+    if (summaryBar) {
+        summaryBar.innerHTML = `
+            <span class="summary-item">共 <strong>${totalCount}</strong></span>
+            <span class="summary-item">草稿 <strong>${draftCount}</strong></span>
+            <span class="summary-item">已发布 <strong>${publishedCount}</strong></span>
+            <span class="summary-item">已完成 <strong>${closedCount}</strong></span>
+        `;
+    }
+
+    const tableContainer = document.getElementById('req-table-container');
+    const cardsContainer = document.getElementById('req-cards-container');
+
+    if (reqViewMode === 'list') {
+        tableContainer.style.display = '';
+        cardsContainer.style.display = 'none';
+        renderReqTable(filtered);
+    } else {
+        tableContainer.style.display = 'none';
+        cardsContainer.style.display = '';
+        renderReqCards(filtered);
+    }
+}
+
+// 列表渲染
+function renderReqTable(filtered) {
+    const tbody = document.getElementById('req-table');
+    if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📄</div><div>${requirementsData.length === 0 ? '暂无需求' : '没有符合筛选条件的需求'}</div></td></tr>`;
+        return;
+    }
+    tbody.innerHTML = filtered.map((r, i) => {
+        const priorityBadge = { high: '🔴 高', medium: '🟡 中', low: '🟢 低' }[r.priority] || r.priority;
+        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
+        const statusLabel = statusMap[r.status] || r.status;
+        const totalGames = r.total_games || 0;
+        const finishedGames = r.finished_games || 0;
+        const progress = totalGames > 0 ? Math.round(finishedGames / totalGames * 100) : 0;
+        return `<tr>
+            <td class="text-center"><strong>${i + 1}</strong></td>
+            <td><span style="color:var(--text-muted);font-size:12px;">${escapeHtml(r.req_no || '')}</span></td>
+            <td><a href="javascript:void(0)" onclick="openReqDetail(${r.id})" style="color:var(--primary);font-weight:500;">${escapeHtml(r.title)}</a></td>
+            <td>${priorityBadge}</td>
+            <td>${escapeHtml(r.assigned_name || '-')}</td>
+            <td>${statusLabel}</td>
+            <td>${r.deadline || '-'}</td>
+            <td class="text-center">${r.plan_count || 0}</td>
+            <td>
+                <div class="plan-card-progress" style="margin:0;">
+                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
+                    <span class="plan-card-pct" style="font-size:11px;">${progress}%</span>
+                </div>
+            </td>
+            <td style="font-size:12px;color:var(--text-muted);">${(r.created_at || '').slice(0, 10)}</td>
+            <td>
+                <button class="btn btn-small btn-edit" onclick="editRequirement(${r.id})">编辑</button>
+                ${r.status === 'draft' ? `<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishRequirement(${r.id})">发布</button>` : ''}
+                <button class="btn btn-small btn-delete" onclick="deleteRequirement(${r.id})">删除</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// 卡片渲染
+function renderReqCards(filtered) {
+    const container = document.getElementById('req-cards-container');
+    if (!filtered.length) {
+        container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📄</div><div>${requirementsData.length === 0 ? '暂无需求' : '没有符合筛选条件的需求'}</div></div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(r => {
+        const priorityColor = { high: '#e53e3e', medium: '#d69e2e', low: '#38a169' }[r.priority] || '#718096';
+        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
+        const totalGames = r.total_games || 0;
+        const finishedGames = r.finished_games || 0;
+        const progress = totalGames > 0 ? Math.round(finishedGames / totalGames * 100) : 0;
+        return `
+        <div class="plan-card status-${r.status}" onclick="openReqDetail(${r.id})" style="cursor:pointer;">
+            <div class="plan-card-top">
+                <div class="plan-card-title-row">
+                    <span class="plan-card-status status-${r.status}">${statusMap[r.status] || r.status}</span>
+                    <span class="plan-card-title">${escapeHtml(r.title)}</span>
+                    <span class="plan-card-no">${escapeHtml(r.req_no || '')}</span>
+                </div>
+            </div>
+            <div class="plan-card-meta">
+                <span class="plan-card-meta-item"><span class="meta-icon" style="color:${priorityColor}">●</span>${{high:'高优先级',medium:'中优先级',low:'低优先级'}[r.priority] || r.priority}</span>
+                ${r.assigned_name ? `<span class="plan-card-meta-item"><span class="meta-icon">👤</span>${escapeHtml(r.assigned_name)}</span>` : ''}
+                ${r.deadline ? `<span class="plan-card-meta-item"><span class="meta-icon">📅</span>${r.deadline}</span>` : ''}
+                <span class="plan-card-meta-item"><span class="meta-icon">📋</span>${r.plan_count || 0} 个计划</span>
+            </div>
+            ${r.description ? `<div style="font-size:12px;color:var(--text-secondary);margin:6px 0;line-height:1.5;overflow:hidden;max-height:36px;">${escapeHtml(r.description).slice(0, 80)}${r.description.length > 80 ? '...' : ''}</div>` : ''}
+            <div class="plan-card-body">
+                <div class="plan-card-progress">
+                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
+                    <span class="plan-card-pct">${progress}%</span>
+                </div>
+            </div>
+            <div class="plan-card-actions" onclick="event.stopPropagation()">
+                <button class="plan-card-action-btn" onclick="event.stopPropagation(); editRequirement(${r.id})">✏️ 编辑</button>
+                ${r.status === 'draft' ? `<button class="plan-card-action-btn btn-publish" onclick="event.stopPropagation(); publishRequirement(${r.id})">🚀 发布</button>` : ''}
+                <button class="plan-card-action-btn btn-danger" onclick="event.stopPropagation(); deleteRequirement(${r.id})">🗑️ 删除</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// 显示创建需求视图
+function showReqCreateView() {
+    document.getElementById('req-list-view').style.display = 'none';
+    document.getElementById('req-detail-view').style.display = 'none';
+    document.getElementById('req-create-view').style.display = '';
+    document.getElementById('req-form-title').textContent = '新增需求';
+    document.getElementById('req-edit-id').value = '';
+    document.getElementById('req-title').value = '';
+    document.getElementById('req-description').value = '';
+    document.getElementById('req-priority').value = 'medium';
+    document.getElementById('req-deadline').value = '';
+    document.getElementById('req-assigned-to').value = '';
+    // 填充项目经理下拉
+    populateReqAssigneeSelect();
+}
+
+// 填充指派下拉（只显示项目经理角色的成员）
+function populateReqAssigneeSelect() {
+    const select = document.getElementById('req-assigned-to');
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '<option value="">不指定</option>';
+    (allMembersData || []).forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name + (m.role ? ` (${m.role})` : '');
+        if (String(m.id) === String(current)) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+// 编辑需求
+async function editRequirement(id) {
+    try {
+        const resp = await authFetch(`${API_BASE}/requirements/${id}`);
+        const result = await resp.json();
+        if (!result.success) return showToast('加载需求失败', 'danger');
+        const r = result.data;
+        document.getElementById('req-list-view').style.display = 'none';
+        document.getElementById('req-detail-view').style.display = 'none';
+        document.getElementById('req-create-view').style.display = '';
+        document.getElementById('req-form-title').textContent = '编辑需求';
+        document.getElementById('req-edit-id').value = r.id;
+        document.getElementById('req-title').value = r.title || '';
+        document.getElementById('req-description').value = r.description || '';
+        document.getElementById('req-priority').value = r.priority || 'medium';
+        document.getElementById('req-deadline').value = r.deadline || '';
+        populateReqAssigneeSelect();
+        document.getElementById('req-assigned-to').value = r.assigned_to || '';
+    } catch (e) {
+        showToast('加载需求失败', 'danger');
+    }
+}
+
+// 提交需求（创建/更新）
+async function submitRequirement(status) {
+    const id = document.getElementById('req-edit-id').value;
+    const title = document.getElementById('req-title').value.trim();
+    if (!title) return showToast('请输入需求标题', 'warning');
+
+    const data = {
+        title,
+        description: document.getElementById('req-description').value,
+        priority: document.getElementById('req-priority').value,
+        assigned_to: document.getElementById('req-assigned-to').value || null,
+        deadline: document.getElementById('req-deadline').value || null,
+        status
+    };
+
+    try {
+        const url = id ? `${API_BASE}/requirements/${id}` : `${API_BASE}/requirements`;
+        const method = id ? 'PUT' : 'POST';
+        const resp = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.success) {
+            // 如果是新建且状态为published，还需要调发布接口
+            if (!id && status === 'published' && result.id) {
+                await authFetch(`${API_BASE}/requirements/${result.id}/publish`, { method: 'POST' });
+            }
+            showToast(id ? '需求已更新' : '需求已创建', 'success');
+            backToReqList();
+            await loadRequirements();
+        } else {
+            showToast('操作失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('操作失败: ' + e.message, 'danger');
+    }
+}
+
+// 发布需求
+async function publishRequirement(id) {
+    showConfirm('确定发布此需求？发布后将通知指派的项目经理。', async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/requirements/${id}/publish`, { method: 'POST' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('需求已发布', 'success');
+                await loadRequirements();
+            } else {
+                showToast('发布失败: ' + (result.error || ''), 'danger');
+            }
+        } catch (e) {
+            showToast('发布失败', 'danger');
+        }
+    });
+}
+
+// 删除需求
+async function deleteRequirement(id) {
+    showConfirm('确定删除此需求？关联的配置计划将解除关联但不会被删除。', async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/requirements/${id}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('需求已删除', 'success');
+                await loadRequirements();
+            }
+        } catch (e) {
+            showToast('删除失败', 'danger');
+        }
+    });
+}
+
+// 打开需求详情
+async function openReqDetail(id) {
+    try {
+        const resp = await authFetch(`${API_BASE}/requirements/${id}`);
+        const result = await resp.json();
+        if (!result.success) return showToast('加载需求详情失败', 'danger');
+        const r = result.data;
+
+        document.getElementById('req-list-view').style.display = 'none';
+        document.getElementById('req-create-view').style.display = 'none';
+        document.getElementById('req-detail-view').style.display = 'flex';
+
+        // 标题
+        document.getElementById('req-detail-title').innerHTML = `${escapeHtml(r.title)} <span style="font-size:12px;color:var(--text-light);font-weight:400;margin-left:8px;">${escapeHtml(r.req_no || '')}</span>`;
+
+        // 操作按钮
+        const actionsEl = document.getElementById('req-detail-actions');
+        actionsEl.innerHTML = `
+            <button class="tool-btn" onclick="editRequirement(${r.id})">✏️ 编辑</button>
+            ${r.status === 'draft' ? `<button class="tool-btn tool-btn-primary" onclick="publishRequirement(${r.id})">🚀 发布</button>` : ''}
+            ${r.status === 'published' ? `<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closeRequirement(${r.id})">✅ 完成</button>` : ''}
+            <button class="tool-btn" onclick="createPlanFromReq(${r.id})">📋 创建配置计划</button>
+            <button class="btn btn-small btn-delete" onclick="deleteRequirement(${r.id})">🗑️ 删除</button>
+        `;
+
+        // 信息条
+        const priorityLabel = { high: '🔴 高', medium: '🟡 中', low: '🟢 低' }[r.priority] || r.priority;
+        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
+        const infoEl = document.getElementById('req-detail-info');
+        infoEl.innerHTML = `
+            <span class="info-tag"><span class="tag-label">状态：</span>${statusMap[r.status] || r.status}</span>
+            <span class="info-tag"><span class="tag-label">优先级：</span>${priorityLabel}</span>
+            <span class="info-tag"><span class="tag-label">指派给：</span>${escapeHtml(r.assigned_name || '未指派')}</span>
+            ${r.deadline ? `<span class="info-tag"><span class="tag-label">截止日期：</span>${r.deadline}</span>` : ''}
+            <span class="info-tag"><span class="tag-label">创建者：</span>${escapeHtml(r.creator_name || '-')}</span>
+            <span class="info-tag"><span class="tag-label">创建时间：</span>${(r.created_at || '').slice(0, 16)}</span>
+            ${r.description ? `<div style="margin-top:8px;padding:10px 14px;background:var(--bg-card);border-radius:6px;font-size:13px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;">${escapeHtml(r.description)}</div>` : ''}
+        `;
+
+        // 关联的配置计划
+        const plansBody = document.getElementById('req-plans-table');
+        const plans = r.plans || [];
+        if (plans.length === 0) {
+            plansBody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无关联的配置计划</div><div class="empty-sub">点击"创建配置计划"基于此需求创建</div></td></tr>`;
+        } else {
+            plansBody.innerHTML = plans.map((p, i) => {
+                const statusLabel = { draft: '📝 草稿', published: '✅ 已发布', closed: '🏁 已完成' }[p.status] || p.status;
+                const progress = p.game_count > 0 ? Math.round((p.finished_count || 0) / p.game_count * 100) : 0;
+                return `<tr>
+                    <td class="text-center">${i + 1}</td>
+                    <td style="font-size:12px;color:var(--text-muted);">${escapeHtml(p.plan_no || '')}</td>
+                    <td><a href="javascript:void(0)" onclick="switchTab('config-plan'); setTimeout(()=>{ const idx = configPlans.findIndex(cp=>cp.id===${p.id}); if(idx>=0) openPlanDetail(idx); }, 500);" style="color:var(--primary);">${escapeHtml(p.title)}</a></td>
+                    <td>${statusLabel}</td>
+                    <td>${p.plan_date || '-'}</td>
+                    <td class="text-center">${p.game_count || 0}</td>
+                    <td>
+                        <div class="plan-card-progress" style="margin:0;">
+                            <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
+                            <span class="plan-card-pct" style="font-size:11px;">${progress}%</span>
+                        </div>
+                    </td>
+                    <td><button class="btn btn-small btn-edit" onclick="switchTab('config-plan'); setTimeout(()=>{ const idx = configPlans.findIndex(cp=>cp.id===${p.id}); if(idx>=0) openPlanDetail(idx); }, 500);">查看</button></td>
+                </tr>`;
+            }).join('');
+        }
+    } catch (e) {
+        showToast('加载失败', 'danger');
+    }
+}
+
+// 关闭需求
+async function closeRequirement(id) {
+    showConfirm('确定将此需求标记为已完成？', async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/requirements/${id}/close`, { method: 'POST' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('需求已完成', 'success');
+                backToReqList();
+                await loadRequirements();
+            }
+        } catch (e) {
+            showToast('操作失败', 'danger');
+        }
+    });
+}
+
+// 基于需求创建配置计划（跳到配置计划创建页面，预填 requirement_id）
+function createPlanFromReq(reqId) {
+    // 存储当前需求ID，在创建计划时使用
+    window._pendingReqId = reqId;
+    switchTab('config-plan');
+    setTimeout(() => {
+        showCreatePlanView();
+        // 标记来源
+        const titleInput = document.getElementById('plan-title');
+        if (titleInput && !titleInput.value) {
+            const req = requirementsData.find(r => r.id === reqId);
+            if (req) titleInput.value = req.title;
+        }
+    }, 300);
+}
+
+// 返回需求列表
+function backToReqList() {
+    document.getElementById('req-list-view').style.display = '';
+    document.getElementById('req-detail-view').style.display = 'none';
+    document.getElementById('req-create-view').style.display = 'none';
+}
+
+
 // ==================== 我的任务（二级结构：计划卡片 → 任务列表） ====================
 let myTasksData = [];           // 所有任务（扁平）
 let myTasksFiltered = [];       // 当前二级视图中筛选后的任务
@@ -6269,16 +6730,56 @@ function filterMyTasks() {
     }
 }
 
+// 我的任务视图模式切换
+let myTaskViewMode = 'card'; // 'card' or 'list'
+
+function toggleMyTaskView(mode) {
+    myTaskViewMode = mode;
+    document.querySelectorAll('#mytask-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#mytask-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    renderMyTaskPlanCards();
+}
+
+// 我的任务 - 列表渲染
+function renderMyTaskPlanListTable(filteredPlans) {
+    const tbody = document.getElementById('my-tasks-plan-list-table');
+    if (!filteredPlans.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📌</div><div>暂无任务</div></td></tr>`;
+        return;
+    }
+    tbody.innerHTML = filteredPlans.map((plan, i) => {
+        const total = plan.tasks.length;
+        const finished = plan.tasks.filter(t => t.adapt_status === 'finished').length;
+        const avgProgress = total > 0 ? Math.round(plan.tasks.reduce((s, t) => s + (t.adapt_progress || 0), 0) / total) : 0;
+        return `<tr>
+            <td class="text-center"><strong>${i + 1}</strong></td>
+            <td><a href="javascript:void(0)" onclick="openMyTaskPlan(${plan.planId})" style="color:var(--primary);font-weight:500;">${escapeHtml(plan.planTitle)}</a></td>
+            <td style="font-size:12px;color:var(--text-muted);">${escapeHtml(plan.planNo)}</td>
+            <td>${plan.planDate || '-'}</td>
+            <td class="text-center">${total} (✅${finished})</td>
+            <td>
+                <div class="plan-card-progress" style="margin:0;">
+                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${avgProgress}%"></div></div>
+                    <span class="plan-card-pct" style="font-size:11px;">${avgProgress}%</span>
+                </div>
+            </td>
+            <td><button class="btn btn-small btn-edit" onclick="openMyTaskPlan(${plan.planId})">查看</button></td>
+        </tr>`;
+    }).join('');
+}
+
 // ========== 一级视图：计划卡片 ==========
 function renderMyTaskPlanCards() {
     const container = document.getElementById('my-tasks-plan-cards');
+    const tableContainer = document.getElementById('my-tasks-plan-table');
     const detailView = document.getElementById('my-tasks-detail-view');
 
-    // 确保显示一级，隐藏二级
-    container.style.display = '';
+    // 确保隐藏二级
     detailView.style.display = 'none';
 
     if (myTaskPlans.length === 0) {
+        container.style.display = '';
+        if (tableContainer) tableContainer.style.display = 'none';
         container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📌</div><div>暂无分配给您的任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></div>`;
         return;
     }
@@ -6298,8 +6799,21 @@ function renderMyTaskPlanCards() {
     });
 
     if (filteredPlans.length === 0) {
+        container.style.display = '';
+        if (tableContainer) tableContainer.style.display = 'none';
         container.innerHTML = `<div class="empty-state-full"><div class="empty-icon">📌</div><div>没有符合筛选条件的计划</div></div>`;
         return;
+    }
+
+    // 视图模式分流
+    if (myTaskViewMode === 'list') {
+        container.style.display = 'none';
+        if (tableContainer) tableContainer.style.display = '';
+        renderMyTaskPlanListTable(filteredPlans);
+        return;
+    } else {
+        container.style.display = '';
+        if (tableContainer) tableContainer.style.display = 'none';
     }
 
     container.innerHTML = filteredPlans.map(plan => {

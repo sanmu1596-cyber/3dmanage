@@ -75,6 +75,9 @@
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">项目管理</div>
                     <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="requirements" onclick="switchTab('requirements')">
+                            <span class="sidebar-icon">📄</span>需求管理
+                        </a>
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
@@ -618,6 +621,134 @@
                     </div>
                 </section>
 
+                <!-- ========== 需求管理 ========== -->
+                <section id="requirements" class="tab-content">
+                    <!-- 需求列表视图 -->
+                    <div id="req-list-view">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="showReqCreateView()"><span class="tool-icon">＋</span>新增需求</button>
+                                <span class="toolbar-divider"></span>
+                                <select id="req-status-filter" class="compact-select" onchange="filterRequirements()">
+                                    <option value="">全部状态</option>
+                                    <option value="draft">草稿</option>
+                                    <option value="published">已发布</option>
+                                    <option value="in_progress">进行中</option>
+                                    <option value="closed">已完成</option>
+                                </select>
+                                <select id="req-priority-filter" class="compact-select" onchange="filterRequirements()">
+                                    <option value="">全部优先级</option>
+                                    <option value="high">高</option>
+                                    <option value="medium">中</option>
+                                    <option value="low">低</option>
+                                </select>
+                            </div>
+                            <div class="toolbar-right">
+                                <div class="view-toggle" id="req-view-toggle">
+                                    <button class="view-toggle-btn active" data-view="list" onclick="toggleReqView('list')" title="列表视图">☰</button>
+                                    <button class="view-toggle-btn" data-view="card" onclick="toggleReqView('card')" title="卡片视图">▦</button>
+                                </div>
+                                <div class="plans-summary" id="req-summary-bar"></div>
+                            </div>
+                        </div>
+                        <!-- 列表视图 -->
+                        <div id="req-table-container" class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th width="130">编号</th>
+                                        <th>标题</th>
+                                        <th width="80">优先级</th>
+                                        <th width="100">指派给</th>
+                                        <th width="100">状态</th>
+                                        <th width="100">截止日期</th>
+                                        <th width="80">关联计划</th>
+                                        <th width="100">进度</th>
+                                        <th width="100">创建时间</th>
+                                        <th width="120">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="req-table">
+                                    <tr><td colspan="11" class="empty-state"><div class="empty-icon">📄</div><div>暂无需求</div><div class="empty-sub">点击"新增需求"创建第一个需求</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- 卡片视图 -->
+                        <div id="req-cards-container" class="plan-cards-grid" style="display:none;">
+                        </div>
+                    </div>
+                    <!-- 需求详情视图 -->
+                    <div id="req-detail-view" style="display:none;">
+                        <div class="detail-back-bar">
+                            <button class="tool-btn" onclick="backToReqList()"><span class="tool-icon">←</span>返回需求列表</button>
+                            <span class="detail-plan-title" id="req-detail-title"></span>
+                            <div style="margin-left:auto;display:flex;gap:8px;" id="req-detail-actions"></div>
+                        </div>
+                        <div class="plan-detail-info" id="req-detail-info"></div>
+                        <!-- 关联的配置计划列表 -->
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th width="150">计划编号</th>
+                                        <th>计划标题</th>
+                                        <th width="80">状态</th>
+                                        <th width="100">日期</th>
+                                        <th width="80">游戏数</th>
+                                        <th width="100">完成进度</th>
+                                        <th width="100">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="req-plans-table">
+                                    <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无关联的配置计划</div><div class="empty-sub">项目经理可基于此需求创建配置计划</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- 创建/编辑需求视图 -->
+                    <div id="req-create-view" style="display:none;">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn" onclick="backToReqList()"><span class="tool-icon">←</span>返回</button>
+                                <span class="toolbar-title" id="req-form-title">新增需求</span>
+                            </div>
+                        </div>
+                        <div class="plan-form-container">
+                            <form id="req-form" onsubmit="return false;">
+                                <input type="hidden" id="req-edit-id">
+                                <div class="form-row">
+                                    <div class="form-group"><label>标题 *</label><input type="text" id="req-title" placeholder="请输入需求标题" required></div>
+                                    <div class="form-group"><label>截止日期</label><input type="date" id="req-deadline"></div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>优先级</label>
+                                        <select id="req-priority">
+                                            <option value="high">高</option>
+                                            <option value="medium" selected>中</option>
+                                            <option value="low">低</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>指派项目经理</label>
+                                        <select id="req-assigned-to">
+                                            <option value="">不指定</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group"><label>描述</label><textarea id="req-description" rows="5" placeholder="请输入需求描述..."></textarea></div>
+                                <div class="form-actions">
+                                    <button type="button" class="tool-btn" onclick="backToReqList()">取消</button>
+                                    <button type="button" class="tool-btn" onclick="submitRequirement('draft')">💾 保存草稿</button>
+                                    <button type="button" class="tool-btn tool-btn-primary" onclick="submitRequirement('published')">🚀 创建并发布</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- ========== 我的任务 ========== -->
                 <section id="my-tasks" class="tab-content">
                     <div class="toolbar">
@@ -632,12 +763,33 @@
                             </select>
                         </div>
                         <div class="toolbar-right">
+                            <div class="view-toggle" id="mytask-view-toggle">
+                                <button class="view-toggle-btn" data-view="list" onclick="toggleMyTaskView('list')" title="列表视图">☰</button>
+                                <button class="view-toggle-btn active" data-view="card" onclick="toggleMyTaskView('card')" title="卡片视图">▦</button>
+                            </div>
                             <div class="my-tasks-summary" id="my-tasks-summary-bar"></div>
                         </div>
                     </div>
                     <!-- 计划卡片列表（一级） -->
                     <div id="my-tasks-plan-cards" class="plan-cards-grid">
                         <div class="empty-state-full"><div class="empty-icon">📌</div><div>暂无分配给您的任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></div>
+                    </div>
+                    <!-- 计划列表表格（一级列表模式） -->
+                    <div id="my-tasks-plan-table" class="table-container" style="display:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>计划标题</th>
+                                    <th width="120">编号</th>
+                                    <th width="100">日期</th>
+                                    <th width="80">游戏数</th>
+                                    <th width="100">进度</th>
+                                    <th width="80">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="my-tasks-plan-list-table"></tbody>
+                        </table>
                     </div>
                     <!-- 任务详情视图（二级） -->
                     <div id="my-tasks-detail-view" style="display:none;">
@@ -688,12 +840,37 @@
                                 </select>
                             </div>
                             <div class="toolbar-right">
+                                <div class="view-toggle" id="plan-view-toggle">
+                                    <button class="view-toggle-btn" data-view="list" onclick="togglePlanView('list')" title="列表视图">☰</button>
+                                    <button class="view-toggle-btn active" data-view="card" onclick="togglePlanView('card')" title="卡片视图">▦</button>
+                                </div>
                                 <div class="plans-summary" id="plans-summary-bar"></div>
                             </div>
                         </div>
                         <!-- 计划列表卡片 -->
                         <div id="plan-cards-container" class="plan-cards-grid">
                             <div class="empty-state-full"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建第一个计划</div></div>
+                        </div>
+                        <!-- 计划列表表格 -->
+                        <div id="plan-table-container" class="table-container" style="display:none;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th width="150">编号</th>
+                                        <th>标题</th>
+                                        <th width="80">状态</th>
+                                        <th width="100">日期</th>
+                                        <th width="80">游戏数</th>
+                                        <th width="80">参与人</th>
+                                        <th width="100">进度</th>
+                                        <th width="100">关联需求</th>
+                                        <th width="100">创建者</th>
+                                        <th width="130">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plan-list-table"></tbody>
+                            </table>
                         </div>
                     </div>
                     <!-- 计划详情视图 -->
@@ -1249,7 +1426,7 @@
                 <div class="form-grid">
                     <div class="form-group"><label>姓名 *</label><input type="text" id="member-name" required></div>
                     <div class="form-group"><label>企业微信ID</label><input type="text" id="member-wechat-id"></div>
-                    <div class="form-group"><label>角色</label><input type="text" id="member-role"></div>
+                    <div class="form-group"><label>角色</label><select id="member-role"><option value="">请选择角色</option></select></div>
                     <div class="form-group"><label>状态</label><select id="member-status"><option value="active">活跃</option><option value="inactive">非活跃</option></select></div>
                     <div class="form-group full-width"><label>职责</label><textarea id="member-duty" rows="3"></textarea></div>
                     <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('member-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>

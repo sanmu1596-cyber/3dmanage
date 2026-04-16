@@ -689,12 +689,14 @@ plansRouter.use(auth.verifyToken);
 // 获取所有计划（含创建者信息 + 游戏统计）
 plansRouter.get('/', (req, res) => {
   db.all(`SELECT p.*, u.real_name as creator_name,
+          r.title as requirement_title, r.req_no as requirement_no,
           (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id) as game_count,
           (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.adapt_status = 'finished') as finished_count,
           (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.adapt_status = 'adapting') as adapting_count,
           (SELECT COUNT(DISTINCT pg.assigned_to) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.assigned_to IS NOT NULL) as assignee_count,
           (SELECT ROUND(AVG(pg.adapt_progress), 0) FROM plan_games pg WHERE pg.plan_id = p.id) as avg_progress
-          FROM plans p LEFT JOIN users u ON p.creator_id = u.id 
+          FROM plans p LEFT JOIN users u ON p.creator_id = u.id
+          LEFT JOIN requirements r ON p.requirement_id = r.id
           ORDER BY p.created_at DESC`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const data = rows.map(r => ({ ...r, devices_json: JSON.parse(r.devices_json || '[]') }));
@@ -720,7 +722,7 @@ plansRouter.get('/:id', (req, res) => {
 
 // 创建计划（默认草稿状态，自动生成编号）
 plansRouter.post('/', (req, res) => {
-  const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, games, status } = req.body;
+  const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, games, status, requirement_id } = req.body;
   const planStatus = status || 'draft';
   const creatorId = req.user ? req.user.id : null;
 
@@ -737,8 +739,8 @@ plansRouter.post('/', (req, res) => {
     const seq = String((cntRow ? cntRow.cnt : 0) + 1).padStart(2, '0');
     const planNo = `PLAN-${dateStr}-${timeStr}-${seq}`;
 
-    const sql = `INSERT INTO plans (title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, status, creator_id, plan_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    db.run(sql, [title, plan_date, JSON.stringify(devices_json || []), interlace_version || '', client_version || '', goal || '', tab_name || '', planStatus, creatorId, planNo], function(err) {
+    const sql = `INSERT INTO plans (title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, status, creator_id, plan_no, requirement_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(sql, [title, plan_date, JSON.stringify(devices_json || []), interlace_version || '', client_version || '', goal || '', tab_name || '', planStatus, creatorId, planNo, requirement_id || null], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       const planId = this.lastID;
       if (games && games.length > 0) {
@@ -1510,6 +1512,9 @@ statsRouter.get('/search', (req, res) => {
     { type: 'plan', icon: '📋', label: '计划',
       sql: `SELECT id, title, tab_name as subtitle FROM plans WHERE title LIKE ? OR tab_name LIKE ? OR goal LIKE ? LIMIT 5`,
       params: [like, like, like] },
+    { type: 'requirement', icon: '📄', label: '需求',
+      sql: `SELECT id, title, req_no as subtitle FROM requirements WHERE title LIKE ? OR description LIKE ? OR req_no LIKE ? LIMIT 5`,
+      params: [like, like, like] },
   ];
   let completed = 0;
   searches.forEach(s => {
@@ -1667,7 +1672,162 @@ batchRouter.post('/delete', (req, res) => {
   });
 });
 
+// ==================== 需求管理 API ====================
+// 创建 requirements 表（用 serialize 确保顺序执行）
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS requirements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    req_no TEXT,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    priority TEXT DEFAULT 'medium',
+    status TEXT DEFAULT 'draft',
+    assigned_to INTEGER,
+    creator_id INTEGER,
+    deadline TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assigned_to) REFERENCES users(id),
+    FOREIGN KEY (creator_id) REFERENCES users(id)
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_requirements_status ON requirements(status)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_requirements_assigned ON requirements(assigned_to)');
+
+  // 给 plans 表添加 requirement_id 字段（关联需求）
+  db.run(`ALTER TABLE plans ADD COLUMN requirement_id INTEGER`, (err) => {
+    // 忽略"列已存在"的错误
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('plans加列失败:', err.message);
+    }
+  });
+});
+
+const requirementsRouter = express.Router();
+requirementsRouter.use(auth.verifyToken);
+
+// 获取所有需求（含创建者和指派人信息 + 关联计划统计）
+requirementsRouter.get('/', (req, res) => {
+  db.all(`SELECT r.*, 
+          uc.real_name as creator_name,
+          ua.real_name as assigned_name,
+          (SELECT COUNT(*) FROM plans p WHERE p.requirement_id = r.id) as plan_count,
+          (SELECT COUNT(*) FROM plans p INNER JOIN plan_games pg ON pg.plan_id = p.id WHERE p.requirement_id = r.id) as total_games,
+          (SELECT COUNT(*) FROM plans p INNER JOIN plan_games pg ON pg.plan_id = p.id WHERE p.requirement_id = r.id AND pg.adapt_status = 'finished') as finished_games
+          FROM requirements r
+          LEFT JOIN users uc ON r.creator_id = uc.id
+          LEFT JOIN users ua ON r.assigned_to = ua.id
+          ORDER BY r.created_at DESC`, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 获取单个需求详情
+requirementsRouter.get('/:id', (req, res) => {
+  db.get(`SELECT r.*, 
+          uc.real_name as creator_name,
+          ua.real_name as assigned_name
+          FROM requirements r
+          LEFT JOIN users uc ON r.creator_id = uc.id
+          LEFT JOIN users ua ON r.assigned_to = ua.id
+          WHERE r.id = ?`, [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '需求不存在' });
+    // 获取关联的配置计划
+    db.all(`SELECT p.id, p.title, p.plan_no, p.status, p.plan_date,
+            (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id) as game_count,
+            (SELECT COUNT(*) FROM plan_games pg WHERE pg.plan_id = p.id AND pg.adapt_status = 'finished') as finished_count
+            FROM plans p WHERE p.requirement_id = ? ORDER BY p.created_at DESC`, [row.id], (err2, plans) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json({ success: true, data: { ...row, plans: plans || [] } });
+    });
+  });
+});
+
+// 创建需求
+requirementsRouter.post('/', (req, res) => {
+  const { title, description, priority, assigned_to, deadline, status } = req.body;
+  if (!title) return res.status(400).json({ error: '需求标题不能为空' });
+  const creatorId = req.user ? req.user.id : null;
+  const reqStatus = status || 'draft';
+
+  // 生成编号 REQ-YYYYMMDD-序号
+  const now = new Date();
+  const dateStr = now.getFullYear().toString() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0');
+
+  db.get("SELECT COUNT(*) as cnt FROM requirements WHERE req_no LIKE ?", [`REQ-${dateStr}-%`], (cntErr, cntRow) => {
+    const seq = String((cntRow ? cntRow.cnt : 0) + 1).padStart(3, '0');
+    const reqNo = `REQ-${dateStr}-${seq}`;
+
+    const sql = `INSERT INTO requirements (req_no, title, description, priority, status, assigned_to, creator_id, deadline)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    db.run(sql, [reqNo, title, description || '', priority || 'medium', reqStatus, assigned_to || null, creatorId, deadline || null], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      const reqId = this.lastID;
+      logActivity('create', 'requirement', reqId, title);
+      res.json({ success: true, id: reqId, req_no: reqNo });
+    });
+  });
+});
+
+// 更新需求
+requirementsRouter.put('/:id', (req, res) => {
+  const { title, description, priority, assigned_to, deadline, status } = req.body;
+  const sql = `UPDATE requirements SET 
+    title = COALESCE(?, title), description = COALESCE(?, description),
+    priority = COALESCE(?, priority), assigned_to = COALESCE(?, assigned_to),
+    deadline = COALESCE(?, deadline), status = COALESCE(?, status),
+    updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [title, description, priority, assigned_to, deadline, status, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '需求不存在' });
+    logActivity('update', 'requirement', parseInt(req.params.id), title || '');
+    res.json({ success: true });
+  });
+});
+
+// 发布需求（draft → published，同时通知指派的项目经理）
+requirementsRouter.post('/:id/publish', (req, res) => {
+  const reqId = req.params.id;
+  db.run("UPDATE requirements SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'draft'", [reqId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(400).json({ error: '需求不存在或不是草稿状态' });
+    logActivity('publish', 'requirement', parseInt(reqId), '发布需求');
+    // 通知指派人
+    db.get("SELECT title, assigned_to FROM requirements WHERE id = ?", [reqId], (err2, req_) => {
+      if (!err2 && req_ && req_.assigned_to) {
+        createNotification(req_.assigned_to, 'requirement_published', '新需求分配给您',
+          `需求「${req_.title}」已发布并分配给您，请查看并创建配置计划`, 'requirement', parseInt(reqId));
+      }
+    });
+    res.json({ success: true });
+  });
+});
+
+// 关闭需求
+requirementsRouter.post('/:id/close', (req, res) => {
+  db.run("UPDATE requirements SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 删除需求
+requirementsRouter.delete('/:id', (req, res) => {
+  // 先解除关联的计划
+  db.run("UPDATE plans SET requirement_id = NULL WHERE requirement_id = ?", [req.params.id], () => {
+    db.run('DELETE FROM requirements WHERE id = ?', [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('delete', 'requirement', parseInt(req.params.id), '删除需求');
+      res.json({ success: true });
+    });
+  });
+});
+
 // 注册路由
+app.use('/api/requirements', requirementsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/roles', rolesRouter);
