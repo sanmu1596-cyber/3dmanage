@@ -129,6 +129,29 @@ membersRouter.put('/:id', auth.checkPermission('members', 'edit'), (req, res) =>
   });
 });
 
+// 单字段更新（行内编辑用）
+membersRouter.patch('/:id', auth.checkPermission('members', 'edit'), (req, res) => {
+  const allowedFields = ['real_name', 'wechat_id', 'project_role', 'duty', 'status'];
+  const fieldMap = { name: 'real_name', role: 'project_role' }; // 前端字段名 → 数据库字段名
+  const updates = [];
+  const values = [];
+  for (const [key, val] of Object.entries(req.body)) {
+    const dbField = fieldMap[key] || key;
+    if (allowedFields.includes(dbField)) {
+      updates.push(`${dbField} = ?`);
+      values.push(val);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+  values.push(req.params.id);
+  const sql = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_member = 1`;
+  db.run(sql, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '成员不存在' });
+    res.json({ success: true });
+  });
+});
+
 membersRouter.delete('/:id', auth.checkPermission('members', 'delete'), (req, res) => {
   // 删除成员：将 is_member 设为 0（软删除），保留用户记录
   const sql = 'UPDATE users SET is_member = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_member = 1';
@@ -1103,6 +1126,17 @@ testCasesRouter.use(auth.verifyToken);
 
 // 初始化测试用例表（使用 serialize 确保同步执行）
 db.serialize(() => {
+  // 测试套件表
+  db.run(`CREATE TABLE IF NOT EXISTS test_suites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS test_cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -1115,10 +1149,19 @@ db.serialize(() => {
     expected_result TEXT,
     is_template INTEGER DEFAULT 0,
     tags TEXT,
+    suite_id INTEGER,
     created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (suite_id) REFERENCES test_suites(id) ON DELETE SET NULL
   )`);
+
+  // 给 test_cases 表添加 suite_id 列（已有表迁移）
+  db.run(`ALTER TABLE test_cases ADD COLUMN suite_id INTEGER`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('test_cases加列suite_id失败:', err.message);
+    }
+  });
 
   // 初始化计划-用例关联表
   db.run(`CREATE TABLE IF NOT EXISTS plan_test_cases (
@@ -1138,21 +1181,105 @@ db.serialize(() => {
   // 添加索引
   db.run('CREATE INDEX IF NOT EXISTS idx_test_cases_category ON test_cases(category)');
   db.run('CREATE INDEX IF NOT EXISTS idx_test_cases_priority ON test_cases(priority)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_test_cases_suite ON test_cases(suite_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_plan_test_cases_plan ON plan_test_cases(plan_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_plan_test_cases_status ON plan_test_cases(status)');
 });
 
+// ==================== 测试套件 API ====================
+// 获取所有测试套件（含用例数量统计）
+testCasesRouter.get('/suites', (req, res) => {
+  db.all(`SELECT ts.*, u.real_name as creator_name,
+          (SELECT COUNT(*) FROM test_cases tc WHERE tc.suite_id = ts.id) as case_count
+          FROM test_suites ts
+          LEFT JOIN users u ON ts.created_by = u.id
+          ORDER BY ts.sort_order, ts.created_at`, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 获取单个测试套件
+testCasesRouter.get('/suites/:id', (req, res) => {
+  db.get(`SELECT ts.*, u.real_name as creator_name FROM test_suites ts
+          LEFT JOIN users u ON ts.created_by = u.id WHERE ts.id = ?`, [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '套件不存在' });
+    res.json({ success: true, data: row });
+  });
+});
+
+// 创建测试套件
+testCasesRouter.post('/suites', (req, res) => {
+  const { name, description, sort_order } = req.body;
+  if (!name) return res.status(400).json({ error: '套件名称不能为空' });
+  const creatorId = req.user ? req.user.id : null;
+  db.run(`INSERT INTO test_suites (name, description, sort_order, created_by) VALUES (?, ?, ?, ?)`,
+    [name, description || '', sort_order || 0, creatorId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('create', 'test_suite', this.lastID, name);
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+// 更新测试套件
+testCasesRouter.put('/suites/:id', (req, res) => {
+  const { name, description, sort_order } = req.body;
+  db.run(`UPDATE test_suites SET name = COALESCE(?, name), description = COALESCE(?, description),
+          sort_order = COALESCE(?, sort_order), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [name, description, sort_order, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '套件不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 删除测试套件（用例的 suite_id 会被自动 SET NULL）
+testCasesRouter.delete('/suites/:id', (req, res) => {
+  // 先将该套件下的用例解绑
+  db.run('UPDATE test_cases SET suite_id = NULL WHERE suite_id = ?', [req.params.id], () => {
+    db.run('DELETE FROM test_suites WHERE id = ?', [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('delete', 'test_suite', parseInt(req.params.id), '删除测试套件');
+      res.json({ success: true });
+    });
+  });
+});
+
+// 批量移动用例到某套件
+testCasesRouter.post('/suites/move-cases', (req, res) => {
+  const { case_ids, suite_id } = req.body;
+  if (!case_ids || !Array.isArray(case_ids) || case_ids.length === 0) {
+    return res.status(400).json({ error: 'case_ids 必须是非空数组' });
+  }
+  const targetSuiteId = suite_id === null || suite_id === undefined ? null : suite_id;
+  const placeholders = case_ids.map(() => '?').join(',');
+  db.run(`UPDATE test_cases SET suite_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+    [targetSuiteId, ...case_ids], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, updated: this.changes });
+  });
+});
+
 // 获取所有测试用例
 testCasesRouter.get('/', (req, res) => {
-  const { category, priority, game_type, is_template, search } = req.query;
-  let sql = `SELECT tc.*, u.real_name as creator_name FROM test_cases tc 
-             LEFT JOIN users u ON tc.created_by = u.id WHERE 1=1`;
+  const { category, priority, game_type, is_template, search, suite_id } = req.query;
+  let sql = `SELECT tc.*, u.real_name as creator_name, ts.name as suite_name FROM test_cases tc 
+             LEFT JOIN users u ON tc.created_by = u.id
+             LEFT JOIN test_suites ts ON tc.suite_id = ts.id WHERE 1=1`;
   const params = [];
   
   if (category) { sql += ' AND tc.category = ?'; params.push(category); }
   if (priority) { sql += ' AND tc.priority = ?'; params.push(priority); }
   if (game_type) { sql += ' AND tc.game_type = ?'; params.push(game_type); }
   if (is_template !== undefined) { sql += ' AND tc.is_template = ?'; params.push(is_template); }
+  if (suite_id !== undefined) {
+    if (suite_id === 'null' || suite_id === '0') {
+      sql += ' AND (tc.suite_id IS NULL OR tc.suite_id = 0)';
+    } else {
+      sql += ' AND tc.suite_id = ?'; params.push(suite_id);
+    }
+  }
   if (search) { 
     sql += ' AND (tc.name LIKE ? OR tc.code LIKE ? OR tc.tags LIKE ?)'; 
     const like = `%${search}%`;
@@ -1183,10 +1310,11 @@ testCasesRouter.post('/', (req, res) => {
   if (!name) return res.status(400).json({ error: '用例名称不能为空' });
   
   const creatorId = req.user ? req.user.id : null;
-  const sql = `INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, created_by) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const suiteId = req.body.suite_id !== undefined ? req.body.suite_id : null;
+  const sql = `INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, suite_id, created_by) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [name, code || '', category || '功能测试', game_type || '', priority || 'medium', 
-               precondition || '', steps || '', expected_result || '', is_template || 0, tags || '', creatorId], function(err) {
+               precondition || '', steps || '', expected_result || '', is_template || 0, tags || '', suiteId, creatorId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     logActivity('create', 'test_case', this.lastID, name);
     res.json({ success: true, id: this.lastID });
@@ -1195,21 +1323,23 @@ testCasesRouter.post('/', (req, res) => {
 
 // 批量创建测试用例
 testCasesRouter.post('/batch', (req, res) => {
-  const { cases } = req.body;
+  const { cases, suite_id } = req.body;
   if (!cases || !Array.isArray(cases) || cases.length === 0) {
     return res.status(400).json({ error: 'cases 必须是非空数组' });
   }
   
   const creatorId = req.user ? req.user.id : null;
-  const stmt = db.prepare(`INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, created_by) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const batchSuiteId = suite_id !== undefined ? suite_id : null;
+  const stmt = db.prepare(`INSERT INTO test_cases (name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, suite_id, created_by) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   let count = 0;
   let errors = 0;
   
   cases.forEach(c => {
     if (!c.name) { errors++; return; }
+    const cSuiteId = c.suite_id !== undefined ? c.suite_id : batchSuiteId;
     stmt.run([c.name, c.code || '', c.category || '功能测试', c.game_type || '', c.priority || 'medium',
-              c.precondition || '', c.steps || '', c.expected_result || '', c.is_template || 0, c.tags || '', creatorId], (err) => {
+              c.precondition || '', c.steps || '', c.expected_result || '', c.is_template || 0, c.tags || '', cSuiteId, creatorId], (err) => {
       if (err) errors++; else count++;
     });
   });
@@ -1221,14 +1351,22 @@ testCasesRouter.post('/batch', (req, res) => {
 
 // 更新测试用例
 testCasesRouter.put('/:id', (req, res) => {
-  const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags } = req.body;
-  const sql = `UPDATE test_cases SET name = COALESCE(?, name), code = COALESCE(?, code), 
+  const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, suite_id } = req.body;
+  // suite_id 需要特殊处理：允许设为 null（从套件中移除）
+  const hasSuiteId = suite_id !== undefined;
+  let sql = `UPDATE test_cases SET name = COALESCE(?, name), code = COALESCE(?, code), 
                category = COALESCE(?, category), game_type = COALESCE(?, game_type),
                priority = COALESCE(?, priority), precondition = COALESCE(?, precondition),
                steps = COALESCE(?, steps), expected_result = COALESCE(?, expected_result),
-               is_template = COALESCE(?, is_template), tags = COALESCE(?, tags),
-               updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-  db.run(sql, [name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, req.params.id], function(err) {
+               is_template = COALESCE(?, is_template), tags = COALESCE(?, tags)`;
+  const sqlParams = [name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags];
+  if (hasSuiteId) {
+    sql += ', suite_id = ?';
+    sqlParams.push(suite_id);
+  }
+  sql += ', updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+  sqlParams.push(req.params.id);
+  db.run(sql, sqlParams, function(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: '用例不存在' });
     res.json({ success: true });

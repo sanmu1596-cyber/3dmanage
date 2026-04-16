@@ -532,11 +532,11 @@ function renderMembersTable(data) {
         tbody.innerHTML = data.map((member, index) => `
             <tr>
                 <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${escapeHtml(member.name)}</td>
-                <td>${escapeHtml(member.wechat_id || '-')}</td>
-                <td>${escapeHtml(member.role || '-')}</td>
-                <td>${escapeHtml(member.duty || '-')}</td>
-                <td class="text-center"><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${escapeHtml(member.name)}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${escapeHtml(member.wechat_id || '-')}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${escapeHtml(member.role || '-')}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>
+                <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
                 <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editMember(${member.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteMember(${member.id})">删除</button>
@@ -1992,6 +1992,208 @@ function resetForm(formId) {
     }
 }
 
+// ========== 成员列表 - 双击行内编辑 ==========
+/**
+ * 双击成员单元格进入编辑模式
+ * @param {HTMLElement} td - 被双击的<td>元素
+ * @param {number} memberId - 成员ID
+ * @param {string} field - 字段名 (name/wechat_id/role/duty/status)
+ * @param {string} inputType - 输入类型 (text/select/textarea)
+ */
+function startMemberInlineEdit(td, memberId, field, inputType) {
+    // 防止重复激活
+    if (td.querySelector('input, textarea, select')) return;
+
+    const currentValue = td.textContent.trim();
+    const displayValue = currentValue === '-' ? '' : currentValue;
+
+    td.classList.add('editing');
+
+    // 锁定单元格宽高，防止编辑态撑开引起抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    // 角色：下拉选择（从字段选项获取）
+    if (field === 'role') {
+        const select = document.createElement('select');
+        select.className = 'inline-edit-select';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '-- 请选择角色 --';
+        select.appendChild(emptyOpt);
+
+        // 优先从 fieldOptions 获取，兜底写死
+        const roleOptions = getFieldOptionsByKey('member_role').length > 0 ? getFieldOptionsByKey('member_role') : [
+            {value:'项目经理',label:'项目经理'},{value:'开发工程师',label:'开发工程师'},
+            {value:'测试工程师',label:'测试工程师'},{value:'适配工程师',label:'适配工程师'},
+            {value:'UI设计师',label:'UI设计师'}
+        ];
+        roleOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.value === displayValue || opt.label === displayValue) o.selected = true;
+            select.appendChild(o);
+        });
+
+        td.innerHTML = '';
+        td.appendChild(select);
+        select.focus();
+        try { select.showPicker(); } catch(e) { select.click(); }
+        select.addEventListener('change', () => saveMemberInlineEdit(td, memberId, field, select.value));
+        select.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (td.querySelector('select')) cancelMemberInlineEdit(td, memberId, field, currentValue);
+            }, 150);
+        });
+        select.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') cancelMemberInlineEdit(td, memberId, field, currentValue);
+        });
+    }
+    // 状态：下拉选择
+    else if (field === 'status') {
+        const select = document.createElement('select');
+        select.className = 'inline-edit-select';
+        const statusOptions = getFieldOptionsByKey('member_status').length > 0 ? getFieldOptionsByKey('member_status') : [
+            {value:'active',label:'活跃'},{value:'inactive',label:'非活跃'}
+        ];
+        statusOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            // 找到当前成员的实际status值
+            const member = (allMembersData || []).find(m => m.id === memberId);
+            if (member && member.status === opt.value) o.selected = true;
+            select.appendChild(o);
+        });
+
+        td.innerHTML = '';
+        td.appendChild(select);
+        select.focus();
+        try { select.showPicker(); } catch(e) { select.click(); }
+        select.addEventListener('change', () => saveMemberInlineEdit(td, memberId, field, select.value));
+        select.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (td.querySelector('select')) cancelMemberInlineEdit(td, memberId, field, currentValue);
+            }, 150);
+        });
+        select.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') cancelMemberInlineEdit(td, memberId, field, currentValue);
+        });
+    }
+    // 职责：textarea（多行文本）
+    else if (field === 'duty') {
+        td.innerHTML = `<textarea class="inline-edit-input" style="min-height:60px;resize:vertical;">${escapeHtml(displayValue)}</textarea>`;
+        const textarea = td.querySelector('textarea');
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        textarea.addEventListener('blur', () => saveMemberInlineEdit(td, memberId, field, textarea.value));
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); textarea.blur(); }
+            if (e.key === 'Escape') cancelMemberInlineEdit(td, memberId, field, currentValue);
+        });
+    }
+    // 其他字段：通用 input
+    else {
+        td.innerHTML = `<input type="text" class="inline-edit-input" value="${escapeHtml(displayValue)}">`;
+        const input = td.querySelector('input');
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.addEventListener('blur', () => saveMemberInlineEdit(td, memberId, field, input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') cancelMemberInlineEdit(td, memberId, field, currentValue);
+        });
+    }
+}
+
+/**
+ * 保存成员行内编辑
+ */
+async function saveMemberInlineEdit(td, memberId, field, newValue) {
+    td.classList.remove('editing');
+    const trimmed = newValue.trim();
+
+    // 构造PATCH请求体
+    const body = {};
+    body[field] = trimmed;
+
+    try {
+        const response = await authFetch(`${API_BASE}/members/${memberId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            // 更新本地数据
+            const member = (allMembersData || []).find(m => m.id === memberId);
+            if (member) member[field] = trimmed;
+
+            // 恢复单元格显示
+            if (field === 'status') {
+                td.innerHTML = `<span class="status-badge status-${trimmed}">${getStatusText(trimmed)}</span>`;
+            } else {
+                td.textContent = trimmed || '-';
+            }
+
+            // 解除宽高锁定
+            td.style.width = '';
+            td.style.minWidth = '';
+            td.style.maxWidth = '';
+            td.style.height = '';
+
+            showToast('已保存', 'success');
+        } else {
+            // 保存失败，恢复原值
+            cancelMemberInlineEditRestore(td, memberId, field);
+            showToast('保存失败', 'danger');
+        }
+    } catch (error) {
+        cancelMemberInlineEditRestore(td, memberId, field);
+        showToast('保存失败', 'danger');
+    }
+}
+
+/**
+ * 取消成员行内编辑（ESC或blur时未change）
+ */
+function cancelMemberInlineEdit(td, memberId, field, originalValue) {
+    td.classList.remove('editing');
+    if (field === 'status') {
+        const member = (allMembersData || []).find(m => m.id === memberId);
+        const statusVal = member ? member.status : 'active';
+        td.innerHTML = `<span class="status-badge status-${statusVal}">${getStatusText(statusVal)}</span>`;
+    } else {
+        td.textContent = originalValue || '-';
+    }
+    td.style.width = '';
+    td.style.minWidth = '';
+    td.style.maxWidth = '';
+    td.style.height = '';
+}
+
+/**
+ * 保存失败时恢复（从本地数据恢复）
+ */
+function cancelMemberInlineEditRestore(td, memberId, field) {
+    const member = (allMembersData || []).find(m => m.id === memberId);
+    if (field === 'status') {
+        const statusVal = member ? member.status : 'active';
+        td.innerHTML = `<span class="status-badge status-${statusVal}">${getStatusText(statusVal)}</span>`;
+    } else {
+        td.textContent = member ? (member[field] || '-') : '-';
+    }
+    td.style.width = '';
+    td.style.minWidth = '';
+    td.style.maxWidth = '';
+    td.style.height = '';
+}
+
 // 编辑成员
 async function editMember(id) {
     try {
@@ -3116,8 +3318,10 @@ function showCreatePlanView() {
     // 填充默认负责人下拉框
     fillAssigneeSelect();
 
-    // 填充测试用例模板下拉框
-    fillPlanTcTemplateSelect();
+    // 重置测试用例选择
+    planSelectedTcMode = null;
+    planSelectedTcIds = new Set();
+    updatePlanTcSummary();
 }
 
 // 编辑已有计划
@@ -3180,42 +3384,246 @@ function fillAssigneeSelect() {
     if (currentVal) select.value = currentVal;
 }
 
-// 填充测试用例模板下拉框
+// 填充测试用例模板下拉框 (已废弃，改用弹窗选择)
 async function fillPlanTcTemplateSelect() {
-    const select = document.getElementById('plan-tc-template');
-    if (!select) return;
-    
-    // 先加载测试用例数据（如果还没有）
-    if (!allTestCasesData) {
-        try {
-            const resp = await authFetch(`${API_BASE}/test-cases`);
-            const result = await resp.json();
-            if (result.success && result.data) {
-                allTestCasesData = result.data;
-            }
-        } catch (e) { console.error('加载用例失败:', e); }
-    }
-
-    const templates = (allTestCasesData || []).filter(tc => tc.is_template);
-    templates.forEach(tc => {
-        select.innerHTML += `<option value="${tc.id}">📋 ${escapeHtml(tc.name)} (${tc.category || '未分类'})</option>`;
-    });
+    // 兼容保留，新流程使用 openPlanTcSelectModal()
 }
 
-// 模板选择变化时的提示
+// 模板选择变化时的提示 (已废弃，改用弹窗选择)
 function onPlanTcTemplateChange() {
-    const val = document.getElementById('plan-tc-template').value;
-    if (val === '__all__') {
-        planSelectedTcMode = 'all';
-    } else if (val) {
-        planSelectedTcMode = 'template';
+    // 兼容保留
+}
+
+// 测试用例关联模式: null=不关联, 'selected'=选定用例
+let planSelectedTcMode = null;
+let planSelectedTcIds = new Set(); // 创建计划时选中的用例ID
+
+// ========== 创建计划 - 测试用例选择弹窗 ==========
+let planTcAllCases = [];
+let planTcFilteredCases = [];
+let planTcSuites = [];
+let planTcCurrentSuiteId = null;
+let planTcTempSelectedIds = new Set(); // 弹窗内临时选中
+
+// 打开选择弹窗
+async function openPlanTcSelectModal() {
+    // 加载套件
+    try {
+        const suiteResp = await authFetch(`${API_BASE}/test-cases/suites`);
+        const suiteResult = await suiteResp.json();
+        planTcSuites = suiteResult.data || [];
+    } catch (e) { planTcSuites = []; }
+    
+    // 加载所有用例
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases`);
+        const result = await resp.json();
+        planTcAllCases = result.data || [];
+    } catch (e) { planTcAllCases = []; }
+    
+    // 复制已选状态到临时
+    planTcTempSelectedIds = new Set(planSelectedTcIds);
+    planTcCurrentSuiteId = null;
+    
+    document.getElementById('plan-tc-search').value = '';
+    document.getElementById('plan-tc-category').value = '';
+    
+    renderPlanTcSuiteTree();
+    updatePlanTcBreadcrumb();
+    filterPlanTcCases();
+    updatePlanTcSelCount();
+    
+    openModal('plan-tc-select-modal');
+}
+
+// 渲染左侧套件树
+function renderPlanTcSuiteTree() {
+    const container = document.getElementById('plan-tc-suite-list');
+    if (!container) return;
+    
+    const totalCount = planTcAllCases.length;
+    const unclassifiedCount = planTcAllCases.filter(tc => !tc.suite_id).length;
+    
+    let html = `
+        <div class="link-tc-suite-item ${planTcCurrentSuiteId === null ? 'active' : ''}" onclick="selectPlanTcSuite(null)">
+            <span class="suite-icon">📋</span>
+            <span class="suite-name">全部用例</span>
+            <span class="suite-count">${totalCount}</span>
+        </div>
+        <div class="link-tc-suite-item ${planTcCurrentSuiteId === 'unclassified' ? 'active' : ''}" onclick="selectPlanTcSuite('unclassified')">
+            <span class="suite-icon">📄</span>
+            <span class="suite-name">未归类</span>
+            <span class="suite-count">${unclassifiedCount}</span>
+        </div>
+        <div style="border-top:1px solid var(--border-light);margin:4px 10px;"></div>
+    `;
+    
+    planTcSuites.forEach(suite => {
+        const count = planTcAllCases.filter(tc => tc.suite_id === suite.id).length;
+        html += `
+        <div class="link-tc-suite-item ${planTcCurrentSuiteId === suite.id ? 'active' : ''}" onclick="selectPlanTcSuite(${suite.id})" title="${escapeHtml(suite.description || '')}">
+            <span class="suite-icon">📂</span>
+            <span class="suite-name">${escapeHtml(suite.name)}</span>
+            <span class="suite-count">${count}</span>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 选择套件
+function selectPlanTcSuite(suiteId) {
+    planTcCurrentSuiteId = suiteId;
+    renderPlanTcSuiteTree();
+    updatePlanTcBreadcrumb();
+    filterPlanTcCases();
+}
+
+// 更新面包屑
+function updatePlanTcBreadcrumb() {
+    const container = document.getElementById('plan-tc-breadcrumb');
+    if (!container) return;
+    
+    if (planTcCurrentSuiteId === null) {
+        container.innerHTML = '<span class="tc-breadcrumb-item active">📂 全部用例</span>';
+    } else if (planTcCurrentSuiteId === 'unclassified') {
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectPlanTcSuite(null)" style="cursor:pointer">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📄 未归类</span>`;
     } else {
-        planSelectedTcMode = null;
+        const suite = planTcSuites.find(s => s.id === planTcCurrentSuiteId);
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectPlanTcSuite(null)" style="cursor:pointer">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📂 ${escapeHtml(suite?.name || '')}</span>`;
     }
 }
 
-// 测试用例关联模式: null=不关联, 'all'=全部, 'template'=特定模板
-let planSelectedTcMode = null;
+// 筛选用例
+function filterPlanTcCases() {
+    const search = (document.getElementById('plan-tc-search')?.value || '').toLowerCase();
+    const category = document.getElementById('plan-tc-category')?.value || '';
+    
+    planTcFilteredCases = planTcAllCases.filter(tc => {
+        if (planTcCurrentSuiteId === 'unclassified') {
+            if (tc.suite_id) return false;
+        } else if (planTcCurrentSuiteId !== null) {
+            if (tc.suite_id !== planTcCurrentSuiteId) return false;
+        }
+        if (search && !tc.name.toLowerCase().includes(search) && !(tc.code || '').toLowerCase().includes(search)) {
+            return false;
+        }
+        if (category && tc.category !== category) return false;
+        return true;
+    });
+    
+    renderPlanTcTable();
+}
+
+// 渲染用例表格
+function renderPlanTcTable() {
+    const tbody = document.getElementById('plan-tc-table');
+    if (!tbody) return;
+    
+    if (planTcFilteredCases.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">暂无测试用例</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = planTcFilteredCases.map(tc => {
+        const isSelected = planTcTempSelectedIds.has(tc.id);
+        return `
+            <tr class="${isSelected ? 'selected' : ''}" onclick="togglePlanTcSelect(${tc.id})">
+                <td><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); togglePlanTcSelect(${tc.id})"></td>
+                <td>${escapeHtml(tc.code || '-')}</td>
+                <td>${escapeHtml(tc.name)}</td>
+                <td><span class="tc-category-tag">${escapeHtml(tc.category || '')}</span></td>
+                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 切换单条选择
+function togglePlanTcSelect(id) {
+    if (planTcTempSelectedIds.has(id)) {
+        planTcTempSelectedIds.delete(id);
+    } else {
+        planTcTempSelectedIds.add(id);
+    }
+    renderPlanTcTable();
+    updatePlanTcSelCount();
+}
+
+// 全选
+function togglePlanTcSelectAll() {
+    const checkbox = document.getElementById('plan-tc-select-all');
+    if (checkbox?.checked) {
+        planTcFilteredCases.forEach(tc => planTcTempSelectedIds.add(tc.id));
+    } else {
+        planTcFilteredCases.forEach(tc => planTcTempSelectedIds.delete(tc.id));
+    }
+    renderPlanTcTable();
+    updatePlanTcSelCount();
+}
+
+// 更新已选计数
+function updatePlanTcSelCount() {
+    const el = document.getElementById('plan-tc-sel-count');
+    if (el) el.textContent = planTcTempSelectedIds.size;
+}
+
+// 确定选择
+function confirmPlanTcSelect() {
+    planSelectedTcIds = new Set(planTcTempSelectedIds);
+    planSelectedTcMode = planSelectedTcIds.size > 0 ? 'selected' : null;
+    updatePlanTcSummary();
+    closeModal('plan-tc-select-modal');
+}
+
+// 不关联
+function planTcSelectNone() {
+    planSelectedTcIds = new Set();
+    planSelectedTcMode = null;
+    updatePlanTcSummary();
+    closeModal('plan-tc-select-modal');
+}
+
+// 更新表单回显
+function updatePlanTcSummary() {
+    const summaryEl = document.getElementById('plan-tc-selected-summary');
+    const tagsEl = document.getElementById('plan-tc-selected-tags');
+    
+    if (planSelectedTcIds.size === 0) {
+        if (summaryEl) summaryEl.textContent = '未选择（后续手动添加）';
+        if (tagsEl) tagsEl.style.display = 'none';
+        return;
+    }
+    
+    if (summaryEl) summaryEl.textContent = `已选择 ${planSelectedTcIds.size} 条测试用例`;
+    
+    if (tagsEl) {
+        // 显示前5个用例名称作为标签
+        const selectedCases = planTcAllCases.filter(tc => planSelectedTcIds.has(tc.id));
+        const showCases = selectedCases.slice(0, 5);
+        let html = showCases.map(tc => 
+            `<span class="tag-item">${escapeHtml(tc.name)} <span class="tag-remove" onclick="removePlanTcSelection(${tc.id})">×</span></span>`
+        ).join('');
+        if (selectedCases.length > 5) {
+            html += `<span class="tag-item" style="background:var(--bg-secondary);color:var(--text-muted);">+${selectedCases.length - 5} 更多</span>`;
+        }
+        tagsEl.innerHTML = html;
+        tagsEl.style.display = 'flex';
+    }
+}
+
+// 移除单条选择
+function removePlanTcSelection(id) {
+    planSelectedTcIds.delete(id);
+    if (planSelectedTcIds.size === 0) planSelectedTcMode = null;
+    updatePlanTcSummary();
+}
 
 // 创建计划后自动关联测试用例
 async function autoLinkTestCasesToPlan(planId) {
@@ -3227,24 +3635,8 @@ async function autoLinkTestCasesToPlan(planId) {
     const planGames = planResult.data.games;
     if (planGames.length === 0) return;
 
-    // 确定要关联哪些测试用例
-    let tcIds = [];
-    
-    if (planSelectedTcMode === 'all') {
-        // 关联所有测试用例
-        const allTcResp = await authFetch(`${API_BASE}/test-cases`);
-        const allTcResult = await allTcResp.json();
-        if (allTcResult.success && allTcResult.data) {
-            tcIds = allTcResult.data.map(tc => tc.id);
-        }
-    } else if (planSelectedTcMode === 'template') {
-        // 获取选中的模板ID
-        const templateSelect = document.getElementById('plan-tc-template');
-        const templateId = parseInt(templateSelect.value);
-        tcIds = [templateId];
-        
-        // 如果是模板，也查找同分类下的其他模板/用例（可选，这里先只关联模板本身）
-    }
+    // 使用弹窗选择的用例ID
+    let tcIds = Array.from(planSelectedTcIds);
 
     if (tcIds.length === 0) return;
 
@@ -7095,17 +7487,121 @@ showCreatePlanView = function() {
 let allTestCasesData = [];
 let filteredTestCasesData = [];
 let selectedTestCaseIds = new Set();
+let allTestSuites = [];             // 所有套件
+let currentSuiteId = null;          // 当前选中的套件ID (null=全部)
+
+// 加载测试套件列表
+async function loadTestSuites() {
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/suites`);
+        const result = await resp.json();
+        if (result.success) {
+            allTestSuites = result.data || [];
+        }
+    } catch (e) {
+        console.error('加载测试套件失败:', e);
+        allTestSuites = [];
+    }
+    renderSuiteTree();
+    populateSuiteSelects();
+}
+
+// 渲染左侧套件树
+function renderSuiteTree() {
+    const container = document.getElementById('tc-suite-list');
+    if (!container) return;
+
+    // 计算未归类数量
+    const unclassifiedCount = allTestCasesData.filter(tc => !tc.suite_id).length;
+    const totalCount = allTestCasesData.length;
+
+    let html = `
+        <div class="tc-suite-item ${currentSuiteId === null ? 'active' : ''}" onclick="selectSuite(null)">
+            <span class="suite-icon">📋</span>
+            <span class="suite-name">全部用例</span>
+            <span class="suite-count">${totalCount}</span>
+        </div>
+        <div class="tc-suite-item ${currentSuiteId === 'unclassified' ? 'active' : ''}" onclick="selectSuite('unclassified')">
+            <span class="suite-icon">📄</span>
+            <span class="suite-name">未归类</span>
+            <span class="suite-count">${unclassifiedCount}</span>
+        </div>
+        <div style="border-top:1px solid var(--border-light);margin:4px 14px;"></div>
+    `;
+
+    allTestSuites.forEach(suite => {
+        html += `
+        <div class="tc-suite-item ${currentSuiteId === suite.id ? 'active' : ''}" onclick="selectSuite(${suite.id})" title="${escapeHtml(suite.description || '')}">
+            <span class="suite-icon">📂</span>
+            <span class="suite-name">${escapeHtml(suite.name)}</span>
+            <span class="suite-count">${suite.case_count || 0}</span>
+            <div class="suite-actions">
+                <button class="suite-action-btn" onclick="event.stopPropagation(); editSuite(${suite.id})" title="编辑">✏️</button>
+                <button class="suite-action-btn" onclick="event.stopPropagation(); deleteSuite(${suite.id}, '${escapeHtml(suite.name)}')" title="删除">🗑️</button>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// 填充套件下拉选择框（用例表单、移动弹窗等）
+function populateSuiteSelects() {
+    const selects = ['tc-suite-id', 'move-target-suite'];
+    selects.forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">未归类</option>';
+        allTestSuites.forEach(s => {
+            select.innerHTML += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
+        });
+        select.value = currentVal;
+    });
+}
+
+// 选择套件
+function selectSuite(suiteId) {
+    currentSuiteId = suiteId;
+    renderSuiteTree();
+    updateBreadcrumb();
+    filterTestCases();
+}
+
+// 更新面包屑
+function updateBreadcrumb() {
+    const container = document.getElementById('tc-breadcrumb');
+    if (!container) return;
+
+    if (currentSuiteId === null) {
+        container.innerHTML = '<span class="tc-breadcrumb-item active" onclick="selectSuite(null)">📂 全部用例</span>';
+    } else if (currentSuiteId === 'unclassified') {
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectSuite(null)">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📄 未归类</span>`;
+    } else {
+        const suite = allTestSuites.find(s => s.id === currentSuiteId);
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectSuite(null)">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📂 ${escapeHtml(suite?.name || '')}</span>`;
+    }
+}
 
 // 加载测试用例列表
 async function loadTestCases() {
     try {
+        // 先加载套件
+        await loadTestSuites();
+        
         const resp = await authFetch(`${API_BASE}/test-cases`);
         const result = await resp.json();
         if (result.success) {
             allTestCasesData = result.data || [];
-            filteredTestCasesData = [...allTestCasesData];
-            renderTestCases();
+            filterTestCases();
             updateTestCaseStats();
+            renderSuiteTree(); // 更新套件计数
         }
     } catch (e) {
         console.error('加载测试用例失败:', e);
@@ -7175,6 +7671,13 @@ function filterTestCases() {
     const templateFilter = document.getElementById('tc-template-filter')?.value || '';
     
     filteredTestCasesData = allTestCasesData.filter(tc => {
+        // 套件过滤
+        if (currentSuiteId === 'unclassified') {
+            if (tc.suite_id) return false;
+        } else if (currentSuiteId !== null) {
+            if (tc.suite_id !== currentSuiteId) return false;
+        }
+        // 搜索过滤
         if (search && !tc.name.toLowerCase().includes(search) && 
             !(tc.code || '').toLowerCase().includes(search) &&
             !(tc.tags || '').toLowerCase().includes(search)) {
@@ -7187,6 +7690,7 @@ function filterTestCases() {
     });
     
     renderTestCases();
+    updateBatchMoveBtn();
 }
 
 // 重置筛选
@@ -7201,8 +7705,18 @@ function resetTestCaseFilters() {
     if (priority) priority.value = '';
     if (template) template.value = '';
     
-    filteredTestCasesData = [...allTestCasesData];
+    filteredTestCasesData = allTestCasesData.filter(tc => {
+        if (currentSuiteId === 'unclassified') return !tc.suite_id;
+        if (currentSuiteId !== null) return tc.suite_id === currentSuiteId;
+        return true;
+    });
     renderTestCases();
+}
+
+// 更新批量移动按钮可见性
+function updateBatchMoveBtn() {
+    const btn = document.getElementById('tc-batch-move-btn');
+    if (btn) btn.style.display = selectedTestCaseIds.size > 0 ? 'inline-flex' : 'none';
 }
 
 // 打开新增/编辑弹窗
@@ -7213,6 +7727,9 @@ function openTestCaseModal(tc = null) {
     
     form.reset();
     document.getElementById('tc-id').value = '';
+    
+    // 刷新套件下拉
+    populateSuiteSelects();
     
     if (tc) {
         title.textContent = '编辑测试用例';
@@ -7226,8 +7743,16 @@ function openTestCaseModal(tc = null) {
         document.getElementById('tc-expected').value = tc.expected_result || '';
         document.getElementById('tc-tags').value = tc.tags || '';
         document.getElementById('tc-is-template').checked = !!tc.is_template;
+        // 设置套件
+        const suiteSelect = document.getElementById('tc-suite-id');
+        if (suiteSelect) suiteSelect.value = tc.suite_id || '';
     } else {
         title.textContent = '新增测试用例';
+        // 新增时默认归入当前选中套件
+        const suiteSelect = document.getElementById('tc-suite-id');
+        if (suiteSelect && currentSuiteId && currentSuiteId !== 'unclassified') {
+            suiteSelect.value = currentSuiteId;
+        }
     }
     
     openModal('test-case-modal');
@@ -7244,6 +7769,7 @@ async function submitTestCaseForm(event) {
     event.preventDefault();
     
     const id = document.getElementById('tc-id').value;
+    const suiteVal = document.getElementById('tc-suite-id')?.value;
     const payload = {
         name: document.getElementById('tc-name').value.trim(),
         code: document.getElementById('tc-code').value.trim(),
@@ -7253,7 +7779,8 @@ async function submitTestCaseForm(event) {
         steps: document.getElementById('tc-steps').value.trim(),
         expected_result: document.getElementById('tc-expected').value.trim(),
         tags: document.getElementById('tc-tags').value.trim(),
-        is_template: document.getElementById('tc-is-template').checked ? 1 : 0
+        is_template: document.getElementById('tc-is-template').checked ? 1 : 0,
+        suite_id: suiteVal ? parseInt(suiteVal) : null
     };
     
     if (!payload.name) {
@@ -7335,6 +7862,7 @@ function toggleSelectAllTestCases() {
     }
     
     renderTestCases();
+    updateBatchMoveBtn();
 }
 
 // 单选
@@ -7345,6 +7873,7 @@ function toggleTestCaseSelect(id) {
         selectedTestCaseIds.add(id);
     }
     renderTestCases();
+    updateBatchMoveBtn();
 }
 
 // 批量删除
@@ -7419,7 +7948,8 @@ async function submitBatchTestCases() {
             category: parts[1] || '功能测试',
             priority: parts[2] || 'medium',
             steps: parts[3] || '',
-            expected_result: parts[4] || ''
+            expected_result: parts[4] || '',
+            suite_id: (currentSuiteId && currentSuiteId !== 'unclassified') ? currentSuiteId : null
         });
     }
     
@@ -7474,12 +8004,146 @@ function exportTestCasesToExcel() {
     showToast('导出成功', 'success');
 }
 
+// ========== 测试套件管理 ==========
+
+// 打开新增/编辑套件弹窗
+function openSuiteModal(suite = null) {
+    const form = document.getElementById('suite-form');
+    const title = document.getElementById('suite-modal-title');
+    form.reset();
+    document.getElementById('suite-id').value = '';
+    
+    if (suite) {
+        title.textContent = '编辑测试套件';
+        document.getElementById('suite-id').value = suite.id;
+        document.getElementById('suite-name').value = suite.name || '';
+        document.getElementById('suite-desc').value = suite.description || '';
+        document.getElementById('suite-order').value = suite.sort_order || 0;
+    } else {
+        title.textContent = '新增测试套件';
+    }
+    
+    openModal('suite-modal');
+}
+
+// 编辑套件
+function editSuite(id) {
+    const suite = allTestSuites.find(s => s.id === id);
+    if (suite) openSuiteModal(suite);
+}
+
+// 删除套件
+function deleteSuite(id, name) {
+    showConfirm(`删除套件「${name}」后，其下用例将变为"未归类"，确定？`, async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/test-cases/suites/${id}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('套件已删除', 'success');
+                if (currentSuiteId === id) currentSuiteId = null;
+                await loadTestCases();
+            } else {
+                showToast('删除失败: ' + (result.error || ''), 'danger');
+            }
+        } catch (e) {
+            showToast('删除失败，请重试', 'danger');
+        }
+    });
+}
+
+// 提交套件表单
+async function submitSuiteForm(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('suite-id').value;
+    const payload = {
+        name: document.getElementById('suite-name').value.trim(),
+        description: document.getElementById('suite-desc').value.trim(),
+        sort_order: parseInt(document.getElementById('suite-order').value) || 0
+    };
+    
+    if (!payload.name) {
+        showToast('套件名称不能为空', 'warning');
+        return;
+    }
+    
+    try {
+        const url = id ? `${API_BASE}/test-cases/suites/${id}` : `${API_BASE}/test-cases/suites`;
+        const method = id ? 'PUT' : 'POST';
+        
+        const resp = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            showToast(id ? '套件已更新' : '套件已创建', 'success');
+            closeModal('suite-modal');
+            await loadTestCases();
+        } else {
+            showToast('保存失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('保存失败，请重试', 'danger');
+    }
+}
+
+// ========== 批量移动用例到套件 ==========
+
+// 打开移动弹窗
+function batchMoveTestCases() {
+    if (selectedTestCaseIds.size === 0) {
+        showToast('请先选择要移动的用例', 'warning');
+        return;
+    }
+    
+    populateSuiteSelects();
+    document.getElementById('move-tc-count').textContent = selectedTestCaseIds.size;
+    openModal('move-to-suite-modal');
+}
+
+// 确认移动
+async function confirmMoveToSuite() {
+    const targetVal = document.getElementById('move-target-suite').value;
+    const suiteId = targetVal ? parseInt(targetVal) : null;
+    
+    try {
+        const resp = await authFetch(`${API_BASE}/test-cases/suites/move-cases`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                case_ids: Array.from(selectedTestCaseIds),
+                suite_id: suiteId
+            })
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            const targetName = suiteId 
+                ? (allTestSuites.find(s => s.id === suiteId)?.name || '指定套件')
+                : '未归类';
+            showToast(`已将 ${selectedTestCaseIds.size} 条用例移动到「${targetName}」`, 'success');
+            selectedTestCaseIds.clear();
+            closeModal('move-to-suite-modal');
+            await loadTestCases();
+        } else {
+            showToast('移动失败: ' + (result.error || ''), 'danger');
+        }
+    } catch (e) {
+        showToast('移动失败，请重试', 'danger');
+    }
+}
+
 
 // ==================== 关联测试用例（配置计划用） ====================
 let linkTcAllCases = [];          // 所有可选用例
 let linkTcFilteredCases = [];     // 筛选后
 let linkTcSelectedIds = new Set(); // 已选中的用例ID
 let linkTcContext = null;          // {planId, planGameId, planIndex, gameIndex}
+let linkTcSuites = [];             // 套件列表
+let linkTcCurrentSuiteId = null;   // 当前选中套件 (null=全部)
 
 // 打开关联用例弹窗
 async function openLinkTestCaseModal(planIndex, gameIndex) {
@@ -7495,6 +8159,15 @@ async function openLinkTestCaseModal(planIndex, gameIndex) {
     };
     
     document.getElementById('link-tc-modal-title').textContent = `关联测试用例 - ${game.name}`;
+    
+    // 加载套件列表
+    try {
+        const suiteResp = await authFetch(`${API_BASE}/test-cases/suites`);
+        const suiteResult = await suiteResp.json();
+        linkTcSuites = suiteResult.data || [];
+    } catch (e) {
+        linkTcSuites = [];
+    }
     
     // 加载所有测试用例
     try {
@@ -7515,14 +8188,80 @@ async function openLinkTestCaseModal(planIndex, gameIndex) {
         linkTcSelectedIds = new Set();
     }
     
-    linkTcFilteredCases = [...linkTcAllCases];
-    renderLinkTestCaseTable();
+    linkTcCurrentSuiteId = null;
+    renderLinkTcSuiteTree();
+    updateLinkTcBreadcrumb();
+    filterLinkTestCases();
     updateLinkTcSelectedCount();
     
     document.getElementById('link-tc-search').value = '';
     document.getElementById('link-tc-category').value = '';
     
     openModal('link-test-case-modal');
+}
+
+// 渲染关联弹窗左侧套件树
+function renderLinkTcSuiteTree() {
+    const container = document.getElementById('link-tc-suite-list');
+    if (!container) return;
+    
+    const totalCount = linkTcAllCases.length;
+    const unclassifiedCount = linkTcAllCases.filter(tc => !tc.suite_id).length;
+    
+    let html = `
+        <div class="link-tc-suite-item ${linkTcCurrentSuiteId === null ? 'active' : ''}" onclick="selectLinkTcSuite(null)">
+            <span class="suite-icon">📋</span>
+            <span class="suite-name">全部用例</span>
+            <span class="suite-count">${totalCount}</span>
+        </div>
+        <div class="link-tc-suite-item ${linkTcCurrentSuiteId === 'unclassified' ? 'active' : ''}" onclick="selectLinkTcSuite('unclassified')">
+            <span class="suite-icon">📄</span>
+            <span class="suite-name">未归类</span>
+            <span class="suite-count">${unclassifiedCount}</span>
+        </div>
+        <div style="border-top:1px solid var(--border-light);margin:4px 10px;"></div>
+    `;
+    
+    linkTcSuites.forEach(suite => {
+        const count = linkTcAllCases.filter(tc => tc.suite_id === suite.id).length;
+        html += `
+        <div class="link-tc-suite-item ${linkTcCurrentSuiteId === suite.id ? 'active' : ''}" onclick="selectLinkTcSuite(${suite.id})" title="${escapeHtml(suite.description || '')}">
+            <span class="suite-icon">📂</span>
+            <span class="suite-name">${escapeHtml(suite.name)}</span>
+            <span class="suite-count">${count}</span>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 选择套件
+function selectLinkTcSuite(suiteId) {
+    linkTcCurrentSuiteId = suiteId;
+    renderLinkTcSuiteTree();
+    updateLinkTcBreadcrumb();
+    filterLinkTestCases();
+}
+
+// 更新面包屑
+function updateLinkTcBreadcrumb() {
+    const container = document.getElementById('link-tc-breadcrumb');
+    if (!container) return;
+    
+    if (linkTcCurrentSuiteId === null) {
+        container.innerHTML = '<span class="tc-breadcrumb-item active">📂 全部用例</span>';
+    } else if (linkTcCurrentSuiteId === 'unclassified') {
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectLinkTcSuite(null)" style="cursor:pointer">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📄 未归类</span>`;
+    } else {
+        const suite = linkTcSuites.find(s => s.id === linkTcCurrentSuiteId);
+        container.innerHTML = `
+            <span class="tc-breadcrumb-item" onclick="selectLinkTcSuite(null)" style="cursor:pointer">📂 全部用例</span>
+            <span class="tc-breadcrumb-sep">›</span>
+            <span class="tc-breadcrumb-item active">📂 ${escapeHtml(suite?.name || '')}</span>`;
+    }
 }
 
 // 渲染关联用例表格
@@ -7555,6 +8294,13 @@ function filterLinkTestCases() {
     const category = document.getElementById('link-tc-category')?.value || '';
     
     linkTcFilteredCases = linkTcAllCases.filter(tc => {
+        // 套件过滤
+        if (linkTcCurrentSuiteId === 'unclassified') {
+            if (tc.suite_id) return false;
+        } else if (linkTcCurrentSuiteId !== null) {
+            if (tc.suite_id !== linkTcCurrentSuiteId) return false;
+        }
+        // 搜索过滤
         if (search && !tc.name.toLowerCase().includes(search) && !(tc.code || '').toLowerCase().includes(search)) {
             return false;
         }
