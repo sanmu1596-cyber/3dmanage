@@ -353,6 +353,10 @@ function switchTab(tabId, fromHash) {
     const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
     clearTimeout(_revealTimer);
 
+    // 切换模块时自动关闭详情面板和下拉菜单
+    closeDetailPanel();
+    closeAllMoreActions();
+
     // 移除所有激活状态
     document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -5810,6 +5814,61 @@ document.addEventListener('DOMContentLoaded', () => {
         searchBtn.style.cssText = 'margin-right: 8px; cursor: pointer; font-size: 16px; background: none; border: none; padding: 4px 8px; border-radius: 4px;';
         searchBtn.onclick = openGlobalSearch;
         topBarRight.insertBefore(searchBtn, topBarRight.firstChild);
+    }
+});
+
+// ==================== "更多操作" 下拉菜单 ====================
+
+/**
+ * 切换下拉菜单显示/隐藏
+ */
+function toggleMoreActions(btn) {
+    const wrapper = btn.closest('.more-actions-wrapper');
+    const dropdown = wrapper.querySelector('.more-actions-dropdown');
+    const isOpen = dropdown.classList.contains('show');
+
+    // 先关闭所有已打开的
+    closeAllMoreActions();
+
+    if (!isOpen) {
+        dropdown.classList.add('show');
+        btn.classList.add('active');
+    }
+}
+
+/**
+ * 关闭所有"更多操作"下拉菜单
+ */
+function closeAllMoreActions() {
+    document.querySelectorAll('.more-actions-dropdown.show').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.more-actions-btn.active').forEach(b => b.classList.remove('active'));
+}
+
+/**
+ * 批量删除提示（从"更多操作"菜单触发）
+ * 检查是否有选中项，没有则提示先勾选
+ */
+function batchDeletePrompt(moduleName) {
+    const tableMap = { games: 'games-table', members: 'members-table', devices: 'devices-table' };
+    const tableId = tableMap[moduleName];
+    if (!tableId) return;
+
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    const checkedBoxes = table.querySelectorAll('.row-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        showToast('请先在列表中勾选要删除的记录', 'warning');
+        return;
+    }
+    // 已有勾选，直接触发批量删除
+    batchDelete();
+}
+
+// 点击页面其他区域时关闭下拉菜单
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.more-actions-wrapper')) {
+        closeAllMoreActions();
     }
 });
 
