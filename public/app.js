@@ -541,9 +541,9 @@ function renderMembersTable(data) {
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${escapeHtml(member.role || '-')}</td>
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>
                 <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
-                <td class="text-center">
-                    <button class="btn btn-small btn-edit" onclick="editMember(${member.id})">编辑</button>
-                    <button class="btn btn-small btn-delete" onclick="deleteMember(${member.id})">删除</button>
+                <td class="text-center action-icons">
+                    <button class="action-icon-btn edit" onclick="editMember(${member.id})" title="编辑">✏️</button>
+                    <button class="action-icon-btn delete" onclick="deleteMember(${member.id})" title="删除">🗑️</button>
                 </td>
             </tr>
         `).join('');
@@ -597,8 +597,9 @@ function renderDevicesTable(data) {
                 <td>${escapeHtml(device.total_bugs || 0)}</td>
                 <td>${escapeHtml(device.completed_adaptations || 0)}</td>
                 <td>${getDeviceOnlineGameCount(device.name)}</td>
-                <td class="text-center">
-                    <button class="btn btn-small btn-delete" onclick="deleteDevice(${device.id})">删除</button>
+                <td class="text-center action-icons">
+                    <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
+                    <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
                 </td>
             </tr>
         `).join('');
@@ -918,9 +919,9 @@ function renderGamesPage() {
             }
 
             rowHtml += `
-                <td class="text-center">
-                    <button class="btn btn-small btn-edit" onclick="editGame(${game.id})">编辑</button>
-                    <button class="btn btn-small btn-delete" onclick="deleteGame(${game.id})">删除</button>
+                <td class="text-center action-icons">
+                    <button class="action-icon-btn edit" onclick="editGame(${game.id})" title="编辑">✏️</button>
+                    <button class="action-icon-btn delete" onclick="deleteGame(${game.id})" title="删除">🗑️</button>
                 </td>
             `;
 

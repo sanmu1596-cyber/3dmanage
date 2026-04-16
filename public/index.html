@@ -184,12 +184,18 @@
                     <!-- 工具栏 -->
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>添加一行</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="toggleColumnSettings()"><span class="tool-icon">⚙</span>字段设置</button>
-                            <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
-                            <button class="tool-btn" onclick="document.getElementById('excel-upload').click()"><span class="tool-icon">📥</span>导入</button>
-                            <button class="tool-btn" onclick="exportToExcel('games')"><span class="tool-icon">📤</span>导出</button>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <div class="more-actions-wrapper">
+                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                <div class="more-actions-dropdown">
+                                    <div class="dropdown-item" onclick="toggleColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
+                                    <div class="dropdown-item" onclick="document.getElementById('excel-upload').click(); closeAllMoreActions();"><span class="drop-icon">📥</span>导入</div>
+                                    <div class="dropdown-item" onclick="exportToExcel('games'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('games'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="toolbar-right">
                             <div class="pagination-compact">
@@ -305,9 +311,15 @@
                 <section id="members" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>添加成员</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="exportToExcel('members')"><span class="tool-icon">📤</span>导出</button>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <div class="more-actions-wrapper">
+                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                <div class="more-actions-dropdown">
+                                    <div class="dropdown-item" onclick="exportToExcel('members'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                </div>
+                            </div>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="members-search" class="filter-input" placeholder="搜索姓名/角色..." style="width:180px" oninput="filterModule('members')">
                             <select id="members-status-filter" class="compact-select" onchange="filterModule('members')">
@@ -340,101 +352,128 @@
 
                 <!-- ========== 测试用例管理 ========== -->
                 <section id="test-cases" class="tab-content">
-                    <div class="toolbar">
-                        <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openTestCaseModal()"><span class="tool-icon">＋</span>新增用例</button>
-                            <button class="tool-btn" onclick="openBatchTestCaseModal()"><span class="tool-icon">📋</span>批量添加</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="exportTestCasesToExcel()"><span class="tool-icon">📤</span>导出</button>
-                        </div>
-                        <div class="toolbar-right">
-                            <input type="text" id="tc-search" class="filter-input" placeholder="搜索用例名称/编号/标签..." style="width:200px" oninput="filterTestCases()">
-                        </div>
-                    </div>
-                    <!-- 筛选面板 -->
-                    <div class="filter-panel show" style="padding: 12px 16px;">
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>分类</label>
-                                <select id="tc-category-filter" class="filter-select" onchange="filterTestCases()">
-                                    <option value="">全部分类</option>
-                                    <option value="功能测试">功能测试</option>
-                                    <option value="性能测试">性能测试</option>
-                                    <option value="兼容性测试">兼容性测试</option>
-                                    <option value="UI测试">UI测试</option>
-                                    <option value="安装卸载">安装卸载</option>
-                                    <option value="适配验收">适配验收</option>
-                                </select>
+                    <div style="display:flex;gap:0;height:calc(100vh - 120px);">
+                        <!-- 左侧：测试套件树 -->
+                        <div class="tc-suite-panel" id="tc-suite-panel">
+                            <div class="tc-suite-header">
+                                <span class="tc-suite-title">📂 测试套件</span>
+                                <button class="tc-suite-add-btn" onclick="openSuiteModal()" title="新建套件">＋</button>
                             </div>
-                            <div class="filter-group">
-                                <label>优先级</label>
-                                <select id="tc-priority-filter" class="filter-select" onchange="filterTestCases()">
-                                    <option value="">全部优先级</option>
-                                    <option value="high">高</option>
-                                    <option value="medium">中</option>
-                                    <option value="low">低</option>
-                                </select>
+                            <div class="tc-suite-list" id="tc-suite-list">
+                                <!-- 动态渲染 -->
                             </div>
-                            <div class="filter-group">
-                                <label>类型</label>
-                                <select id="tc-template-filter" class="filter-select" onchange="filterTestCases()">
-                                    <option value="">全部类型</option>
-                                    <option value="0">普通用例</option>
-                                    <option value="1">模板用例</option>
-                                </select>
+                        </div>
+                        <!-- 右侧：用例列表 -->
+                        <div class="tc-cases-panel" style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                            <div class="toolbar">
+                                <div class="toolbar-left">
+                                    <button class="tool-btn tool-btn-primary" onclick="openTestCaseModal()"><span class="tool-icon">＋</span>新增用例</button>
+                                    <button class="tool-btn" onclick="openBatchTestCaseModal()"><span class="tool-icon">📋</span>批量添加</button>
+                                    <span class="toolbar-divider"></span>
+                                    <button class="tool-btn" onclick="exportTestCasesToExcel()"><span class="tool-icon">📤</span>导出</button>
+                                    <span class="toolbar-divider"></span>
+                                    <button class="tool-btn" onclick="batchMoveTestCases()" id="tc-batch-move-btn" style="display:none;"><span class="tool-icon">📁</span>移动到套件</button>
+                                </div>
+                                <div class="toolbar-right">
+                                    <input type="text" id="tc-search" class="filter-input" placeholder="搜索用例名称/编号/标签..." style="width:200px" oninput="filterTestCases()">
+                                </div>
                             </div>
-                            <button class="tool-btn" onclick="resetTestCaseFilters()">重置</button>
+                            <!-- 当前套件面包屑 -->
+                            <div class="tc-breadcrumb" id="tc-breadcrumb">
+                                <span class="tc-breadcrumb-item active" onclick="selectSuite(null)">📂 全部用例</span>
+                            </div>
+                            <!-- 筛选面板 -->
+                            <div class="filter-panel show" style="padding: 8px 16px;">
+                                <div class="filter-row">
+                                    <div class="filter-group">
+                                        <label>分类</label>
+                                        <select id="tc-category-filter" class="filter-select" onchange="filterTestCases()">
+                                            <option value="">全部分类</option>
+                                            <option value="功能测试">功能测试</option>
+                                            <option value="性能测试">性能测试</option>
+                                            <option value="兼容性测试">兼容性测试</option>
+                                            <option value="UI测试">UI测试</option>
+                                            <option value="安装卸载">安装卸载</option>
+                                            <option value="适配验收">适配验收</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>优先级</label>
+                                        <select id="tc-priority-filter" class="filter-select" onchange="filterTestCases()">
+                                            <option value="">全部优先级</option>
+                                            <option value="high">高</option>
+                                            <option value="medium">中</option>
+                                            <option value="low">低</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>类型</label>
+                                        <select id="tc-template-filter" class="filter-select" onchange="filterTestCases()">
+                                            <option value="">全部类型</option>
+                                            <option value="0">普通用例</option>
+                                            <option value="1">模板用例</option>
+                                        </select>
+                                    </div>
+                                    <button class="tool-btn" onclick="resetTestCaseFilters()">重置</button>
+                                </div>
+                            </div>
+                            <!-- 统计卡片 -->
+                            <div class="tc-stats-bar" id="tc-stats-bar">
+                                <div class="tc-stat-card">
+                                    <span class="tc-stat-num" id="tc-stat-total">0</span>
+                                    <span class="tc-stat-label">总用例数</span>
+                                </div>
+                                <div class="tc-stat-card tc-stat-high">
+                                    <span class="tc-stat-num" id="tc-stat-high">0</span>
+                                    <span class="tc-stat-label">高优先级</span>
+                                </div>
+                                <div class="tc-stat-card tc-stat-template">
+                                    <span class="tc-stat-num" id="tc-stat-template">0</span>
+                                    <span class="tc-stat-label">模板用例</span>
+                                </div>
+                            </div>
+                            <!-- 用例列表 -->
+                            <div class="table-container" style="flex:1;overflow-y:auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="40"><input type="checkbox" id="tc-select-all" onchange="toggleSelectAllTestCases()"></th>
+                                            <th width="50">序号</th>
+                                            <th width="100">用例编号</th>
+                                            <th>用例名称</th>
+                                            <th width="100">分类</th>
+                                            <th width="80">优先级</th>
+                                            <th>前置条件</th>
+                                            <th>测试步骤</th>
+                                            <th>预期结果</th>
+                                            <th width="80">类型</th>
+                                            <th width="120">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="test-cases-table">
+                                        <tr><td colspan="11" class="empty-state"><div class="empty-icon">📝</div><div>暂无测试用例</div><div class="empty-sub">点击"新增用例"创建第一个测试用例</div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="module-stats" id="test-cases-stats">
+                                <div class="stats-items" id="test-cases-stats-items"></div>
+                            </div>
                         </div>
-                    </div>
-                    <!-- 统计卡片 -->
-                    <div class="tc-stats-bar" id="tc-stats-bar">
-                        <div class="tc-stat-card">
-                            <span class="tc-stat-num" id="tc-stat-total">0</span>
-                            <span class="tc-stat-label">总用例数</span>
-                        </div>
-                        <div class="tc-stat-card tc-stat-high">
-                            <span class="tc-stat-num" id="tc-stat-high">0</span>
-                            <span class="tc-stat-label">高优先级</span>
-                        </div>
-                        <div class="tc-stat-card tc-stat-template">
-                            <span class="tc-stat-num" id="tc-stat-template">0</span>
-                            <span class="tc-stat-label">模板用例</span>
-                        </div>
-                    </div>
-                    <!-- 用例列表 -->
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="40"><input type="checkbox" id="tc-select-all" onchange="toggleSelectAllTestCases()"></th>
-                                    <th width="50">序号</th>
-                                    <th width="100">用例编号</th>
-                                    <th>用例名称</th>
-                                    <th width="100">分类</th>
-                                    <th width="80">优先级</th>
-                                    <th>前置条件</th>
-                                    <th>测试步骤</th>
-                                    <th>预期结果</th>
-                                    <th width="80">类型</th>
-                                    <th width="120">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="test-cases-table">
-                                <tr><td colspan="11" class="empty-state"><div class="empty-icon">📝</div><div>暂无测试用例</div><div class="empty-sub">点击"新增用例"创建第一个测试用例</div></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="module-stats" id="test-cases-stats">
-                        <div class="stats-items" id="test-cases-stats-items"></div>
                     </div>
                 </section>
 
                 <section id="devices" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>添加设备</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="exportToExcel('devices')"><span class="tool-icon">📤</span>导出</button>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <div class="more-actions-wrapper">
+                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                <div class="more-actions-dropdown">
+                                    <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                </div>
+                            </div>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
@@ -947,12 +986,13 @@
                                     <small class="form-hint">选中后，所有游戏将默认分配给此人；也可在计划详情中逐个修改</small>
                                 </div>
                                 <div class="form-group" id="plan-tc-template-section">
-                                    <label>关联测试用例模板</label>
-                                    <select id="plan-tc-template" class="filter-select" onchange="onPlanTcTemplateChange()">
-                                        <option value="">不关联（后续手动添加）</option>
-                                        <option value="__all__">📋 关联全部测试用例</option>
-                                    </select>
-                                    <small class="form-hint">选择后，创建计划时会自动将所选模板/用例关联到每个游戏</small>
+                                    <label>关联测试用例</label>
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <button type="button" class="tool-btn tool-btn-primary" onclick="openPlanTcSelectModal()">📋 选择测试用例</button>
+                                        <span id="plan-tc-selected-summary" style="color:var(--text-muted);font-size:13px;">未选择（后续手动添加）</span>
+                                    </div>
+                                    <div id="plan-tc-selected-tags" class="plan-tc-tags" style="margin-top:8px;display:none;"></div>
+                                    <small class="form-hint">点击选择后，创建计划时会自动将所选用例关联到每个游戏</small>
                                 </div>
                                 <div class="form-actions">
                                     <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
@@ -1113,6 +1153,12 @@
                             <option value="low">低</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>所属套件</label>
+                        <select id="tc-suite-id">
+                            <option value="">未归类</option>
+                        </select>
+                    </div>
                     <div class="form-group full-width">
                         <label>前置条件</label>
                         <textarea id="tc-precondition" rows="2" placeholder="执行用例前需满足的条件"></textarea>
@@ -1173,45 +1219,170 @@
         </div>
     </div>
 
+    <!-- 测试套件新增/编辑弹窗 -->
+    <div id="suite-modal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="suite-modal-title">新建测试套件</h3>
+                <span class="close-btn" onclick="closeModal('suite-modal')">&times;</span>
+            </div>
+            <form id="suite-form" onsubmit="submitSuiteForm(event)">
+                <input type="hidden" id="suite-id">
+                <div style="padding:16px;">
+                    <div class="form-group">
+                        <label>套件名称 *</label>
+                        <input type="text" id="suite-name" placeholder="如：基础功能测试集、3D适配验收集" required>
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="suite-desc" rows="3" placeholder="套件说明..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>排序</label>
+                        <input type="number" id="suite-order" value="0" min="0" placeholder="数字越小越靠前">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('suite-modal')">取消</button>
+                    <button type="submit" class="tool-btn tool-btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 移动到套件弹窗 -->
+    <div id="move-to-suite-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>移动到套件</h3>
+                <span class="close-btn" onclick="closeModal('move-to-suite-modal')">&times;</span>
+            </div>
+            <div style="padding:16px;">
+                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">
+                    将选中的 <strong id="move-tc-count">0</strong> 条用例移动到：
+                </p>
+                <select id="move-target-suite" class="filter-select" style="width:100%;padding:8px;">
+                    <option value="">未归类（从套件中移除）</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('move-to-suite-modal')">取消</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmMoveToSuite()">确认移动</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 关联测试用例弹窗（配置计划用） -->
     <div id="link-test-case-modal" class="modal">
-        <div class="modal-content" style="max-width: 900px; max-height: 80vh;">
+        <div class="modal-content" style="max-width: 960px; max-height: 80vh;">
             <div class="modal-header">
                 <h3 id="link-tc-modal-title">关联测试用例</h3>
                 <span class="close-btn" onclick="closeModal('link-test-case-modal')">&times;</span>
             </div>
-            <div style="padding: 16px;">
-                <div class="filter-row" style="margin-bottom: 12px;">
-                    <input type="text" id="link-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:200px;" oninput="filterLinkTestCases()">
-                    <select id="link-tc-category" class="filter-select" onchange="filterLinkTestCases()">
-                        <option value="">全部分类</option>
-                        <option value="功能测试">功能测试</option>
-                        <option value="性能测试">性能测试</option>
-                        <option value="兼容性测试">兼容性测试</option>
-                        <option value="UI测试">UI测试</option>
-                        <option value="安装卸载">安装卸载</option>
-                        <option value="适配验收">适配验收</option>
-                    </select>
-                    <span style="margin-left:auto;color:var(--text-muted);font-size:13px;">已选 <strong id="link-tc-selected-count">0</strong> 条</span>
+            <div style="display:flex;height:480px;border-top:1px solid var(--border-light);">
+                <!-- 左侧：套件树 -->
+                <div class="link-tc-suite-panel" id="link-tc-suite-panel">
+                    <div class="link-tc-suite-header">📂 测试套件</div>
+                    <div class="link-tc-suite-list" id="link-tc-suite-list">
+                        <!-- 动态渲染 -->
+                    </div>
                 </div>
-                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th width="40"><input type="checkbox" id="link-tc-select-all" onchange="toggleLinkTcSelectAll()"></th>
-                                <th width="80">编号</th>
-                                <th>用例名称</th>
-                                <th width="90">分类</th>
-                                <th width="70">优先级</th>
-                            </tr>
-                        </thead>
-                        <tbody id="link-tc-table"></tbody>
-                    </table>
+                <!-- 右侧：用例列表 -->
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                    <div style="padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-light);background:var(--bg-card);">
+                        <div class="link-tc-breadcrumb" id="link-tc-breadcrumb">
+                            <span class="tc-breadcrumb-item active">📂 全部用例</span>
+                        </div>
+                        <span style="margin-left:auto;"></span>
+                        <input type="text" id="link-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:180px;height:30px;font-size:12px;" oninput="filterLinkTestCases()">
+                        <select id="link-tc-category" class="filter-select" style="height:30px;font-size:12px;" onchange="filterLinkTestCases()">
+                            <option value="">全部分类</option>
+                            <option value="功能测试">功能测试</option>
+                            <option value="性能测试">性能测试</option>
+                            <option value="兼容性测试">兼容性测试</option>
+                            <option value="UI测试">UI测试</option>
+                            <option value="安装卸载">安装卸载</option>
+                            <option value="适配验收">适配验收</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:12px;white-space:nowrap;">已选 <strong id="link-tc-selected-count">0</strong></span>
+                    </div>
+                    <div class="table-container" style="flex:1;overflow-y:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="36"><input type="checkbox" id="link-tc-select-all" onchange="toggleLinkTcSelectAll()"></th>
+                                    <th width="70">编号</th>
+                                    <th>用例名称</th>
+                                    <th width="80">分类</th>
+                                    <th width="60">优先级</th>
+                                </tr>
+                            </thead>
+                            <tbody id="link-tc-table"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('link-test-case-modal')">取消</button>
                 <button class="tool-btn tool-btn-primary" onclick="confirmLinkTestCases()">确定关联</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建计划时选择测试用例弹窗 -->
+    <div id="plan-tc-select-modal" class="modal">
+        <div class="modal-content" style="max-width: 960px; max-height: 80vh;">
+            <div class="modal-header">
+                <h3>选择测试用例</h3>
+                <span class="close-btn" onclick="closeModal('plan-tc-select-modal')">&times;</span>
+            </div>
+            <div style="display:flex;height:480px;border-top:1px solid var(--border-light);">
+                <!-- 左侧：套件树 -->
+                <div class="link-tc-suite-panel" id="plan-tc-suite-panel">
+                    <div class="link-tc-suite-header">📂 测试套件</div>
+                    <div class="link-tc-suite-list" id="plan-tc-suite-list">
+                        <!-- 动态渲染 -->
+                    </div>
+                </div>
+                <!-- 右侧：用例列表 -->
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                    <div style="padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-light);background:var(--bg-card);">
+                        <div class="link-tc-breadcrumb" id="plan-tc-breadcrumb">
+                            <span class="tc-breadcrumb-item active">📂 全部用例</span>
+                        </div>
+                        <span style="margin-left:auto;"></span>
+                        <input type="text" id="plan-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:180px;height:30px;font-size:12px;" oninput="filterPlanTcCases()">
+                        <select id="plan-tc-category" class="filter-select" style="height:30px;font-size:12px;" onchange="filterPlanTcCases()">
+                            <option value="">全部分类</option>
+                            <option value="功能测试">功能测试</option>
+                            <option value="性能测试">性能测试</option>
+                            <option value="兼容性测试">兼容性测试</option>
+                            <option value="UI测试">UI测试</option>
+                            <option value="安装卸载">安装卸载</option>
+                            <option value="适配验收">适配验收</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:12px;white-space:nowrap;">已选 <strong id="plan-tc-sel-count">0</strong></span>
+                    </div>
+                    <div class="table-container" style="flex:1;overflow-y:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="36"><input type="checkbox" id="plan-tc-select-all" onchange="togglePlanTcSelectAll()"></th>
+                                    <th width="70">编号</th>
+                                    <th>用例名称</th>
+                                    <th width="80">分类</th>
+                                    <th width="60">优先级</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plan-tc-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('plan-tc-select-modal')">取消</button>
+                <button class="tool-btn" onclick="planTcSelectNone()">不关联</button>
+                <button class="tool-btn tool-btn-primary" onclick="confirmPlanTcSelect()">✓ 确定选择</button>
             </div>
         </div>
     </div>
