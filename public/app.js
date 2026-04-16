@@ -7684,22 +7684,242 @@ function renderTestCases() {
             <td><input type="checkbox" class="tc-checkbox" data-id="${tc.id}" ${selectedTestCaseIds.has(tc.id) ? 'checked' : ''} onchange="toggleTestCaseSelect(${tc.id})"></td>
             <td>${i + 1}</td>
             <td><span class="tc-code">${escapeHtml(tc.code || '-')}</span></td>
-            <td><strong>${escapeHtml(tc.name)}</strong></td>
-            <td><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
-            <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
-            <td><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
-            <td><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
-            <td><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
-            <td><span class="tc-type-tag ${tc.is_template ? 'template' : 'normal'}">${tc.is_template ? '模板' : '普通'}</span></td>
-            <td>
-                <div class="action-btns">
-                    <button class="action-btn edit-btn" onclick="editTestCase(${tc.id})" title="编辑">✏️</button>
-                    <button class="action-btn" onclick="copyTestCase(${tc.id})" title="复制">📋</button>
-                    <button class="action-btn delete-btn" onclick="deleteTestCase(${tc.id})" title="删除">🗑️</button>
-                </div>
+            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'name')" title="双击编辑"><strong>${escapeHtml(tc.name)}</strong></td>
+            <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'category')" title="双击选择"><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
+            <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'priority')" title="双击选择"><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'precondition')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
+            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'steps')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
+            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'expected_result')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
+            <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'is_template')" title="双击选择"><span class="tc-type-tag ${tc.is_template ? 'template' : 'normal'}">${tc.is_template ? '模板' : '普通'}</span></td>
+            <td class="text-center action-icons">
+                <button class="action-icon-btn edit" onclick="editTestCase(${tc.id})" title="编辑">✏️</button>
+                <button class="action-icon-btn" onclick="copyTestCase(${tc.id})" title="复制">📋</button>
+                <button class="action-icon-btn delete" onclick="deleteTestCase(${tc.id})" title="删除">🗑️</button>
             </td>
         </tr>
     `).join('');
+}
+
+// ==================== 测试用例行内编辑 ====================
+
+/**
+ * 测试用例 — 双击文本编辑（用例名称、前置条件、测试步骤、预期结果）
+ */
+function startTcTextEdit(td, tcId, field) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
+
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const tc = allTestCasesData.find(t => t.id === tcId);
+    const originalValue = tc ? (tc[field] || '') : '';
+    const originalHtml = td.innerHTML;
+
+    // 多行字段用 textarea，单行用 input
+    const multiLineFields = ['precondition', 'steps', 'expected_result'];
+    let input;
+    if (multiLineFields.includes(field)) {
+        input = document.createElement('textarea');
+        input.className = 'inline-edit-textarea';
+        input.value = originalValue;
+        input.rows = 3;
+        input.style.minHeight = '60px';
+        input.style.resize = 'vertical';
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'inline-edit-input';
+        input.value = originalValue;
+    }
+
+    td.innerHTML = '';
+    td.appendChild(input);
+    input.focus();
+    if (input.tagName === 'TEXTAREA') {
+        input.selectionStart = input.selectionEnd = input.value.length;
+    } else {
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = input.value.trim();
+        if (newValue === originalValue) {
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            return;
+        }
+        try {
+            const response = await authFetch(`${API_BASE}/test-cases/${tcId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: newValue })
+            });
+            if (response.ok) {
+                if (tc) tc[field] = newValue;
+                // 恢复显示
+                if (field === 'name') {
+                    td.innerHTML = `<strong>${escapeHtml(newValue || '-')}</strong>`;
+                } else {
+                    td.innerHTML = `<span class="tc-cell-text" title="${escapeHtml(newValue || '')}">${escapeHtml(newValue || '-')}</span>`;
+                }
+                showToast('已保存', 'success');
+            } else {
+                td.innerHTML = originalHtml;
+                showToast('保存失败', 'danger');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    };
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !multiLineFields.includes(field)) { e.preventDefault(); input.blur(); }
+        if (e.key === 'Enter' && e.ctrlKey && multiLineFields.includes(field)) { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') {
+            saved = true;
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        }
+    });
+}
+
+/**
+ * 测试用例 — 双击下拉编辑（分类、优先级、类型）
+ */
+function startTcDropdownEdit(td, tcId, field) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
+
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const tc = allTestCasesData.find(t => t.id === tcId);
+    const originalHtml = td.innerHTML;
+
+    const select = document.createElement('select');
+    select.className = 'inline-edit-select';
+
+    // 根据字段确定选项
+    let options = [];
+    let currentVal = '';
+    if (field === 'category') {
+        options = [
+            { value: '功能测试', label: '功能测试' },
+            { value: '性能测试', label: '性能测试' },
+            { value: '兼容性测试', label: '兼容性测试' },
+            { value: 'UI测试', label: 'UI测试' },
+            { value: '安装卸载', label: '安装卸载' },
+            { value: '适配验收', label: '适配验收' }
+        ];
+        currentVal = tc ? (tc.category || '功能测试') : '';
+    } else if (field === 'priority') {
+        options = [
+            { value: 'high', label: '高' },
+            { value: 'medium', label: '中' },
+            { value: 'low', label: '低' }
+        ];
+        currentVal = tc ? (tc.priority || 'medium') : '';
+    } else if (field === 'is_template') {
+        options = [
+            { value: '0', label: '普通' },
+            { value: '1', label: '模板' }
+        ];
+        currentVal = tc ? String(tc.is_template || 0) : '0';
+    }
+
+    options.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if (o.value === currentVal) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    td.innerHTML = '';
+    td.appendChild(select);
+    select.focus();
+    try { select.showPicker(); } catch(e) { select.click(); }
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = select.value;
+        if (newValue === currentVal) {
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            return;
+        }
+
+        // 构造请求体
+        const payload = {};
+        if (field === 'is_template') {
+            payload.is_template = parseInt(newValue);
+        } else {
+            payload[field] = newValue;
+        }
+
+        try {
+            const response = await authFetch(`${API_BASE}/test-cases/${tcId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                if (tc) {
+                    if (field === 'is_template') tc.is_template = parseInt(newValue);
+                    else tc[field] = newValue;
+                }
+                // 更新显示
+                if (field === 'category') {
+                    td.innerHTML = `<span class="tc-category-tag">${escapeHtml(newValue)}</span>`;
+                } else if (field === 'priority') {
+                    td.innerHTML = `<span class="tc-priority-tag ${newValue}">${getPriorityLabel(newValue)}</span>`;
+                } else if (field === 'is_template') {
+                    const isTemplate = parseInt(newValue);
+                    td.innerHTML = `<span class="tc-type-tag ${isTemplate ? 'template' : 'normal'}">${isTemplate ? '模板' : '普通'}</span>`;
+                }
+                showToast('已保存', 'success');
+            } else {
+                td.innerHTML = originalHtml;
+                showToast('保存失败', 'danger');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    };
+
+    select.addEventListener('change', save);
+    select.addEventListener('blur', () => {
+        if (!saved) {
+            saved = true;
+            td.classList.remove('editing');
+            td.innerHTML = originalHtml;
+            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        }
+    });
 }
 
 // 获取优先级标签文本
