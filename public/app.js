@@ -5198,26 +5198,52 @@ function updateSelectOptions(selectId, data, valueField, textField, defaultText)
 
 /**
  * 为所有 .data-table 的表头单元格添加拖拽 resize 手柄。
- * 每次表格内容渲染后调用此函数即可自动补全手柄。
+ * 拖拽只改当前列宽度，其他列不受影响，表格总宽度可增长/缩小。
  */
 function initColumnResize() {
     document.querySelectorAll('.data-table').forEach(table => {
+        // 跳过隐藏表格（offsetWidth === 0 时无法计算列宽）
+        if (table.offsetWidth === 0) return;
+
         const ths = table.querySelectorAll('thead th');
+        if (!ths.length) return;
+
+        // 第一步：快照每列实际宽度并锁定为 px 值
+        if (!table.dataset.colLocked) {
+            const widths = [];
+            ths.forEach(th => widths.push(th.offsetWidth));
+            const totalWidth = widths.reduce((a, b) => a + b, 0);
+
+            // 写入每列的 px 宽度
+            ths.forEach((th, i) => {
+                const thText = th.textContent.trim();
+                if (th.classList.contains('batch-th')) {
+                    th.style.width = '36px';
+                    th.style.minWidth = '36px';
+                    th.style.maxWidth = '36px';
+                    return;
+                }
+                if (thText === '序号') {
+                    th.style.width = '50px';
+                    th.style.minWidth = '50px';
+                    th.style.maxWidth = '50px';
+                    return;
+                }
+                th.style.width = widths[i] + 'px';
+                th.style.minWidth = '40px';
+            });
+
+            // 用 table-layout:fixed + 精确总宽，确保浏览器严格按 px 渲染
+            table.style.tableLayout = 'fixed';
+            table.style.width = totalWidth + 'px';
+            table.dataset.colLocked = '1';
+        }
+
+        // 第二步：给每个 th 补全拖拽手柄
         ths.forEach(th => {
-            // 跳过已有手柄的
             if (th.querySelector('.col-resize-handle')) return;
-
-            // 跳过 checkbox 列（不可拖拽）
             if (th.classList.contains('batch-th')) return;
-
-            // 序号列：固定宽度，不可拖拽
-            const thText = th.textContent.trim();
-            if (thText === '序号') {
-                th.style.width = '50px';
-                th.style.minWidth = '50px';
-                th.style.maxWidth = '50px';
-                return;
-            }
+            if (th.textContent.trim() === '序号') return;
 
             const handle = document.createElement('div');
             handle.className = 'col-resize-handle';
@@ -5228,16 +5254,23 @@ function initColumnResize() {
                 e.stopPropagation();
 
                 const startX = e.pageX;
-                const startWidth = th.offsetWidth;
-                
+                const startColWidth = th.offsetWidth;
+                const startTableWidth = table.offsetWidth;
+
                 handle.classList.add('resizing');
                 document.body.classList.add('col-resizing');
 
                 const onMouseMove = (moveEvt) => {
                     const delta = moveEvt.pageX - startX;
-                    const newWidth = Math.max(40, startWidth + delta);
-                    th.style.width = newWidth + 'px';
-                    th.style.minWidth = newWidth + 'px';
+                    const newColWidth = Math.max(40, startColWidth + delta);
+                    const widthChange = newColWidth - startColWidth;
+
+                    // 只改当前列的宽度
+                    th.style.width = newColWidth + 'px';
+                    th.style.minWidth = newColWidth + 'px';
+
+                    // 同步调整表格总宽度，使其他列保持不变
+                    table.style.width = (startTableWidth + widthChange) + 'px';
                 };
 
                 const onMouseUp = () => {
@@ -5254,10 +5287,51 @@ function initColumnResize() {
     });
 }
 
+/**
+ * 重置指定表格的列宽锁定（用于视图切换后重新计算）
+ */
+function resetColumnLock(tableOrContainer) {
+    const tables = tableOrContainer.classList?.contains('data-table')
+        ? [tableOrContainer]
+        : tableOrContainer.querySelectorAll('.data-table');
+    tables.forEach(t => {
+        delete t.dataset.colLocked;
+        t.style.tableLayout = '';
+        t.style.width = '';
+        t.querySelectorAll('thead th').forEach(th => {
+            if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
+                th.style.width = '';
+                th.style.minWidth = '';
+            }
+        });
+        t.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+    });
+}
+
 // 用 MutationObserver 自动监测表格变化，补全 resize 手柄（防抖合并）
+// 当 tbody 内容变化时，需重置列宽锁定再重新初始化
 let _resizeTimer = null;
-const _resizeObserver = new MutationObserver(() => {
+const _resizeObserver = new MutationObserver((mutations) => {
     clearTimeout(_resizeTimer);
+    // 检查是否有 tbody 子节点变化（数据刷新），需重置锁定
+    for (const m of mutations) {
+        if (m.target.tagName === 'TBODY' || (m.target.closest && m.target.closest('tbody'))) {
+            const table = m.target.closest('.data-table');
+            if (table && table.dataset.colLocked) {
+                delete table.dataset.colLocked;
+                table.style.tableLayout = '';
+                table.style.width = '';
+                table.querySelectorAll('thead th').forEach(th => {
+                    if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
+                        th.style.width = '';
+                        th.style.minWidth = '';
+                    }
+                });
+                table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+            }
+            break;
+        }
+    }
     _resizeTimer = setTimeout(initColumnResize, 80);
 });
 

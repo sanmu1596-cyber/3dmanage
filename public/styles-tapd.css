@@ -778,22 +778,34 @@ body {
     border-right: none;
 }
 
-/* 列宽拖拽手柄 */
+/* 列宽拖拽手柄 - 常驻可见 */
 .col-resize-handle {
     position: absolute;
-    right: 0;
-    top: 0;
-    width: 4px;
-    height: 100%;
+    right: -1px;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
     cursor: col-resize;
     z-index: 20;
-    background: transparent;
-    transition: background 0.15s;
+    background: var(--border-light, #e5e6eb);
+    border-radius: 2px;
+    transition: background 0.15s, width 0.1s;
 }
 
-.col-resize-handle:hover,
+.col-resize-handle:hover {
+    background: var(--primary);
+    width: 4px;
+    right: -1.5px;
+    top: 2px;
+    bottom: 2px;
+}
+
 .col-resize-handle.resizing {
     background: var(--primary);
+    width: 4px;
+    right: -1.5px;
+    top: 0;
+    bottom: 0;
 }
 
 body.col-resizing {
@@ -811,7 +823,6 @@ body.col-resizing * {
     color: var(--text-primary);
     font-weight: 400;
     vertical-align: middle;
-    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
