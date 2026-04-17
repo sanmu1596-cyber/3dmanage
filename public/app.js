@@ -132,7 +132,8 @@ let visibleColumns = {
     online_status: true,
     quality: true,
     game_account: true,
-    storage_location: true
+    storage_location: true,
+    game_engine: true
 };
 
 // 适配进展状态
@@ -927,6 +928,9 @@ function renderGamesPage() {
             }
             if (visibleColumns.storage_location) {
                 rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'storage_location', 'storage_location')" title="点击选择">${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
+            }
+            if (visibleColumns.game_engine) {
+                rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'game_engine')" title="双击编辑">${escapeHtml(game.game_engine || '-')}</td>`;
             }
 
             rowHtml += `
@@ -1883,7 +1887,8 @@ function initForms() {
             online_status: document.getElementById('game-online-status').value,
             quality: document.getElementById('game-quality').value,
             game_account: document.getElementById('game-account').value,
-            storage_location: document.getElementById('game-storage-location').value
+            storage_location: document.getElementById('game-storage-location').value,
+            game_engine: document.getElementById('game-engine').value
         };
 
         const url = id ? `${API_BASE}/games/${id}` : `${API_BASE}/games`;
@@ -2340,6 +2345,7 @@ async function editGame(id) {
             document.getElementById('game-quality').value = game.quality || 'normal';
             document.getElementById('game-account').value = game.game_account || '';
             document.getElementById('game-storage-location').value = game.storage_location || '硬盘1号';
+            document.getElementById('game-engine').value = game.game_engine || '';
             openModal('game-modal');
         }
     } catch (error) {

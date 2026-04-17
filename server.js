@@ -270,16 +270,16 @@ gamesRouter.post('/', auth.checkPermission('games', 'edit'), (req, res) => {
   const { name, english_name, platform, game_id, game_type, description,
           developer, operator, release_date, config_path, adapter_progress,
           version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
-          game_account, storage_location } = req.body;
+          game_account, storage_location, game_engine } = req.body;
   const sql = `INSERT INTO games (name, english_name, platform, game_id, game_type, description,
                                   developer, operator, release_date, config_path, adapter_progress,
                                   version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
-                                  game_account, storage_location)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                                  game_account, storage_location, game_engine)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [name, english_name, platform, game_id, game_type, description,
                developer, operator, release_date, config_path, adapter_progress,
                version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
-               game_account, storage_location], function(err) {
+               game_account, storage_location, game_engine], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -293,17 +293,17 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
   const { name, english_name, platform, game_id, game_type, description,
           developer, operator, release_date, config_path, adapter_progress,
           version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
-          game_account, storage_location } = req.body;
+          game_account, storage_location, game_engine } = req.body;
   const sql = `UPDATE games SET name = ?, english_name = ?, platform = ?, game_id = ?, game_type = ?,
                               description = ?, developer = ?, operator = ?, release_date = ?, config_path = ?,
                               adapter_progress = ?, version = ?, package_size = ?, adaptation_status = ?,
                               adaptation_notes = ?, owner_id = ?, online_status = ?, quality = ?,
-                              game_account = ?, storage_location = ?, updated_at = CURRENT_TIMESTAMP
+                              game_account = ?, storage_location = ?, game_engine = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
   db.run(sql, [name, english_name, platform, game_id, game_type, description,
                developer, operator, release_date, config_path, adapter_progress,
                version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
-               game_account, storage_location, req.params.id], function(err) {
+               game_account, storage_location, game_engine, req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -315,7 +315,7 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
-  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location'];
+  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine'];
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {
