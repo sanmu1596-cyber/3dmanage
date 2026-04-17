@@ -12,7 +12,7 @@ function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+    try { localStorage.setItem('theme', newTheme); } catch (e) { /* QuotaExceeded */ }
     updateThemeIcon(newTheme);
     showToast(newTheme === 'dark' ? '已切换到深色模式' : '已切换到浅色模式', 'info', 1500);
 }
@@ -46,7 +46,7 @@ function showToast(message, type = 'info', duration = 3000) {
     const c = colors[type] || colors.info;
     const toast = document.createElement('div');
     toast.style.cssText = `background:${c.bg};color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px;pointer-events:auto;animation:slideInRight 0.3s ease;max-width:360px;`;
-    toast.innerHTML = `<span>${c.icon}</span><span>${message}</span>`;
+    toast.innerHTML = `<span>${c.icon}</span><span>${escapeHtml(message)}</span>`;
     container.appendChild(toast);
     setTimeout(() => {
         toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
@@ -64,7 +64,7 @@ function showConfirm(message, onConfirm, onCancel) {
     const box = document.createElement('div');
     box.style.cssText = 'background:var(--bg-input);border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);animation:slideIn 0.2s ease;';
     box.innerHTML = `
-        <div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:20px;white-space:pre-line;">${message}</div>
+        <div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:20px;white-space:pre-line;">${escapeHtml(message)}</div>
         <div style="display:flex;justify-content:flex-end;gap:8px;">
             <button class="btn btn-secondary confirm-cancel-btn" style="padding:6px 20px;cursor:pointer;">取消</button>
             <button class="tool-btn tool-btn-primary confirm-ok-btn" style="padding:6px 20px;cursor:pointer;">确定</button>
@@ -180,8 +180,12 @@ async function authFetch(url, options = {}) {
 
     // 处理 403 权限不足
     if (response.status === 403) {
-        const error = await response.json();
-        alert(error.error || '权限不足');
+        try {
+            const error = await response.json();
+            showToast(error.error || '权限不足', 'danger');
+        } catch(e) {
+            showToast('权限不足', 'danger');
+        }
         throw new Error('权限不足');
     }
 
@@ -227,7 +231,7 @@ async function checkLoginStatus() {
         // 更新本地缓存的用户信息
         const result = await resp.json();
         if (result.success && result.user) {
-            localStorage.setItem('userInfo', JSON.stringify(result.user));
+            try { localStorage.setItem('userInfo', JSON.stringify(result.user)); } catch (e) { /* QuotaExceeded */ }
         }
     } catch (e) {
         console.error('Token 验证失败', e);
@@ -455,9 +459,14 @@ async function loadTabData(tabId, switchId) {
             // 配置计划需要设备和游戏数据（穿梭框选择用）
             if (!allDevicesData || allDevicesData.length === 0) await loadDevices();
             if (!allGamesForProgress || allGamesForProgress.length === 0) {
-                const gamesResp = await authFetch(`${API_BASE}/games`);
-                const gamesResult = await gamesResp.json();
-                allGamesForProgress = gamesResult.data || [];
+                try {
+                    const gamesResp = await authFetch(`${API_BASE}/games`);
+                    const gamesResult = await gamesResp.json();
+                    allGamesForProgress = gamesResult.data || [];
+                } catch (e) {
+                    console.error('加载游戏数据失败:', e);
+                    allGamesForProgress = [];
+                }
             }
             if (!allMembersData || allMembersData.length === 0) await loadMembers();
             await loadConfigPlans();
@@ -490,7 +499,7 @@ async function loadTabData(tabId, switchId) {
 // 切换侧边栏
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('collapsed');
+    if (sidebar) sidebar.classList.toggle('collapsed');
 }
 
 // 加载所有数据
@@ -540,7 +549,7 @@ function renderMembersTable(data) {
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${escapeHtml(member.wechat_id || '-')}</td>
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${escapeHtml(member.role || '-')}</td>
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>
-                <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${member.status}">${getStatusText(member.status)}</span></td>
+                <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${sanitizeCssClass(member.status)}">${getStatusText(member.status)}</span></td>
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editMember(${member.id})" title="编辑">✏️</button>
                     <button class="action-icon-btn delete" onclick="deleteMember(${member.id})" title="删除">🗑️</button>
@@ -818,6 +827,7 @@ async function loadGames() {
 function populateFilterOptions() {
     // 游戏平台筛选
     const platformFilter = document.getElementById('platform-filter');
+    if (!platformFilter) return;
     // 保留第一个"全部"选项，清空其他选项
     while (platformFilter.options.length > 1) {
         platformFilter.remove(1);
@@ -832,6 +842,7 @@ function populateFilterOptions() {
 
     // 游戏类型筛选
     const typeFilter = document.getElementById('type-filter');
+    if (!typeFilter) return;
     // 保留第一个"全部"选项，清空其他选项
     while (typeFilter.options.length > 1) {
         typeFilter.remove(1);
@@ -1159,11 +1170,14 @@ function updatePaginationControls() {
     }
 
     // 更新按钮状态
-    document.getElementById('prev-btn').disabled = currentPage <= 1;
-    document.getElementById('next-btn').disabled = pageSize === -1 || currentPage >= totalPages;
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageSize === -1 || currentPage >= totalPages;
 
     // 更新页码显示
     const pageNumbersDiv = document.getElementById('page-numbers');
+    if (!pageNumbersDiv) return;
     if (totalPages <= 1) {
         pageNumbersDiv.innerHTML = '';
         return;
@@ -1205,6 +1219,7 @@ function goToPage(page) {
 // 改变每页显示数量
 function changePageSize() {
     const select = document.getElementById('page-size');
+    if (!select) return;
     pageSize = parseInt(select.value);
     currentPage = 1; // 重置到第一页
     renderGamesPage();
@@ -1212,10 +1227,10 @@ function changePageSize() {
 
 // 筛选游戏
 function filterGames() {
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const platformFilter = document.getElementById('platform-filter').value;
-    const typeFilter = document.getElementById('type-filter').value;
-    const statusFilter = document.getElementById('status-filter').value;
+    const searchTerm = (document.getElementById('search-input')?.value || '').toLowerCase();
+    const platformFilter = document.getElementById('platform-filter')?.value || '';
+    const typeFilter = document.getElementById('type-filter')?.value || '';
+    const statusFilter = document.getElementById('status-filter')?.value || '';
 
     filteredGamesData = allGamesData.filter(game => {
         // 搜索匹配（游戏名称或ID）
@@ -1242,10 +1257,14 @@ function filterGames() {
 
 // 重置筛选条件
 function resetFilters() {
-    document.getElementById('search-input').value = '';
-    document.getElementById('platform-filter').value = '';
-    document.getElementById('type-filter').value = '';
-    document.getElementById('status-filter').value = '';
+    const searchInput = document.getElementById('search-input');
+    const platformFilter = document.getElementById('platform-filter');
+    const typeFilter = document.getElementById('type-filter');
+    const statusFilter = document.getElementById('status-filter');
+    if (searchInput) searchInput.value = '';
+    if (platformFilter) platformFilter.value = '';
+    if (typeFilter) typeFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
 
     filteredGamesData = [...allGamesData];
     currentPage = 1;
@@ -1418,8 +1437,8 @@ function renderTestsTable(data) {
                 <td>${escapeHtml(test.device_name || '-')}</td>
                 <td>${escapeHtml(test.tester_name || '-')}</td>
                 <td>${escapeHtml(test.test_date || '-')}</td>
-                <td class="text-center"><span class="status-badge status-${test.status}">${getTestStatusText(test.status)}</span></td>
-                <td class="text-center"><span class="priority-badge priority-${test.priority}">${getPriorityText(test.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${sanitizeCssClass(test.status)}">${getTestStatusText(test.status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(test.priority)}">${getPriorityText(test.priority)}</span></td>
                 <td>${test.bugs_count || 0}</td>
                 <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editTest(${test.id})">编辑</button>
@@ -1467,8 +1486,8 @@ function renderBugsTable(data) {
                 <td>${escapeHtml(bug.device_name || '-')}</td>
                 <td>${escapeHtml(bug.discovery_time || '-')}</td>
                 <td>${escapeHtml(bug.owner || '-')}</td>
-                <td class="text-center"><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
-                <td class="text-center"><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${sanitizeCssClass(bug.bug_status)}">${getBugStatusText(bug.bug_status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(bug.priority)}">${getPriorityText(bug.priority)}</span></td>
                 <td>${escapeHtml(bug.problem_type || '-')}</td>
                 <td>${escapeHtml(bug.description || '-')}</td>
                 <td class="text-center">
@@ -1553,24 +1572,28 @@ function filterModule(moduleName) {
 
 // 更新统计数据（直接查后端API，确保实时准确）
 async function updateStats() {
+    const setStatText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
     try {
         const response = await authFetch(`${API_BASE}/stats/dashboard`);
         const result = await response.json();
         if (result.success) {
             const d = result.data;
-            document.getElementById('stat-members').textContent = d.members_total || 0;
-            document.getElementById('stat-devices').textContent = d.devices_total || 0;
-            document.getElementById('stat-games').textContent = d.games_total || 0;
-            document.getElementById('stat-tests').textContent = d.tests_total || 0;
-            document.getElementById('stat-bugs').textContent = d.bugs_total || 0;
+            setStatText('stat-members', d.members_total || 0);
+            setStatText('stat-devices', d.devices_total || 0);
+            setStatText('stat-games', d.games_total || 0);
+            setStatText('stat-tests', d.tests_total || 0);
+            setStatText('stat-bugs', d.bugs_total || 0);
         }
     } catch (e) {
         // 后端不可用时降级到内存数据
-        document.getElementById('stat-members').textContent = (allMembersData || []).length;
-        document.getElementById('stat-devices').textContent = (allDevicesData || []).length;
-        document.getElementById('stat-games').textContent = (allGamesData || []).length;
-        document.getElementById('stat-tests').textContent = (allTestsData || []).length;
-        document.getElementById('stat-bugs').textContent = (allBugsData || []).length;
+        setStatText('stat-members', (allMembersData || []).length);
+        setStatText('stat-devices', (allDevicesData || []).length);
+        setStatText('stat-games', (allGamesData || []).length);
+        setStatText('stat-tests', (allTestsData || []).length);
+        setStatText('stat-bugs', (allBugsData || []).length);
     }
 
     // 更新各模块底部统计
@@ -1967,11 +1990,13 @@ function initForms() {
 
 // 模态框操作
 function openModal(modalId) {
-    document.getElementById(modalId).style.display = 'block';
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'block';
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'none';
     resetForm(modalId.replace('-modal', '-form'));
 }
 
@@ -1990,7 +2015,8 @@ window.onclick = function(event) {
 
 // 重置表单
 function resetForm(formId) {
-    document.getElementById(formId).reset();
+    const form = document.getElementById(formId);
+    if (form) form.reset();
     const idField = document.getElementById(formId.replace('-form', '-id'));
     if (idField) {
         idField.value = '';
@@ -2141,7 +2167,7 @@ async function saveMemberInlineEdit(td, memberId, field, newValue) {
 
             // 恢复单元格显示
             if (field === 'status') {
-                td.innerHTML = `<span class="status-badge status-${trimmed}">${getStatusText(trimmed)}</span>`;
+                td.innerHTML = `<span class="status-badge status-${sanitizeCssClass(trimmed)}">${getStatusText(trimmed)}</span>`;
             } else {
                 td.textContent = trimmed || '-';
             }
@@ -2172,7 +2198,7 @@ function cancelMemberInlineEdit(td, memberId, field, originalValue) {
     if (field === 'status') {
         const member = (allMembersData || []).find(m => m.id === memberId);
         const statusVal = member ? member.status : 'active';
-        td.innerHTML = `<span class="status-badge status-${statusVal}">${getStatusText(statusVal)}</span>`;
+        td.innerHTML = `<span class="status-badge status-${sanitizeCssClass(statusVal)}">${getStatusText(statusVal)}</span>`;
     } else {
         td.textContent = originalValue || '-';
     }
@@ -2189,7 +2215,7 @@ function cancelMemberInlineEditRestore(td, memberId, field) {
     const member = (allMembersData || []).find(m => m.id === memberId);
     if (field === 'status') {
         const statusVal = member ? member.status : 'active';
-        td.innerHTML = `<span class="status-badge status-${statusVal}">${getStatusText(statusVal)}</span>`;
+        td.innerHTML = `<span class="status-badge status-${sanitizeCssClass(statusVal)}">${getStatusText(statusVal)}</span>`;
     } else {
         td.textContent = member ? (member[field] || '-') : '-';
     }
@@ -2222,7 +2248,7 @@ async function editMember(id) {
 
 // 删除成员
 async function deleteMember(id) {
-    showConfirm('确定要删除这个成员吗？', async () => {
+    showConfirm('确定要删除该成员吗？', async () => {
         try {
             const response = await authFetch(`${API_BASE}/members/${id}`, {
                 method: 'DELETE'
@@ -2269,7 +2295,7 @@ async function editDevice(id) {
 
 // 删除设备
 async function deleteDevice(id) {
-    showConfirm('确定要删除这个设备吗？', async () => {
+    showConfirm('确定要删除该设备吗？', async () => {
         try {
             const response = await authFetch(`${API_BASE}/devices/${id}`, {
                 method: 'DELETE'
@@ -2323,7 +2349,7 @@ async function editGame(id) {
 
 // 删除游戏
 async function deleteGame(id) {
-    showConfirm('确定要删除这个游戏吗？', async () => {
+    showConfirm('确定要删除该游戏吗？', async () => {
         try {
             const response = await authFetch(`${API_BASE}/games/${id}`, {
                 method: 'DELETE'
@@ -2367,7 +2393,7 @@ async function editTest(id) {
 
 // 删除测试
 async function deleteTest(id) {
-    showConfirm('确定要删除这个测试吗？', async () => {
+    showConfirm('确定要删除该测试吗？', async () => {
         try {
             const response = await authFetch(`${API_BASE}/tests/${id}`, {
                 method: 'DELETE'
@@ -2412,7 +2438,7 @@ async function editBug(id) {
 
 // 删除缺陷
 async function deleteBug(id) {
-    showConfirm('确定要删除这个缺陷吗？', async () => {
+    showConfirm('确定要删除该缺陷吗？', async () => {
         try {
             const response = await authFetch(`${API_BASE}/bugs/${id}`, {
                 method: 'DELETE'
@@ -2485,7 +2511,11 @@ function applyColumnSettings() {
     toggleColumnSettings();
 
     // 可选:保存到localStorage
-    localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+    try {
+        localStorage.setItem('visibleColumns', JSON.stringify(visibleColumns));
+    } catch (e) {
+        console.warn('保存列设置到 localStorage 失败:', e);
+    }
 }
 
 // 从localStorage加载列显示设置
@@ -2801,7 +2831,7 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
 
         // 根据字段类型处理值
         if (field === 'onlineStatus') {
-            displayValue = `<span class="status-badge status-${newValue}">${getFieldOptionLabel('online_status', newValue)}</span>`;
+            displayValue = `<span class="status-badge status-${sanitizeCssClass(newValue)}">${getFieldOptionLabel('online_status', newValue)}</span>`;
             gameData.onlineStatus = newValue;
         } else if (field === 'quality') {
             displayValue = getFieldOptionLabel('quality', newValue);
@@ -2860,7 +2890,7 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
 
 // 删除适配进展项目
 function deleteProgressItem(deviceIndex, itemId) {
-    showConfirm('确定要删除这条适配记录吗？', async () => {
+    showConfirm('确定要删除该适配记录吗？', async () => {
         try {
             // P0: 先删后端
             await authFetch(`${API_BASE}/adaptations/${itemId}`, { method: 'DELETE' });
@@ -2893,7 +2923,7 @@ function openAddGameToProgress() {
         currentDeviceId = 0;
     }
     if (currentDeviceId === null) {
-        alert('请先选择一个设备标签');
+        showToast('请先选择一个设备标签', 'warning');
         return;
     }
     gameSelectMode = 'single';
@@ -2907,7 +2937,7 @@ function openBatchAddGameToProgress() {
         currentDeviceId = 0;
     }
     if (currentDeviceId === null) {
-        alert('请先选择一个设备标签');
+        showToast('请先选择一个设备标签', 'warning');
         return;
     }
     gameSelectMode = 'batch';
@@ -3544,7 +3574,7 @@ function renderPlanTcTable() {
                 <td>${escapeHtml(tc.code || '-')}</td>
                 <td>${escapeHtml(tc.name)}</td>
                 <td><span class="tc-category-tag">${escapeHtml(tc.category || '')}</span></td>
-                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+                <td><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
             </tr>
         `;
     }).join('');
@@ -3632,38 +3662,42 @@ function removePlanTcSelection(id) {
 
 // 创建计划后自动关联测试用例
 async function autoLinkTestCasesToPlan(planId) {
-    // 先获取该计划的所有游戏ID
-    const gamesResp = await authFetch(`${API_BASE}/plans/${planId}`);
-    const planResult = await gamesResp.json();
-    if (!planResult.success || !planResult.data?.games) return;
+    try {
+        // 先获取该计划的所有游戏ID
+        const gamesResp = await authFetch(`${API_BASE}/plans/${planId}`);
+        const planResult = await gamesResp.json();
+        if (!planResult.success || !planResult.data?.games) return;
 
-    const planGames = planResult.data.games;
-    if (planGames.length === 0) return;
+        const planGames = planResult.data.games;
+        if (planGames.length === 0) return;
 
-    // 使用弹窗选择的用例ID
-    let tcIds = Array.from(planSelectedTcIds);
+        // 使用弹窗选择的用例ID
+        let tcIds = Array.from(planSelectedTcIds);
 
-    if (tcIds.length === 0) return;
+        if (tcIds.length === 0) return;
 
-    // 为每个游戏批量关联测试用例
-    let linkedCount = 0;
-    for (const pg of planGames) {
-        try {
-            const linkResp = await authFetch(`${API_BASE}/test-cases/link`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    plan_id: planId,
-                    plan_game_id: pg.id,
-                    test_case_ids: tcIds
-                })
-            });
-            const linkResult = await linkResp.json();
-            if (linkResult.success) linkedCount++;
-        } catch (e) { console.error('游戏', pg.game_name, '关联失败:', e); }
+        // 为每个游戏批量关联测试用例
+        let linkedCount = 0;
+        for (const pg of planGames) {
+            try {
+                const linkResp = await authFetch(`${API_BASE}/test-cases/link`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_id: planId,
+                        plan_game_id: pg.id,
+                        test_case_ids: tcIds
+                    })
+                });
+                const linkResult = await linkResp.json();
+                if (linkResult.success) linkedCount++;
+            } catch (e) { console.error('游戏', pg.game_name, '关联失败:', e); }
+        }
+
+        console.log(`测试用例已关联：${tcIds.length}个用例 × ${linkedCount}个游戏`);
+    } catch (e) {
+        console.error('自动关联测试用例失败:', e);
     }
-
-    console.log(`测试用例已关联：${tcIds.length}个用例 × ${linkedCount}个游戏`);
 }
 
 function showPlanListView() {
@@ -3852,7 +3886,7 @@ async function loadConfigPlans() {
                 planNo: p.plan_no || '',
                 title: p.title,
                 date: p.plan_date,
-                devices: typeof p.devices_json === 'string' ? JSON.parse(p.devices_json || '[]') : (p.devices_json || []),
+                devices: (() => { try { return typeof p.devices_json === 'string' ? JSON.parse(p.devices_json || '[]') : (p.devices_json || []); } catch(e) { console.warn('配置计划设备数据解析失败, plan_id:', p.id, e); return []; } })(),
                 interlaceVersion: p.interlace_version || '',
                 clientVersion: p.client_version || '',
                 goal: p.goal || '',
@@ -3894,7 +3928,8 @@ let planViewMode = 'card'; // 'card' or 'list'
 function togglePlanView(mode) {
     planViewMode = mode;
     document.querySelectorAll('#plan-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`#plan-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    const activeBtn = document.querySelector(`#plan-view-toggle .view-toggle-btn[data-view="${mode}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
     renderPlanCards();
 }
 
@@ -4046,16 +4081,16 @@ async function openPlanDetail(planIndex) {
 
     // 操作按钮
     const actionsEl = document.getElementById('plan-detail-actions');
-    actionsEl.innerHTML = '';
-    actionsEl.innerHTML += `<button class="tool-btn" onclick="editPlan(${planIndex})">✏️ 编辑</button>`;
-    actionsEl.innerHTML += `<button class="tool-btn" onclick="addGamesToPlan(${planIndex})">＋ 添加游戏</button>`;
+    let actionsHtml = `<button class="tool-btn" onclick="editPlan(${planIndex})">✏️ 编辑</button>`;
+    actionsHtml += `<button class="tool-btn" onclick="addGamesToPlan(${planIndex})">＋ 添加游戏</button>`;
     if (plan.status === 'draft') {
-        actionsEl.innerHTML += `<button class="tool-btn tool-btn-primary" onclick="publishPlan(${planIndex})">🚀 发布计划</button>`;
+        actionsHtml += `<button class="tool-btn tool-btn-primary" onclick="publishPlan(${planIndex})">🚀 发布计划</button>`;
     }
     if (plan.status === 'published') {
-        actionsEl.innerHTML += `<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closePlan(${planIndex})">✅ 完成计划</button>`;
+        actionsHtml += `<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closePlan(${planIndex})">✅ 完成计划</button>`;
     }
-    actionsEl.innerHTML += `<button class="btn btn-small btn-delete" onclick="deletePlan(${planIndex})">🗑️ 删除</button>`;
+    actionsHtml += `<button class="btn btn-small btn-delete" onclick="deletePlan(${planIndex})">🗑️ 删除</button>`;
+    actionsEl.innerHTML = actionsHtml;
 
     // 信息条
     const infoBar = document.getElementById('plan-detail-info-bar');
@@ -4270,8 +4305,8 @@ function showPlanBugDetail(planIndex, gameIndex) {
             <tr>
                 <td class="text-center">${i + 1}</td>
                 <td>${escapeHtml(bug.description)}</td>
-                <td class="text-center"><span class="status-badge status-${bug.bug_status}">${getBugStatusText(bug.bug_status)}</span></td>
-                <td class="text-center"><span class="priority-badge priority-${bug.priority}">${getPriorityText(bug.priority)}</span></td>
+                <td class="text-center"><span class="status-badge status-${sanitizeCssClass(bug.bug_status)}">${getBugStatusText(bug.bug_status)}</span></td>
+                <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(bug.priority)}">${getPriorityText(bug.priority)}</span></td>
                 <td>${escapeHtml(bug.owner || '-')}</td>
             </tr>
         `).join('');
@@ -4435,7 +4470,7 @@ function filterDeviceTargetList() {
 
 function confirmDeviceSelect() {
     if (deviceSelectTargetList.length === 0) {
-        alert('请先选择机型');
+        showToast('请先选择机型', 'warning');
         return;
     }
     planSelectedDevices = [...planSelectedDevices, ...deviceSelectTargetList.map(d => ({ id: d.id, name: d.name }))];
@@ -4601,7 +4636,7 @@ function filterPlanGameTargetList() {
 
 async function confirmPlanGameSelect() {
     if (planGameSelectTargetList.length === 0) {
-        alert('请先选择游戏');
+        showToast('请先选择游戏', 'warning');
         return;
     }
 
@@ -4756,7 +4791,7 @@ function renderFieldCards() {
                 </div>
                 <div class="field-card-body">
                     <div class="field-options-list" id="options-${field.field_key}">
-                        ${optionsHtml || '<span style="color:#64748b;font-size:12px;">暂无选项</span>'}
+                        ${optionsHtml || '<span style="color:var(--text-muted);font-size:12px;">暂无选项</span>'}
                     </div>
                     <div class="field-add-option">
                         <input type="text" id="new-opt-value-${field.field_key}" placeholder="选项值(英文)" 
@@ -4780,12 +4815,12 @@ async function addFieldOption(fieldKey) {
     const label = labelInput.value.trim();
 
     if (!value) {
-        alert('请输入选项值');
+        showToast('请输入选项值', 'warning');
         valueInput.focus();
         return;
     }
     if (!label) {
-        alert('请输入显示名称');
+        showToast('请输入显示名称', 'warning');
         labelInput.focus();
         return;
     }
@@ -4795,14 +4830,14 @@ async function addFieldOption(fieldKey) {
 
     // 检查重复
     if (field.options.some(o => o.value === value)) {
-        alert(`选项值 "${value}" 已存在`);
+        showToast(`选项值 "${value}" 已存在`, 'warning');
         return;
     }
 
     const newOptions = [...field.options, { value, label }];
 
     try {
-        const response = await authFetch(`${API_BASE}/field-options/${fieldKey}`, {
+        const response = await authFetch(`${API_BASE}/field-options/${encodeURIComponent(fieldKey)}`, {
             method: 'PUT',
             body: JSON.stringify({ options: newOptions })
         });
@@ -4814,10 +4849,10 @@ async function addFieldOption(fieldKey) {
             renderFieldCards();
             refreshAllSelectsFromFieldOptions();
         } else {
-            alert('保存失败: ' + (result.error || '未知错误'));
+            showToast('保存失败: ' + (result.error || '未知错误'), 'danger');
         }
     } catch (error) {
-        alert('保存失败: ' + error.message);
+        showToast('保存失败: ' + error.message, 'danger');
     }
 }
 
@@ -4827,26 +4862,24 @@ async function removeFieldOption(fieldKey, optIndex) {
     if (!field) return;
 
     const opt = field.options[optIndex];
-    if (!confirm(`确定删除选项 "${opt.label}" (${opt.value}) 吗？\n\n注意：已使用此选项的数据不会受影响，但后续将无法再选择此选项。`)) {
-        return;
-    }
+    showConfirm(`确定要删除选项「${opt.label}」(${opt.value}) 吗？\n\n注意：已使用此选项的数据不会受影响，但后续将无法再选择此选项。`, async () => {
+        const newOptions = field.options.filter((_, i) => i !== optIndex);
 
-    const newOptions = field.options.filter((_, i) => i !== optIndex);
-
-    try {
-        const response = await authFetch(`${API_BASE}/field-options/${fieldKey}`, {
-            method: 'PUT',
-            body: JSON.stringify({ options: newOptions })
-        });
-        const result = await response.json();
-        if (result.success) {
-            field.options = newOptions;
-            renderFieldCards();
-            refreshAllSelectsFromFieldOptions();
+        try {
+            const response = await authFetch(`${API_BASE}/field-options/${encodeURIComponent(fieldKey)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ options: newOptions })
+            });
+            const result = await response.json();
+            if (result.success) {
+                field.options = newOptions;
+                renderFieldCards();
+                refreshAllSelectsFromFieldOptions();
+            }
+        } catch (error) {
+            showToast('删除失败: ' + error.message, 'danger');
         }
-    } catch (error) {
-        alert('删除失败: ' + error.message);
-    }
+    });
 }
 
 // 拖拽排序
@@ -4926,13 +4959,13 @@ async function submitField(event) {
     const fieldGroup = document.getElementById('field-group-input').value;
 
     if (!fieldKey || !fieldLabel) {
-        alert('请填写完整信息');
+        showToast('请填写完整信息', 'warning');
         return;
     }
 
     // 校验key格式
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fieldKey)) {
-        alert('字段Key只能包含英文字母、数字和下划线，且不能以数字开头');
+        showToast('字段Key只能包含英文字母、数字和下划线，且不能以数字开头', 'warning');
         return;
     }
 
@@ -4967,32 +5000,31 @@ async function submitField(event) {
             closeFieldModal();
             await loadFieldOptions();
         } else {
-            alert('保存失败: ' + (result.error || '未知错误'));
+            showToast('保存失败: ' + (result.error || '未知错误'), 'danger');
         }
     } catch (error) {
-        alert('保存失败: ' + error.message);
+        showToast('保存失败: ' + error.message, 'danger');
     }
 }
 
 // 删除字段配置
 async function deleteFieldConfig(fieldKey, fieldLabel) {
-    if (!confirm(`确定要删除字段 "${fieldLabel}" (${fieldKey}) 及其所有选项吗？\n\n此操作不可恢复。`)) {
-        return;
-    }
-
-    try {
-        const response = await authFetch(`${API_BASE}/field-options/${fieldKey}`, {
-            method: 'DELETE'
-        });
-        const result = await response.json();
-        if (result.success) {
-            await loadFieldOptions();
-        } else {
-            alert('删除失败: ' + (result.error || '未知错误'));
+    showConfirm(`确定要删除字段「${fieldLabel}」(${fieldKey}) 及其所有选项吗？此操作不可恢复。`, async () => {
+        try {
+            const response = await authFetch(`${API_BASE}/field-options/${encodeURIComponent(fieldKey)}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            if (result.success) {
+                showToast('字段已删除', 'success');
+                await loadFieldOptions();
+            } else {
+                showToast('删除失败: ' + (result.error || '未知错误'), 'danger');
+            }
+        } catch (error) {
+            showToast('删除失败: ' + error.message, 'danger');
         }
-    } catch (error) {
-        alert('删除失败: ' + error.message);
-    }
+    });
 }
 
 // ========== 动态选项填充工具函数 ==========
@@ -5084,6 +5116,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// CSS 类名 sanitize：只保留字母、数字、连字符
+function sanitizeCssClass(str) {
+    if (!str) return '';
+    return String(str).replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, '');
+}
+
+// 清理字符串使其安全用作 CSS 类名（只保留字母、数字、连字符、下划线）
+function safeCssClass(str) {
+    if (!str) return '';
+    return String(str).replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
 function getStatusText(status) {
@@ -5529,7 +5573,7 @@ async function loadRecentActivity() {
             return `<div class="activity-item">
                 <span class="activity-dot"></span>
                 <div class="activity-info">
-                    <span class="activity-text">${a.user_name} ${action}了 ${type}${name}</span>
+                    <span class="activity-text">${escapeHtml(a.user_name || '未知用户')} ${action}了 ${type}${name}</span>
                     <span class="activity-time">${time}</span>
                 </div>
             </div>`;
@@ -5568,7 +5612,7 @@ async function loadMatrixData() {
             const platforms = [...new Set(matrixData.games.map(g => g.platform).filter(Boolean))];
             // 保留第一个"全部平台"选项
             platformFilter.innerHTML = '<option value="">全部平台</option>' +
-                platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+                platforms.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
         }
         
         renderMatrix();
@@ -6455,7 +6499,7 @@ function umRenderUserList(data) {
     }
 
     tbody.innerHTML = list.map((user, idx) => {
-        const roleColor = user.roleColor || '#718096';
+        const roleColor = /^#[0-9a-fA-F]{3,8}$/.test(user.roleColor) ? user.roleColor : '#718096';
         const roleName = user.role || '未分配';
         const statusText = user.status === 'active' ? '正常' : '禁用';
         const statusClass = user.status === 'active' ? 'status-online' : 'status-pending';
@@ -6807,7 +6851,8 @@ function filterRequirements() {
 function toggleReqView(mode) {
     reqViewMode = mode;
     document.querySelectorAll('#req-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`#req-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    const activeBtn = document.querySelector(`#req-view-toggle .view-toggle-btn[data-view="${mode}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
     renderRequirements();
 }
 
@@ -7046,7 +7091,7 @@ async function publishRequirement(id) {
 
 // 删除需求
 async function deleteRequirement(id) {
-    showConfirm('确定删除此需求？关联的配置计划将解除关联但不会被删除。', async () => {
+    showConfirm('确定要删除该需求吗？关联的配置计划将解除关联但不会被删除。', async () => {
         try {
             const resp = await authFetch(`${API_BASE}/requirements/${id}`, { method: 'DELETE' });
             const result = await resp.json();
@@ -7132,7 +7177,7 @@ async function openReqDetail(id) {
 
 // 关闭需求
 async function closeRequirement(id) {
-    showConfirm('确定将此需求标记为已完成？', async () => {
+    showConfirm('确定要将该需求标记为已完成吗？', async () => {
         try {
             const resp = await authFetch(`${API_BASE}/requirements/${id}/close`, { method: 'POST' });
             const result = await resp.json();
@@ -7262,7 +7307,8 @@ let myTaskViewMode = 'card'; // 'card' or 'list'
 function toggleMyTaskView(mode) {
     myTaskViewMode = mode;
     document.querySelectorAll('#mytask-view-toggle .view-toggle-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`#mytask-view-toggle .view-toggle-btn[data-view="${mode}"]`).classList.add('active');
+    const activeBtn = document.querySelector(`#mytask-view-toggle .view-toggle-btn[data-view="${mode}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
     renderMyTaskPlanCards();
 }
 
@@ -7686,10 +7732,11 @@ function populateSuiteSelects() {
         const select = document.getElementById(selectId);
         if (!select) return;
         const currentVal = select.value;
-        select.innerHTML = '<option value="">未归类</option>';
+        let optionsHtml = '<option value="">未归类</option>';
         allTestSuites.forEach(s => {
-            select.innerHTML += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
+            optionsHtml += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
         });
+        select.innerHTML = optionsHtml;
         select.value = currentVal;
     });
 }
@@ -7760,7 +7807,7 @@ function renderTestCases() {
             <td><span class="tc-code">${escapeHtml(tc.code || '-')}</span></td>
             <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'name')" title="双击编辑"><strong>${escapeHtml(tc.name)}</strong></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'category')" title="双击选择"><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
-            <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'priority')" title="双击选择"><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+            <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'priority')" title="双击选择"><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
             <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'precondition')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
             <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'steps')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
             <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'expected_result')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
@@ -7967,7 +8014,7 @@ function startTcDropdownEdit(td, tcId, field) {
                 if (field === 'category') {
                     td.innerHTML = `<span class="tc-category-tag">${escapeHtml(newValue)}</span>`;
                 } else if (field === 'priority') {
-                    td.innerHTML = `<span class="tc-priority-tag ${newValue}">${getPriorityLabel(newValue)}</span>`;
+                    td.innerHTML = `<span class="tc-priority-tag ${sanitizeCssClass(newValue)}">${getPriorityLabel(newValue)}</span>`;
                 } else if (field === 'is_template') {
                     const isTemplate = parseInt(newValue);
                     td.innerHTML = `<span class="tc-type-tag ${isTemplate ? 'template' : 'normal'}">${isTemplate ? '模板' : '普通'}</span>`;
@@ -8636,7 +8683,7 @@ function renderLinkTestCaseTable() {
                 <td>${escapeHtml(tc.code || '-')}</td>
                 <td>${escapeHtml(tc.name)}</td>
                 <td><span class="tc-category-tag">${escapeHtml(tc.category || '')}</span></td>
-                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+                <td><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
             </tr>
         `;
     }).join('');
@@ -8781,7 +8828,7 @@ function renderExecTestCaseTable() {
                     <strong>${escapeHtml(tc.name)}</strong>
                     ${tc.precondition ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">前置: ${escapeHtml(tc.precondition)}</div>` : ''}
                 </td>
-                <td><span class="tc-priority-tag ${tc.priority || 'medium'}">${getPriorityLabel(tc.priority)}</span></td>
+                <td><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
                 <td><span class="tc-cell-text">${escapeHtml(tc.steps || '-')}</span></td>
                 <td><span class="tc-cell-text">${escapeHtml(tc.expected_result || '-')}</span></td>
                 <td>
@@ -8912,12 +8959,15 @@ async function autoUpdateTaskProgress() {
 // ==================== 通知提醒功能 ====================
 let notificationsData = [];
 let notificationsPanelOpen = false;
+let _notifIntervalId = null;
 
 // 初始化通知功能
 function initNotifications() {
     loadUnreadCount();
+    // 清除旧定时器（防止重复调用时累积）
+    if (_notifIntervalId) clearInterval(_notifIntervalId);
     // 每 60 秒刷新一次未读数量
-    setInterval(loadUnreadCount, 60000);
+    _notifIntervalId = setInterval(loadUnreadCount, 60000);
 }
 
 // 获取未读通知数量
@@ -8989,7 +9039,7 @@ function closeNotificationPanel() {
 function handleNotificationOutsideClick(e) {
     const panel = document.getElementById('notification-panel');
     const btn = document.getElementById('notification-btn');
-    if (panel && !panel.contains(e.target) && !btn.contains(e.target)) {
+    if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
         closeNotificationPanel();
     }
 }
@@ -9263,8 +9313,8 @@ function renderGameDetail(game) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">适配状态</div>
-            ${detailField('上线状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
-            ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`)}
+            ${detailField('上线状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
+            ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`, true)}
             ${detailField('适配进度', game.adapter_progress ? game.adapter_progress + '%' : '-')}
             ${detailField('负责人', game.owner_name || '-')}
         </div>
@@ -9299,7 +9349,7 @@ function renderDeviceDetail(device) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">状态信息</div>
-            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
             ${detailField('保管者', device.custodian_name || '-')}
             ${detailField('存放位置', device.location)}
             ${detailField('适配游戏数', device.adapted_games_count || 0)}
@@ -9334,7 +9384,7 @@ function renderMemberDetail(member) {
             <div class="detail-section-title">角色与职责</div>
             ${detailField('项目角色', member.project_role)}
             ${detailField('职责', member.duty)}
-            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
         </div>
     `;
 }
@@ -9375,9 +9425,9 @@ function renderBugDetail(bug) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">状态与优先级</div>
-            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
-            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`)}
-            ${detailField('严重程度', `<span class="severity-badge ${severity.class}">${severity.text}</span>`)}
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
+            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`, true)}
+            ${detailField('严重程度', `<span class="severity-badge ${severity.class}">${severity.text}</span>`, true)}
         </div>
         <div class="detail-section">
             <div class="detail-section-title">人员与时间</div>
@@ -9420,8 +9470,8 @@ function renderTestDetail(test) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">状态与结果</div>
-            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`)}
-            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`)}
+            ${detailField('状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
+            ${detailField('优先级', `<span class="priority-badge ${priority.class}">${priority.text}</span>`, true)}
             ${detailField('测试结果', test.result || '-')}
             ${detailField('发现缺陷数', test.bugs_count || 0)}
         </div>
@@ -9437,13 +9487,14 @@ function renderTestDetail(test) {
     `;
 }
 
-// 详情字段辅助函数
-function detailField(label, value) {
+// 详情字段辅助函数（isHtml=true 时保留原始 HTML，否则自动转义防 XSS）
+function detailField(label, value, isHtml = false) {
     const isEmpty = !value || value === '-' || value === 'undefined' || value === 'null';
+    const displayValue = isEmpty ? '-' : (isHtml ? value : escapeHtml(String(value)));
     return `
         <div class="detail-field">
-            <span class="detail-field-label">${label}</span>
-            <span class="detail-field-value${isEmpty ? ' empty' : ''}">${isEmpty ? '-' : value}</span>
+            <span class="detail-field-label">${escapeHtml(label)}</span>
+            <span class="detail-field-value${isEmpty ? ' empty' : ''}">${displayValue}</span>
         </div>
     `;
 }
