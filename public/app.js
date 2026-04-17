@@ -284,7 +284,8 @@ function updateUserInfo() {
         }
 
         // 刷新主题图标
-        refreshThemeIcon();
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        updateThemeIcon(currentTheme);
     }
 }
 
@@ -325,6 +326,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateUserInfo();
     updateStats();
     initHashRouter(); // P0: URL hash 路由（会调 switchTab → loadTabData 按需加载）
+
+
+    // Dashboard 首次加载：直接加载数据，不经过 switchTab 的 visibility:hidden 机制
+    const currentTab = location.hash.slice(1) || 'dashboard';
+    if (currentTab === 'dashboard') {
+        // 确保 dashboard 是 active 且可见状态（HTML 默认就是 active）
+        const dashEl = document.getElementById('dashboard');
+        if (dashEl) {
+            dashEl.classList.add('active');
+            dashEl.style.visibility = '';
+        }
+        // 标记侧边栏高亮
+        const dashSidebar = document.querySelector('.sidebar-item[data-tab="dashboard"]');
+        if (dashSidebar) dashSidebar.classList.add('active');
+        // 直接加载 dashboard 数据
+        try {
+            await loadDashboard();
+        } catch (e) {
+            console.error('Dashboard 首次加载失败:', e);
+        }
+    }
 });
 
 // ========== P0: URL Hash 路由 ==========
@@ -334,9 +356,11 @@ function initHashRouter() {
         const tab = location.hash.slice(1) || 'dashboard';
         switchTab(tab, true); // true = 来自 hash，不再 pushState
     });
-    // 初始加载时读取 hash
+    // 初始加载时读取 hash — 如果是 dashboard 则跳过（由 DOMContentLoaded 直接加载，避免 visibility 竞态）
     const initialTab = location.hash.slice(1) || 'dashboard';
-    switchTab(initialTab, true);
+    if (initialTab !== 'dashboard') {
+        switchTab(initialTab, true);
+    }
 }
 
 // 标签切换（兼容侧边栏导航 + 旧tabs）
@@ -5416,11 +5440,23 @@ function getDeviceOnlineGameCount(deviceName) {
 
 let dashboardCharts = {}; // 存储 Chart.js 实例，防止重复创建
 
+let _dashRetryCount = 0;
+const DASH_MAX_RETRY = 2;
+
 async function loadDashboard() {
     try {
         const response = await authFetch(`${API_BASE}/stats/dashboard`);
         const result = await response.json();
-        if (!result.success) return;
+        if (!result.success) {
+            // API 返回失败时自动重试
+            if (_dashRetryCount < DASH_MAX_RETRY) {
+                _dashRetryCount++;
+                console.warn(`Dashboard 数据加载失败，${500 * _dashRetryCount}ms 后重试 (${_dashRetryCount}/${DASH_MAX_RETRY})`);
+                setTimeout(loadDashboard, 500 * _dashRetryCount);
+            }
+            return;
+        }
+        _dashRetryCount = 0; // 成功则重置计数
         const d = result.data;
 
         // 更新数字卡片
@@ -5446,6 +5482,12 @@ async function loadDashboard() {
         loadRecentActivity();
     } catch (error) {
         console.error('加载 Dashboard 数据失败:', error);
+        // 网络异常时也自动重试
+        if (_dashRetryCount < DASH_MAX_RETRY) {
+            _dashRetryCount++;
+            console.warn(`Dashboard 网络异常，${500 * _dashRetryCount}ms 后重试 (${_dashRetryCount}/${DASH_MAX_RETRY})`);
+            setTimeout(loadDashboard, 500 * _dashRetryCount);
+        }
     }
 }
 
@@ -6242,6 +6284,11 @@ async function umLoadData() {
     umRenderRoleList();
     umRenderUserList();
     umPopulateRoleFilter();
+
+    // 默认选中第一个角色（如果还没有选中任何角色）
+    if (!umSelectedRoleId && umRoles.length > 0) {
+        umSelectRole(umRoles[0].id);
+    }
 }
 
 // ---------- 子Tab切换 ----------
