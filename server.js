@@ -82,6 +82,7 @@ const devicesRouter = express.Router();
 const gamesRouter = express.Router();
 const testsRouter = express.Router();
 const bugsRouter = express.Router();
+const versionsRouter = express.Router();
 
 // 应用认证中间件
 membersRouter.use(auth.verifyToken);
@@ -89,6 +90,7 @@ devicesRouter.use(auth.verifyToken);
 gamesRouter.use(auth.verifyToken);
 testsRouter.use(auth.verifyToken);
 bugsRouter.use(auth.verifyToken);
+versionsRouter.use(auth.verifyToken);
 
 // ==================== 成员管理 API（已合并到 users 表，通过 is_member=1 标识项目成员）====================
 membersRouter.get('/', auth.checkPermission('members', 'view'), (req, res) => {
@@ -1964,7 +1966,141 @@ requirementsRouter.delete('/:id', (req, res) => {
   });
 });
 
+// ==================== 版本管理 API ====================
+
+// 获取版本列表（支持按状态筛选）
+versionsRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
+  const { status, device_id, version_type } = req.query;
+  let sql = `SELECT v.*, d.name as device_name
+             FROM versions v
+             LEFT JOIN devices d ON v.device_id = d.id
+             WHERE 1=1`;
+  const params = [];
+  if (status) {
+    sql += ' AND v.status = ?';
+    params.push(status);
+  }
+  if (device_id) {
+    sql += ' AND v.device_id = ?';
+    params.push(device_id);
+  }
+  if (version_type) {
+    sql += ' AND v.version_type = ?';
+    params.push(version_type);
+  }
+  sql += ' ORDER BY v.version_date DESC, v.created_at DESC';
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows });
+  });
+});
+
+// 获取单个版本详情
+versionsRouter.get('/:id', auth.checkPermission('devices', 'view'), (req, res) => {
+  const sql = `SELECT v.*, d.name as device_name
+               FROM versions v
+               LEFT JOIN devices d ON v.device_id = d.id
+               WHERE v.id = ?`;
+  db.get(sql, [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '版本不存在' });
+    res.json({ success: true, data: row });
+  });
+});
+
+// 创建版本
+versionsRouter.post('/', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const { device_id, version_number, version_type, status, version_date,
+          download_url, file_size, changelog, notes } = req.body;
+  if (!device_id || !version_number) {
+    return res.status(400).json({ error: '设备和版本号为必填项' });
+  }
+  const updater_id = req.user ? req.user.id : null;
+  const updater_name = req.user ? (req.user.real_name || req.user.username) : '';
+  const sql = `INSERT INTO versions (device_id, version_number, version_type, status, version_date,
+                                     updater_id, updater_name, download_url, file_size, changelog, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [device_id, version_number, version_type || '整合版', status || 'testing',
+               version_date || new Date().toISOString().slice(0, 10),
+               updater_id, updater_name, download_url || '', file_size || '', changelog || '', notes || ''],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('create', 'version', this.lastID, `新增版本 ${version_number}`);
+      res.json({ success: true, id: this.lastID });
+    }
+  );
+});
+
+// 更新版本（完整更新）
+versionsRouter.put('/:id', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const { device_id, version_number, version_type, status, version_date,
+          download_url, file_size, changelog, notes } = req.body;
+  const updater_id = req.user ? req.user.id : null;
+  const updater_name = req.user ? (req.user.real_name || req.user.username) : '';
+  const sql = `UPDATE versions SET device_id = ?, version_number = ?, version_type = ?, status = ?,
+                                   version_date = ?, updater_id = ?, updater_name = ?,
+                                   download_url = ?, file_size = ?, changelog = ?, notes = ?,
+                                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`;
+  db.run(sql, [device_id, version_number, version_type, status, version_date,
+               updater_id, updater_name, download_url, file_size, changelog, notes, req.params.id],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('update', 'version', parseInt(req.params.id), `更新版本 ${version_number}`);
+      res.json({ success: true });
+    }
+  );
+});
+
+// 单字段更新（行内编辑用）
+versionsRouter.patch('/:id', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const allowedFields = ['device_id', 'version_number', 'version_type', 'status', 'version_date',
+                         'download_url', 'file_size', 'changelog', 'notes'];
+  const updates = [];
+  const values = [];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowedFields.includes(key)) {
+      updates.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+  // 自动更新 updater 信息
+  updates.push('updater_id = ?', 'updater_name = ?');
+  values.push(req.user ? req.user.id : null);
+  values.push(req.user ? (req.user.real_name || req.user.username) : '');
+  values.push(req.params.id);
+  const sql = `UPDATE versions SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// 发布版本（从测试中→已发布）
+versionsRouter.post('/:id/release', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const updater_id = req.user ? req.user.id : null;
+  const updater_name = req.user ? (req.user.real_name || req.user.username) : '';
+  const sql = `UPDATE versions SET status = 'released', updater_id = ?, updater_name = ?,
+                                   updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [updater_id, updater_name, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('update', 'version', parseInt(req.params.id), '版本发布');
+    res.json({ success: true });
+  });
+});
+
+// 删除版本
+versionsRouter.delete('/:id', auth.checkPermission('devices', 'delete'), (req, res) => {
+  db.run('DELETE FROM versions WHERE id = ?', [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('delete', 'version', parseInt(req.params.id), '删除版本');
+    res.json({ success: true });
+  });
+});
+
 // 注册路由
+app.use('/api/versions', versionsRouter);
 app.use('/api/requirements', requirementsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);

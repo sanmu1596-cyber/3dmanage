@@ -514,6 +514,10 @@ async function loadTabData(tabId, switchId) {
         case 'user-management':
             await umLoadData();
             break;
+        case 'versions':
+            if (!allDevicesData || allDevicesData.length === 0) await loadDevices();
+            await loadVersions();
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -9616,6 +9620,327 @@ document.addEventListener('DOMContentLoaded', () => {
         enableDeviceRowClick();
     }, 500);
 });
+
+// ==================== 版本管理模块 ====================
+
+let allVersionsData = [];           // 全部版本数据
+let versionsReleasedData = [];      // 已发布
+let versionsTestingData = [];       // 测试中
+let currentVersionSubTab = 'ver-released';
+
+// 切换版本管理子Tab
+function switchVersionTab(subTab) {
+    document.querySelectorAll('#versions .um-sub-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#versions .um-subtab-content').forEach(c => c.classList.remove('active'));
+    const btn = document.querySelector(`#versions .um-sub-tab[data-subtab="${subTab}"]`);
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById(subTab);
+    if (content) content.classList.add('active');
+    currentVersionSubTab = subTab;
+}
+
+// 加载版本数据
+async function loadVersions() {
+    try {
+        const response = await authFetch(`${API_BASE}/versions`);
+        const result = await response.json();
+        allVersionsData = result.data || [];
+
+        // 按状态拆分
+        versionsReleasedData = allVersionsData.filter(v => v.status === 'released');
+        versionsTestingData = allVersionsData.filter(v => v.status === 'testing');
+
+        renderVersionsTable('released', versionsReleasedData);
+        renderVersionsTable('testing', versionsTestingData);
+
+        // 填充设备筛选下拉
+        populateVersionDeviceFilters();
+    } catch (error) {
+        console.error('加载版本数据失败:', error);
+    }
+}
+
+// 填充版本筛选中的设备下拉
+function populateVersionDeviceFilters() {
+    const devices = allDevicesData || [];
+    ['released', 'testing'].forEach(status => {
+        const sel = document.getElementById(`ver-${status}-device-filter`);
+        if (!sel) return;
+        const current = sel.value;
+        sel.innerHTML = '<option value="">全部设备</option>' +
+            devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+        sel.value = current;
+    });
+    // 也填充弹窗中的设备选择
+    const modalSel = document.getElementById('version-device');
+    if (modalSel) {
+        modalSel.innerHTML = '<option value="">请选择设备</option>' +
+            devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+    }
+}
+
+// 渲染版本表格
+function renderVersionsTable(status, data) {
+    const tbodyId = status === 'released' ? 'ver-released-table' : 'ver-testing-table';
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    if (data && data.length > 0) {
+        tbody.innerHTML = data.map((v, index) => {
+            const typeBadge = getVersionTypeBadge(v.version_type);
+            const actions = status === 'testing'
+                ? `<button class="action-icon-btn edit" onclick="editVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn" onclick="releaseVersion(${v.id}, '${escapeHtml(v.version_number)}')" title="发布" style="color:#52c41a">🚀</button>
+                   <button class="action-icon-btn delete" onclick="deleteVersion(${v.id})" title="删除">🗑️</button>`
+                : `<button class="action-icon-btn edit" onclick="editVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn delete" onclick="deleteVersion(${v.id})" title="删除">🗑️</button>`;
+            return `
+            <tr data-id="${v.id}">
+                <td class="text-center"><strong>${index + 1}</strong></td>
+                <td>${escapeHtml(v.device_name || '-')}</td>
+                <td><strong>${escapeHtml(v.version_number)}</strong></td>
+                <td>${typeBadge}</td>
+                <td>${escapeHtml(v.version_date || '-')}</td>
+                <td>${escapeHtml(v.updater_name || '-')}</td>
+                <td>${escapeHtml(v.file_size || '-')}</td>
+                <td class="editable-cell" ondblclick="startVersionInlineEdit(this, ${v.id}, 'changelog')" title="双击编辑">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell" ondblclick="startVersionInlineEdit(this, ${v.id}, 'notes')" title="双击编辑">${escapeHtml(v.notes || '-')}</td>
+                <td class="text-center action-icons">${actions}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        const emptyMsg = status === 'released' ? '还没有已发布的版本' : '还没有测试中的版本';
+        const emptyIcon = status === 'released' ? '🚀' : '🧪';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="empty-state">
+                    <div class="empty-icon">${emptyIcon}</div>
+                    <div class="empty-text">${emptyMsg}</div>
+                    <div class="empty-sub">点击上方按钮添加新版本</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openVersionModal('${status}')">➕ 添加版本</button>
+                    </div>
+                </td>
+            </tr>`;
+    }
+}
+
+// 版本类型标签
+function getVersionTypeBadge(type) {
+    const colors = {
+        '整合版': '#1890ff',
+        'Gateway': '#722ed1',
+        'LITE': '#13c2c2',
+        'Transformer': '#fa8c16',
+        'TransformerPlus': '#eb2f96',
+        'HooK': '#52c41a'
+    };
+    const color = colors[type] || '#666';
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;color:#fff;background:${color}">${escapeHtml(type || '-')}</span>`;
+}
+
+// 筛选版本
+function filterVersions(status) {
+    const searchInput = document.getElementById(`ver-${status}-search`);
+    const deviceFilter = document.getElementById(`ver-${status}-device-filter`);
+    const typeFilter = document.getElementById(`ver-${status}-type-filter`);
+
+    const keyword = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const deviceId = deviceFilter ? deviceFilter.value : '';
+    const vType = typeFilter ? typeFilter.value : '';
+
+    const source = status === 'released' ? versionsReleasedData : versionsTestingData;
+    const filtered = source.filter(v => {
+        if (keyword && !((v.version_number || '').toLowerCase().includes(keyword) ||
+                         (v.device_name || '').toLowerCase().includes(keyword) ||
+                         (v.notes || '').toLowerCase().includes(keyword))) return false;
+        if (deviceId && String(v.device_id) !== deviceId) return false;
+        if (vType && v.version_type !== vType) return false;
+        return true;
+    });
+    renderVersionsTable(status, filtered);
+}
+
+// 打开版本新增弹窗
+function openVersionModal(targetStatus) {
+    document.getElementById('version-id').value = '';
+    document.getElementById('version-target-status').value = targetStatus || 'testing';
+    document.getElementById('version-modal-title').textContent = targetStatus === 'released' ? '新增已发布版本' : '新增测试版本';
+    document.getElementById('version-form').reset();
+    document.getElementById('version-date').value = new Date().toISOString().slice(0, 10);
+    // 确保设备下拉已填充
+    populateVersionDeviceFilters();
+    openModal('version-modal');
+}
+
+// 编辑版本
+async function editVersion(id) {
+    try {
+        const response = await authFetch(`${API_BASE}/versions/${id}`);
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            showToast('获取版本详情失败', 'error');
+            return;
+        }
+        const v = result.data;
+        document.getElementById('version-id').value = v.id;
+        document.getElementById('version-target-status').value = v.status;
+        document.getElementById('version-modal-title').textContent = '编辑版本';
+        populateVersionDeviceFilters();
+        document.getElementById('version-device').value = v.device_id;
+        document.getElementById('version-number').value = v.version_number || '';
+        document.getElementById('version-type').value = v.version_type || '整合版';
+        document.getElementById('version-date').value = v.version_date || '';
+        document.getElementById('version-download-url').value = v.download_url || '';
+        document.getElementById('version-file-size').value = v.file_size || '';
+        document.getElementById('version-changelog').value = v.changelog || '';
+        document.getElementById('version-notes').value = v.notes || '';
+        openModal('version-modal');
+    } catch (error) {
+        console.error('获取版本详情失败:', error);
+        showToast('获取版本详情失败', 'error');
+    }
+}
+
+// 提交版本表单
+async function submitVersionForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('version-id').value;
+    const targetStatus = document.getElementById('version-target-status').value;
+    const data = {
+        device_id: parseInt(document.getElementById('version-device').value),
+        version_number: document.getElementById('version-number').value.trim(),
+        version_type: document.getElementById('version-type').value,
+        status: targetStatus,
+        version_date: document.getElementById('version-date').value,
+        download_url: document.getElementById('version-download-url').value.trim(),
+        file_size: document.getElementById('version-file-size').value.trim(),
+        changelog: document.getElementById('version-changelog').value.trim(),
+        notes: document.getElementById('version-notes').value.trim()
+    };
+
+    if (!data.device_id || !data.version_number) {
+        showToast('请填写设备和版本号', 'warning');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_BASE}/versions/${id}` : `${API_BASE}/versions`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(id ? '版本更新成功' : '版本创建成功', 'success');
+            closeModal('version-modal');
+            await loadVersions();
+        } else {
+            showToast(result.error || '操作失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存版本失败:', error);
+        showToast('保存版本失败', 'error');
+    }
+}
+
+// 发布版本（测试中→已发布）
+async function releaseVersion(id, versionNumber) {
+    const confirmed = await showConfirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`);
+    if (!confirmed) return;
+    try {
+        const response = await authFetch(`${API_BASE}/versions/${id}/release`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(`版本 ${versionNumber} 已发布 🚀`, 'success');
+            await loadVersions();
+        } else {
+            showToast(result.error || '发布失败', 'error');
+        }
+    } catch (error) {
+        console.error('发布版本失败:', error);
+        showToast('发布版本失败', 'error');
+    }
+}
+
+// 删除版本
+async function deleteVersion(id) {
+    const confirmed = await showConfirm('确定要删除这个版本记录吗？此操作不可恢复。');
+    if (!confirmed) return;
+    try {
+        const response = await authFetch(`${API_BASE}/versions/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('版本已删除', 'success');
+            await loadVersions();
+        } else {
+            showToast(result.error || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除版本失败:', error);
+        showToast('删除版本失败', 'error');
+    }
+}
+
+// 版本行内编辑（更新日志、备注）
+async function startVersionInlineEdit(cell, id, field) {
+    if (cell.querySelector('input, textarea')) return;
+    const originalText = cell.textContent === '-' ? '' : cell.textContent;
+    const input = document.createElement('textarea');
+    input.value = originalText;
+    input.className = 'inline-edit-input';
+    input.style.cssText = 'width:100%;min-height:32px;resize:vertical;font-size:inherit;padding:4px;border:1px solid #1890ff;border-radius:4px;';
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveEdit = async () => {
+        const newValue = input.value.trim();
+        if (newValue === originalText) {
+            cell.textContent = originalText || '-';
+            return;
+        }
+        try {
+            const response = await authFetch(`${API_BASE}/versions/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: newValue })
+            });
+            const result = await response.json();
+            if (result.success) {
+                cell.textContent = newValue || '-';
+                showToast('更新成功', 'success');
+                // 同步本地数据
+                const ver = allVersionsData.find(v => v.id === id);
+                if (ver) ver[field] = newValue;
+            } else {
+                cell.textContent = originalText || '-';
+                showToast('更新失败', 'error');
+            }
+        } catch (e) {
+            cell.textContent = originalText || '-';
+            showToast('更新失败', 'error');
+        }
+    };
+
+    input.addEventListener('blur', saveEdit);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            input.blur();
+        }
+        if (e.key === 'Escape') {
+            cell.textContent = originalText || '-';
+        }
+    });
+}
+
 
 
 

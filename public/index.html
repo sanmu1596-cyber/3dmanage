@@ -84,6 +84,9 @@
                         <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
                             <span class="sidebar-icon">📋</span>配置计划
                         </a>
+                        <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
+                            <span class="sidebar-icon">📦</span>版本管理
+                        </a>
                         <a class="sidebar-item" data-tab="field-settings" onclick="switchTab('field-settings')">
                             <span class="sidebar-icon">⚙️</span>字段设置
                         </a>
@@ -1027,6 +1030,167 @@
                     </div>
                     <div id="field-cards-container" class="field-cards-container"></div>
                 </section>
+
+                <!-- ========== 版本管理 ========== -->
+                <section id="versions" class="tab-content">
+                    <!-- 子Tab切换 -->
+                    <div class="um-sub-tabs">
+                        <button class="um-sub-tab active" data-subtab="ver-released" onclick="switchVersionTab('ver-released')">
+                            🚀 已发布
+                        </button>
+                        <button class="um-sub-tab" data-subtab="ver-testing" onclick="switchVersionTab('ver-testing')">
+                            🧪 测试中
+                        </button>
+                    </div>
+
+                    <!-- === 子页面1：已发布 === -->
+                    <div id="ver-released" class="um-subtab-content active">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openVersionModal('released')"><span class="tool-icon">＋</span>新增已发布版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="ver-released-search" class="filter-input" placeholder="搜索版本号/设备..." style="width:180px" oninput="filterVersions('released')">
+                                <select id="ver-released-device-filter" class="compact-select" onchange="filterVersions('released')">
+                                    <option value="">全部设备</option>
+                                </select>
+                                <select id="ver-released-type-filter" class="compact-select" onchange="filterVersions('released')">
+                                    <option value="">全部类型</option>
+                                    <option value="整合版">整合版</option>
+                                    <option value="Gateway">Gateway</option>
+                                    <option value="LITE">LITE</option>
+                                    <option value="Transformer">Transformer</option>
+                                    <option value="TransformerPlus">TransformerPlus</option>
+                                    <option value="HooK">HooK</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>设备名称</th>
+                                        <th>版本号</th>
+                                        <th>版本类型</th>
+                                        <th>发布日期</th>
+                                        <th>更新者</th>
+                                        <th>文件大小</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="100">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ver-released-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- === 子页面2：测试中 === -->
+                    <div id="ver-testing" class="um-subtab-content">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openVersionModal('testing')"><span class="tool-icon">＋</span>新增测试版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="ver-testing-search" class="filter-input" placeholder="搜索版本号/设备..." style="width:180px" oninput="filterVersions('testing')">
+                                <select id="ver-testing-device-filter" class="compact-select" onchange="filterVersions('testing')">
+                                    <option value="">全部设备</option>
+                                </select>
+                                <select id="ver-testing-type-filter" class="compact-select" onchange="filterVersions('testing')">
+                                    <option value="">全部类型</option>
+                                    <option value="整合版">整合版</option>
+                                    <option value="Gateway">Gateway</option>
+                                    <option value="LITE">LITE</option>
+                                    <option value="Transformer">Transformer</option>
+                                    <option value="TransformerPlus">TransformerPlus</option>
+                                    <option value="HooK">HooK</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>设备名称</th>
+                                        <th>版本号</th>
+                                        <th>版本类型</th>
+                                        <th>日期</th>
+                                        <th>更新者</th>
+                                        <th>文件大小</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="130">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ver-testing-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 版本新增/编辑弹窗 -->
+                <div class="modal" id="version-modal">
+                    <div class="modal-overlay" onclick="closeModal('version-modal')"></div>
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="version-modal-title">新增版本</h3>
+                            <button class="modal-close" onclick="closeModal('version-modal')">✕</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="version-form" onsubmit="submitVersionForm(event)">
+                                <input type="hidden" id="version-id">
+                                <input type="hidden" id="version-target-status">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>设备名称 <span class="required">*</span></label>
+                                        <select id="version-device" required>
+                                            <option value="">请选择设备</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>版本号 <span class="required">*</span></label>
+                                        <input type="text" id="version-number" placeholder="如：v1.2.0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>版本类型</label>
+                                        <select id="version-type">
+                                            <option value="整合版">整合版</option>
+                                            <option value="Gateway">Gateway</option>
+                                            <option value="LITE">LITE</option>
+                                            <option value="Transformer">Transformer</option>
+                                            <option value="TransformerPlus">TransformerPlus</option>
+                                            <option value="HooK">HooK</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>日期</label>
+                                        <input type="date" id="version-date">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>下载链接</label>
+                                        <input type="text" id="version-download-url" placeholder="下载地址（可选）">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>文件大小</label>
+                                        <input type="text" id="version-file-size" placeholder="如：256MB">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>更新日志</label>
+                                    <textarea id="version-changelog" rows="3" placeholder="版本更新内容描述"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>问题备注</label>
+                                    <textarea id="version-notes" rows="3" placeholder="已知问题或注意事项"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn" onclick="closeModal('version-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- ========== 用户管理 ========== -->
                 <section id="user-management" class="tab-content">
