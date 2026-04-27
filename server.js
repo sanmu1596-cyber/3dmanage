@@ -6,6 +6,8 @@ const db = require('./database');
 const path = require('path');
 const auth = require('./auth');
 const usersController = require('./usersController');
+const gameIssuesRouter = require('./game-issues');
+const equipmentRouter = require('./equipment');
 
 const app = express();
 const PORT = 3000;
@@ -2118,6 +2120,8 @@ app.use('/api/test-cases', testCasesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/batch', batchRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/game-issues', gameIssuesRouter);
+app.use('/api/equipment', equipmentRouter);
 
 // 定期清理过期session（每小时执行一次）
 setInterval(() => {
