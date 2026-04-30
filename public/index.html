@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260427">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260430g">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -35,6 +35,7 @@
         <div class="main-body">
             <!-- 左侧边栏 -->
             <aside class="sidebar" id="sidebar">
+                <!-- 总览 -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">总览</div>
                     <div class="sidebar-nav">
@@ -43,8 +44,9 @@
                         </a>
                     </div>
                 </div>
+                <!-- 基础数据模块 -->
                 <div class="sidebar-section">
-                    <div class="sidebar-section-title">数据视图</div>
+                    <div class="sidebar-section-title">基础数据模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="games" onclick="switchTab('games')">
                             <span class="sidebar-icon">🎮</span>游戏列表
@@ -55,41 +57,78 @@
                         <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
                             <span class="sidebar-icon">👥</span>项目成员列表
                         </a>
-                        <a class="sidebar-item" data-tab="test-cases" onclick="switchTab('test-cases')">
-                            <span class="sidebar-icon">📝</span>测试用例
-                        </a>
+                    </div>
+                </div>
+                <!-- 游戏模块 -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">游戏模块</div>
+                    <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="progress" onclick="switchTab('progress')">
-                            <span class="sidebar-icon">📊</span>适配进展
-                        </a>
-                        <a class="sidebar-item" data-tab="matrix" onclick="switchTab('matrix')">
-                            <span class="sidebar-icon">🔲</span>适配矩阵
+                            <span class="sidebar-icon">📈</span>适配进展
                         </a>
                         <a class="sidebar-item" data-tab="tests" onclick="switchTab('tests')">
                             <span class="sidebar-icon">🧪</span>测试列表
                         </a>
-                        <a class="sidebar-item" data-tab="bugs" onclick="switchTab('bugs')">
-                            <span class="sidebar-icon">🐛</span>缺陷列表
-                        </a>
                         <a class="sidebar-item" data-tab="game-issues" onclick="switchTab('game-issues')">
                             <span class="sidebar-icon">⚠️</span>游戏问题
                         </a>
+                        <a class="sidebar-item" data-tab="test-cases" onclick="switchTab('test-cases')">
+                            <span class="sidebar-icon">📝</span>测试用例
+                        </a>
+                        <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
+                            <span class="sidebar-icon">📋</span>配置计划
+                        </a>
+                        <a class="sidebar-item" data-tab="game-versions" onclick="switchTab('game-versions')">
+                            <span class="sidebar-icon">📦</span>版本管理
+                        </a>
                     </div>
                 </div>
+                <!-- 交织模块 -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">交织模块</div>
+                    <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="interlace-issues" onclick="switchTab('interlace-issues')">
+                            <span class="sidebar-icon">🔗</span>问题列表
+                        </a>
+                        <a class="sidebar-item" data-tab="interlace-versions" onclick="switchTab('interlace-versions')">
+                            <span class="sidebar-icon">📦</span>版本管理
+                        </a>
+                    </div>
+                </div>
+                <!-- 客户端模块 -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">客户端模块</div>
+                    <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="client-issues" onclick="switchTab('client-issues')">
+                            <span class="sidebar-icon">🖥️</span>问题跟踪
+                        </a>
+                        <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
+                            <span class="sidebar-icon">📦</span>版本管理
+                        </a>
+                    </div>
+                </div>
+                <!-- 项目管理 -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">项目管理</div>
                     <div class="sidebar-nav">
+                        <a class="sidebar-item" data-tab="matrix" onclick="switchTab('matrix')">
+                            <span class="sidebar-icon">🔲</span>适配矩阵
+                        </a>
+                        <a class="sidebar-item" data-tab="bugs" onclick="switchTab('bugs')">
+                            <span class="sidebar-icon">🐛</span>缺陷列表
+                        </a>
                         <a class="sidebar-item" data-tab="requirements" onclick="switchTab('requirements')">
                             <span class="sidebar-icon">📄</span>需求管理
                         </a>
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
-                        <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
-                            <span class="sidebar-icon">📋</span>配置计划
-                        </a>
-                        <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
-                            <span class="sidebar-icon">📦</span>版本管理
-                        </a>
+                    </div>
+                </div>
+                <!-- 设置 -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">设置</div>
+                    <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="field-settings" onclick="switchTab('field-settings')">
                             <span class="sidebar-icon">⚙️</span>字段设置
                         </a>
@@ -699,19 +738,19 @@
                         </div>
                     </div>
                     <div class="table-container">
-                        <table class="data-table">
+                        <table class="data-table" style="table-layout:fixed;">
                             <thead>
                                 <tr>
-                                    <th width="50">序号</th>
-                                    <th>游戏名称</th>
-                                    <th>问题类型</th>
-                                    <th>优先级</th>
-                                    <th>问题描述</th>
-                                    <th>负责人</th>
-                                    <th>状态</th>
-                                    <th>备注</th>
-                                    <th>创建时间</th>
-                                    <th width="120">操作</th>
+                                    <th style="width:50px">序号</th>
+                                    <th style="width:120px">游戏名称</th>
+                                    <th style="width:90px">问题类型</th>
+                                    <th style="width:70px">优先级</th>
+                                    <th style="width:300px">问题描述</th>
+                                    <th style="width:80px">负责人</th>
+                                    <th style="width:80px">状态</th>
+                                    <th style="width:200px">备注</th>
+                                    <th style="width:100px">创建时间</th>
+                                    <th style="width:100px">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="game-issues-table"></tbody>
@@ -1321,6 +1360,486 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ========== 游戏版本弹窗 ========== -->
+                <div class="modal" id="game-version-modal">
+                    <div class="modal-overlay" onclick="closeModal('game-version-modal')"></div>
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="game-version-modal-title">新增游戏版本</h3>
+                            <button class="modal-close" onclick="closeModal('game-version-modal')">✕</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="game-version-form" onsubmit="submitGameVersionForm(event)">
+                                <input type="hidden" id="game-version-id">
+                                <input type="hidden" id="game-version-target-status">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>游戏名称 <span class="required">*</span></label>
+                                        <select id="game-version-game" required>
+                                            <option value="">请选择游戏</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>版本号 <span class="required">*</span></label>
+                                        <input type="text" id="game-version-number" placeholder="如：v1.2.0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>日期</label>
+                                        <input type="date" id="game-version-date">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>更新日志</label>
+                                    <textarea id="game-version-changelog" rows="3" placeholder="版本更新内容描述"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>问题备注</label>
+                                    <textarea id="game-version-notes" rows="3" placeholder="已知问题或注意事项"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn" onclick="closeModal('game-version-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 交织问题弹窗 ========== -->
+                <div class="modal" id="interlace-issue-modal">
+                    <div class="modal-overlay" onclick="closeModal('interlace-issue-modal')"></div>
+                    <div class="modal-container" style="max-width:600px">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="interlace-issue-modal-title">新增交织问题</h3>
+                                <button class="modal-close" onclick="closeModal('interlace-issue-modal')">✕</button>
+                            </div>
+                            <form id="interlace-issue-form" onsubmit="submitInterlaceIssueForm(event)">
+                                <input type="hidden" id="interlace-issue-id">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>问题类型 <span class="required">*</span></label>
+                                        <select id="interlace-issue-type" required>
+                                            <option value="">选择类型</option>
+                                            <option value="交织闪烁">交织闪烁</option>
+                                            <option value="深度异常">深度异常</option>
+                                            <option value="画面错位">画面错位</option>
+                                            <option value="性能问题">性能问题</option>
+                                            <option value="其他">其他</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>关联版本</label>
+                                        <select id="interlace-issue-version">
+                                            <option value="">选择版本</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>优先级</label>
+                                        <select id="interlace-issue-priority">
+                                            <option value="">选择优先级</option>
+                                            <option value="高">高</option>
+                                            <option value="中">中</option>
+                                            <option value="低">低</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>负责人 <span class="required">*</span></label>
+                                        <select id="interlace-issue-owner" required>
+                                            <option value="">选择负责人</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>状态</label>
+                                        <select id="interlace-issue-status">
+                                            <option value="待处理">待处理</option>
+                                            <option value="处理中">处理中</option>
+                                            <option value="已解决">已解决</option>
+                                            <option value="已关闭">已关闭</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>问题描述 <span class="required">*</span></label>
+                                    <textarea id="interlace-issue-desc" rows="3" required placeholder="详细描述问题现象..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>备注</label>
+                                    <textarea id="interlace-issue-remarks" rows="2" placeholder="其他备注信息..."></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn" onclick="closeModal('interlace-issue-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 交织版本弹窗 ========== -->
+                <div class="modal" id="interlace-version-modal">
+                    <div class="modal-overlay" onclick="closeModal('interlace-version-modal')"></div>
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="interlace-version-modal-title">新增交织版本</h3>
+                            <button class="modal-close" onclick="closeModal('interlace-version-modal')">✕</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="interlace-version-form" onsubmit="submitInterlaceVersionForm(event)">
+                                <input type="hidden" id="interlace-version-id">
+                                <input type="hidden" id="interlace-version-target-status">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>版本号 <span class="required">*</span></label>
+                                        <input type="text" id="interlace-version-number" placeholder="如：v1.2.0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>日期</label>
+                                        <input type="date" id="interlace-version-date">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>更新日志</label>
+                                    <textarea id="interlace-version-changelog" rows="3" placeholder="版本更新内容描述"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>问题备注</label>
+                                    <textarea id="interlace-version-notes" rows="3" placeholder="已知问题或注意事项"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn" onclick="closeModal('interlace-version-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 客户端问题弹窗 ========== -->
+                <div class="modal" id="client-issue-modal">
+                    <div class="modal-overlay" onclick="closeModal('client-issue-modal')"></div>
+                    <div class="modal-container" style="max-width:600px">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="client-issue-modal-title">新增客户端问题</h3>
+                                <button class="modal-close" onclick="closeModal('client-issue-modal')">✕</button>
+                            </div>
+                            <form id="client-issue-form" onsubmit="submitClientIssueForm(event)">
+                                <input type="hidden" id="client-issue-id">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>问题类型 <span class="required">*</span></label>
+                                        <select id="client-issue-type" required>
+                                            <option value="">选择类型</option>
+                                            <option value="界面问题">界面问题</option>
+                                            <option value="功能异常">功能异常</option>
+                                            <option value="性能问题">性能问题</option>
+                                            <option value="崩溃闪退">崩溃闪退</option>
+                                            <option value="其他">其他</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>关联版本</label>
+                                        <select id="client-issue-version">
+                                            <option value="">选择版本</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>优先级</label>
+                                        <select id="client-issue-priority">
+                                            <option value="">选择优先级</option>
+                                            <option value="高">高</option>
+                                            <option value="中">中</option>
+                                            <option value="低">低</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>负责人 <span class="required">*</span></label>
+                                        <select id="client-issue-owner" required>
+                                            <option value="">选择负责人</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label>状态</label>
+                                        <select id="client-issue-status">
+                                            <option value="待处理">待处理</option>
+                                            <option value="处理中">处理中</option>
+                                            <option value="已解决">已解决</option>
+                                            <option value="已关闭">已关闭</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>问题描述 <span class="required">*</span></label>
+                                    <textarea id="client-issue-desc" rows="3" required placeholder="详细描述问题现象..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>备注</label>
+                                    <textarea id="client-issue-remarks" rows="2" placeholder="其他备注信息..."></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn" onclick="closeModal('client-issue-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 游戏模块 - 版本管理 ========== -->
+                <section id="game-versions" class="tab-content">
+                    <!-- 子Tab切换 -->
+                    <div class="um-sub-tabs">
+                        <button class="um-sub-tab active" data-subtab="game-ver-released" onclick="switchGameVersionTab('game-ver-released')">
+                            🚀 已发布
+                        </button>
+                        <button class="um-sub-tab" data-subtab="game-ver-testing" onclick="switchGameVersionTab('game-ver-testing')">
+                            🧪 测试中
+                        </button>
+                    </div>
+
+                    <!-- === 子页面1：已发布 === -->
+                    <div id="game-ver-released" class="um-subtab-content active">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openGameVersionModal('released')"><span class="tool-icon">＋</span>新增已发布版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="game-ver-released-search" class="filter-input" placeholder="搜索版本号/游戏..." style="width:180px" oninput="filterGameVersions('released')">
+                                <select id="game-ver-released-game-filter" class="compact-select" onchange="filterGameVersions('released')">
+                                    <option value="">全部游戏</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>游戏名称</th>
+                                        <th>版本号</th>
+                                        <th>发布日期</th>
+                                        <th>更新者</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="100">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="game-ver-released-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- === 子页面2：测试中 === -->
+                    <div id="game-ver-testing" class="um-subtab-content">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openGameVersionModal('testing')"><span class="tool-icon">＋</span>新增测试版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="game-ver-testing-search" class="filter-input" placeholder="搜索版本号/游戏..." style="width:180px" oninput="filterGameVersions('testing')">
+                                <select id="game-ver-testing-game-filter" class="compact-select" onchange="filterGameVersions('testing')">
+                                    <option value="">全部游戏</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>游戏名称</th>
+                                        <th>版本号</th>
+                                        <th>日期</th>
+                                        <th>更新者</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="130">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="game-ver-testing-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ========== 交织模块 - 问题列表 ========== -->
+                <section id="interlace-issues" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openInterlaceIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="interlace-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterInterlaceIssues()">
+                            <select id="interlace-issue-status-filter" class="compact-select" onchange="filterInterlaceIssues()">
+                                <option value="">全部状态</option>
+                                <option value="待处理">待处理</option>
+                                <option value="处理中">处理中</option>
+                                <option value="已解决">已解决</option>
+                                <option value="已关闭">已关闭</option>
+                            </select>
+                            <select id="interlace-issue-type-filter" class="compact-select" onchange="filterInterlaceIssues()">
+                                <option value="">全部类型</option>
+                                <option value="交织闪烁">交织闪烁</option>
+                                <option value="深度异常">深度异常</option>
+                                <option value="画面错位">画面错位</option>
+                                <option value="性能问题">性能问题</option>
+                                <option value="其他">其他</option>
+                            </select>
+                            <select id="interlace-issue-priority-filter" class="compact-select" onchange="filterInterlaceIssues()">
+                                <option value="">全部优先级</option>
+                                <option value="高">高</option>
+                                <option value="中">中</option>
+                                <option value="低">低</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>问题类型</th>
+                                    <th>优先级</th>
+                                    <th>问题描述</th>
+                                    <th>关联版本</th>
+                                    <th>负责人</th>
+                                    <th>状态</th>
+                                    <th>备注</th>
+                                    <th>创建时间</th>
+                                    <th width="120">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="interlace-issues-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="interlace-issues-stats">
+                        <div class="stats-items" id="interlace-issues-stats-items"></div>
+                    </div>
+                </section>
+
+                <!-- ========== 交织模块 - 版本管理 ========== -->
+                <section id="interlace-versions" class="tab-content">
+                    <!-- 子Tab切换 -->
+                    <div class="um-sub-tabs">
+                        <button class="um-sub-tab active" data-subtab="interlace-ver-released" onclick="switchInterlaceVersionTab('interlace-ver-released')">
+                            🚀 已发布
+                        </button>
+                        <button class="um-sub-tab" data-subtab="interlace-ver-testing" onclick="switchInterlaceVersionTab('interlace-ver-testing')">
+                            🧪 测试中
+                        </button>
+                    </div>
+
+                    <!-- === 子页面1：已发布 === -->
+                    <div id="interlace-ver-released" class="um-subtab-content active">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openInterlaceVersionModal('released')"><span class="tool-icon">＋</span>新增已发布版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="interlace-ver-released-search" class="filter-input" placeholder="搜索版本号..." style="width:180px" oninput="filterInterlaceVersions('released')">
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>版本号</th>
+                                        <th>发布日期</th>
+                                        <th>更新者</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="100">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="interlace-ver-released-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- === 子页面2：测试中 === -->
+                    <div id="interlace-ver-testing" class="um-subtab-content">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button class="tool-btn tool-btn-primary" onclick="openInterlaceVersionModal('testing')"><span class="tool-icon">＋</span>新增测试版本</button>
+                                <span class="toolbar-divider"></span>
+                                <input type="text" id="interlace-ver-testing-search" class="filter-input" placeholder="搜索版本号..." style="width:180px" oninput="filterInterlaceVersions('testing')">
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">序号</th>
+                                        <th>版本号</th>
+                                        <th>日期</th>
+                                        <th>更新者</th>
+                                        <th>更新日志</th>
+                                        <th>问题备注</th>
+                                        <th width="130">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="interlace-ver-testing-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ========== 客户端模块 - 问题跟踪 ========== -->
+                <section id="client-issues" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openClientIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
+                            <span class="toolbar-divider"></span>
+                            <input type="text" id="client-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterClientIssues()">
+                            <select id="client-issue-status-filter" class="compact-select" onchange="filterClientIssues()">
+                                <option value="">全部状态</option>
+                                <option value="待处理">待处理</option>
+                                <option value="处理中">处理中</option>
+                                <option value="已解决">已解决</option>
+                                <option value="已关闭">已关闭</option>
+                            </select>
+                            <select id="client-issue-type-filter" class="compact-select" onchange="filterClientIssues()">
+                                <option value="">全部类型</option>
+                                <option value="界面问题">界面问题</option>
+                                <option value="功能异常">功能异常</option>
+                                <option value="性能问题">性能问题</option>
+                                <option value="崩溃闪退">崩溃闪退</option>
+                                <option value="其他">其他</option>
+                            </select>
+                            <select id="client-issue-priority-filter" class="compact-select" onchange="filterClientIssues()">
+                                <option value="">全部优先级</option>
+                                <option value="高">高</option>
+                                <option value="中">中</option>
+                                <option value="低">低</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th>问题类型</th>
+                                    <th>优先级</th>
+                                    <th>问题描述</th>
+                                    <th>关联版本</th>
+                                    <th>负责人</th>
+                                    <th>状态</th>
+                                    <th>备注</th>
+                                    <th>创建时间</th>
+                                    <th width="120">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="client-issues-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="client-issues-stats">
+                        <div class="stats-items" id="client-issues-stats-items"></div>
+                    </div>
+                </section>
 
                 <!-- ========== 用户管理 ========== -->
                 <section id="user-management" class="tab-content">

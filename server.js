@@ -2,12 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const compression = require('compression');
+const cookieParser = require('cookie-parser');
 const db = require('./database');
 const path = require('path');
 const auth = require('./auth');
 const usersController = require('./usersController');
 const gameIssuesRouter = require('./game-issues');
 const equipmentRouter = require('./equipment');
+const gameVersionsRouter = require('./game-versions');
+const interlaceIssuesRouter = require('./interlace-issues');
+const interlaceVersionsRouter = require('./interlace-versions');
+const clientIssuesRouter = require('./client-issues');
 
 const app = express();
 const PORT = 3000;
@@ -15,6 +20,7 @@ const PORT = 3000;
 // 中间件
 app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
+app.use(cookieParser()); // 解析Cookie（用于开发者密钥验证）
 
 app.use(bodyParser.json({ limit: '2mb' }));
 // 静态文件：开发阶段禁用缓存，确保每次加载最新；生产环境可改回 maxAge: '1d'
@@ -48,9 +54,10 @@ function logActivity(action, resourceType, resourceId, resourceName, changesJson
 }
 
 // ==================== 公开接口（不需要token） ====================
-// 前端通过此接口判断是否需要登录
+// 前端通过此接口判断是否需要登录（根据访问来源动态判断）
 app.get('/api/config', (req, res) => {
-  res.json({ success: true, devMode: auth.DEV_MODE });
+  const devMode = auth.isDevMode(req);
+  res.json({ success: true, devMode });
 });
 
 // ==================== 认证路由（不需要token） ====================
@@ -917,10 +924,11 @@ myTasksRouter.use(auth.verifyToken);
 // 获取当前用户的所有任务（已发布计划中分配给我的游戏）
 myTasksRouter.get('/', (req, res) => {
   const userId = req.user ? req.user.id : null;
+  const devMode = req.isDevMode; // 使用动态判断结果
   
-  // DEV_MODE下返回所有已发布计划的任务，正式模式下只返回分配给当前用户的
+  // 开发模式下返回所有已发布计划的任务，正式模式下只返回分配给当前用户的
   let sql, params;
-  if (auth.DEV_MODE) {
+  if (devMode) {
     sql = `SELECT pg.*, p.title as plan_title, p.plan_no, p.plan_date, p.status as plan_status,
                p.devices_json, p.interlace_version, p.client_version, p.goal as plan_goal,
                p.created_at as plan_created_at,
@@ -1011,13 +1019,14 @@ myTasksRouter.get('/:planGameId/test-cases', (req, res) => {
 // 负责人提交进展（单条）
 myTasksRouter.put('/:planGameId', (req, res) => {
   const userId = req.user ? req.user.id : null;
+  const devMode = req.isDevMode; // 使用动态判断结果
   const { adapt_status, adapt_progress, remark } = req.body;
   
-  // 先验证这条任务确实分配给了当前用户（DEV_MODE跳过）
-  const checkSql = auth.DEV_MODE 
+  // 先验证这条任务确实分配给了当前用户（开发模式跳过）
+  const checkSql = devMode 
     ? 'SELECT pg.*, p.devices_json FROM plan_games pg INNER JOIN plans p ON pg.plan_id = p.id WHERE pg.id = ?'
     : 'SELECT pg.*, p.devices_json FROM plan_games pg INNER JOIN plans p ON pg.plan_id = p.id WHERE pg.id = ? AND pg.assigned_to = ?';
-  const checkParams = auth.DEV_MODE ? [req.params.planGameId] : [req.params.planGameId, userId];
+  const checkParams = devMode ? [req.params.planGameId] : [req.params.planGameId, userId];
   
   db.get(checkSql, checkParams, (err, task) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -2125,6 +2134,10 @@ app.use('/api/batch', batchRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/game-issues', gameIssuesRouter);
 app.use('/api/equipment', equipmentRouter);
+app.use('/api/game-versions', gameVersionsRouter);
+app.use('/api/interlace-issues', interlaceIssuesRouter);
+app.use('/api/interlace-versions', interlaceVersionsRouter);
+app.use('/api/client-issues', clientIssuesRouter);
 
 // 定期清理过期session（每小时执行一次）
 setInterval(() => {
@@ -2140,5 +2153,10 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`服务器运行在 http://${HOST}:${PORT}`);
   console.log(`本机访问: http://localhost:${PORT}`);
-  console.log(`认证模式: ${auth.DEV_MODE ? '开发模式（免登录）' : '正式模式（需登录）'}`);
+  console.log(`认证模式: 智能模式`);
+  console.log(`  - localhost 本地访问 → 开发模式（免登录）`);
+  console.log(`  - 外网/远程访问 → 正式模式（需登录）`);
+  if (auth.DEV_MODE) {
+    console.log(`  - 强制开发模式已启用 (DEV_MODE=true)`);
+  }
 });

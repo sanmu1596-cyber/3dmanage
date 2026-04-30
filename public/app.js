@@ -521,6 +521,27 @@ async function loadTabData(tabId, switchId) {
             if (!allDevicesData || allDevicesData.length === 0) await loadDevices();
             await loadVersions();
             break;
+        case 'game-versions':
+            if (!allGamesForProgress || allGamesForProgress.length === 0) {
+                try {
+                    const gamesResp = await authFetch(`${API_BASE}/games`);
+                    const gamesResult = await gamesResp.json();
+                    allGamesForProgress = gamesResult.data || [];
+                } catch (e) { console.error('加载游戏数据失败:', e); }
+            }
+            await loadGameVersions();
+            break;
+        case 'interlace-issues':
+            await loadInterlaceVersions();
+            await loadInterlaceIssues();
+            break;
+        case 'interlace-versions':
+            await loadInterlaceVersions();
+            break;
+        case 'client-issues':
+            await loadVersions();
+            await loadClientIssues();
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -911,10 +932,10 @@ function renderGamesPage() {
 
             // 根据可见列配置生成单元格
             if (visibleColumns.name) {
-                rowHtml += `<td>${escapeHtml(game.name)}</td>`;
+                rowHtml += `<td class="cell-game-name">${escapeHtml(game.name)}</td>`;
             }
             if (visibleColumns.english_name) {
-                rowHtml += `<td>${escapeHtml(game.english_name || '-')}</td>`;
+                rowHtml += `<td class="cell-game-name">${escapeHtml(game.english_name || '-')}</td>`;
             }
             if (visibleColumns.platform) {
                 rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
@@ -926,7 +947,7 @@ function renderGamesPage() {
                 rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${escapeHtml(game.game_type || '-')}</td>`;
             }
             if (visibleColumns.description) {
-                rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
+                rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
             }
             if (visibleColumns.developer) {
                 rowHtml += `<td>${escapeHtml(game.developer || '-')}</td>`;
@@ -10423,6 +10444,833 @@ function showDangerConfirm(message, options = {}) {
 }
 
 console.log('✅ UX Enhancement 模块已加载');
+
+
+// ========== 游戏版本管理 ==========
+let allGameVersionsData = [];
+let gameVersionsReleasedData = [];
+let gameVersionsTestingData = [];
+let currentGameVersionSubTab = 'game-ver-released';
+
+function switchGameVersionTab(subTab) {
+    document.querySelectorAll('#game-versions .um-sub-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#game-versions .um-subtab-content').forEach(c => c.classList.remove('active'));
+    const btn = document.querySelector(`#game-versions .um-sub-tab[data-subtab="${subTab}"]`);
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById(subTab);
+    if (content) content.classList.add('active');
+    currentGameVersionSubTab = subTab;
+}
+
+async function loadGameVersions() {
+    try {
+        const response = await authFetch(`${API_BASE}/game-versions`);
+        const result = await response.json();
+        allGameVersionsData = result.data || result || [];
+        
+        gameVersionsReleasedData = allGameVersionsData.filter(v => v.status === 'released');
+        gameVersionsTestingData = allGameVersionsData.filter(v => v.status === 'testing');
+        
+        renderGameVersionsTable('released', gameVersionsReleasedData);
+        renderGameVersionsTable('testing', gameVersionsTestingData);
+        populateGameVersionGameFilters();
+    } catch (error) {
+        console.error('加载游戏版本数据失败:', error);
+        renderGameVersionsTable('released', []);
+        renderGameVersionsTable('testing', []);
+    }
+}
+
+function populateGameVersionGameFilters() {
+    const games = allGamesForProgress || [];
+    ['released', 'testing'].forEach(status => {
+        const sel = document.getElementById(`game-ver-${status}-game-filter`);
+        if (!sel) return;
+        const current = sel.value;
+        sel.innerHTML = '<option value="">全部游戏</option>' +
+            games.map(g => `<option value="${g.id}">${escapeHtml(g.name || g.game_name || '')}</option>`).join('');
+        sel.value = current;
+    });
+    const modalSel = document.getElementById('game-version-game');
+    if (modalSel) {
+        modalSel.innerHTML = '<option value="">请选择游戏</option>' +
+            games.map(g => `<option value="${g.id}">${escapeHtml(g.name || g.game_name || '')}</option>`).join('');
+    }
+}
+
+function renderGameVersionsTable(status, data) {
+    const tbodyId = status === 'released' ? 'game-ver-released-table' : 'game-ver-testing-table';
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    if (data && data.length > 0) {
+        tbody.innerHTML = data.map((v, index) => {
+            const actions = status === 'testing'
+                ? `<button class="action-icon-btn edit" onclick="editGameVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn" onclick="releaseGameVersion(${v.id}, '${escapeHtml(v.version_number)}')" title="发布" style="color:#52c41a">🚀</button>
+                   <button class="action-icon-btn delete" onclick="deleteGameVersion(${v.id})" title="删除">🗑️</button>`
+                : `<button class="action-icon-btn edit" onclick="editGameVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn delete" onclick="deleteGameVersion(${v.id})" title="删除">🗑️</button>`;
+            return `
+            <tr data-id="${v.id}">
+                <td class="text-center"><strong>${index + 1}</strong></td>
+                <td>${escapeHtml(v.game_name || '-')}</td>
+                <td><strong>${escapeHtml(v.version_number)}</strong></td>
+                <td>${escapeHtml(v.version_date || '-')}</td>
+                <td>${escapeHtml(v.updater_name || '-')}</td>
+                <td class="editable-cell" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
+                <td class="text-center action-icons">${actions}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        const emptyMsg = status === 'released' ? '还没有已发布的版本' : '还没有测试中的版本';
+        const emptyIcon = status === 'released' ? '🚀' : '🧪';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="empty-state">
+                    <div class="empty-icon">${emptyIcon}</div>
+                    <div class="empty-text">${emptyMsg}</div>
+                    <div class="empty-sub">点击上方按钮添加新版本</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openGameVersionModal('${status}')">➕ 添加版本</button>
+                    </div>
+                </td>
+            </tr>`;
+    }
+}
+
+function filterGameVersions(status) {
+    const searchInput = document.getElementById(`game-ver-${status}-search`);
+    const gameFilter = document.getElementById(`game-ver-${status}-game-filter`);
+    const keyword = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const gameId = gameFilter ? gameFilter.value : '';
+    
+    const source = status === 'released' ? gameVersionsReleasedData : gameVersionsTestingData;
+    const filtered = source.filter(v => {
+        if (keyword && !((v.version_number || '').toLowerCase().includes(keyword) ||
+                         (v.game_name || '').toLowerCase().includes(keyword))) return false;
+        if (gameId && String(v.game_id) !== gameId) return false;
+        return true;
+    });
+    renderGameVersionsTable(status, filtered);
+}
+
+function openGameVersionModal(targetStatus) {
+    document.getElementById('game-version-id').value = '';
+    document.getElementById('game-version-target-status').value = targetStatus || 'testing';
+    document.getElementById('game-version-modal-title').textContent = targetStatus === 'released' ? '新增已发布版本' : '新增测试版本';
+    document.getElementById('game-version-form').reset();
+    document.getElementById('game-version-date').value = new Date().toISOString().slice(0, 10);
+    populateGameVersionGameFilters();
+    openModal('game-version-modal');
+}
+
+async function editGameVersion(id) {
+    try {
+        const response = await authFetch(`${API_BASE}/game-versions/${id}`);
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            showToast('获取版本详情失败', 'error');
+            return;
+        }
+        const v = result.data;
+        document.getElementById('game-version-id').value = v.id;
+        document.getElementById('game-version-target-status').value = v.status;
+        document.getElementById('game-version-modal-title').textContent = '编辑游戏版本';
+        populateGameVersionGameFilters();
+        document.getElementById('game-version-game').value = v.game_id;
+        document.getElementById('game-version-number').value = v.version_number || '';
+        document.getElementById('game-version-date').value = v.version_date || '';
+        document.getElementById('game-version-changelog').value = v.changelog || '';
+        document.getElementById('game-version-notes').value = v.notes || '';
+        openModal('game-version-modal');
+    } catch (error) {
+        console.error('获取版本详情失败:', error);
+        showToast('获取版本详情失败', 'error');
+    }
+}
+
+async function submitGameVersionForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('game-version-id').value;
+    const targetStatus = document.getElementById('game-version-target-status').value;
+    const data = {
+        game_id: parseInt(document.getElementById('game-version-game').value),
+        version_number: document.getElementById('game-version-number').value.trim(),
+        status: targetStatus,
+        version_date: document.getElementById('game-version-date').value,
+        changelog: document.getElementById('game-version-changelog').value.trim(),
+        notes: document.getElementById('game-version-notes').value.trim()
+    };
+
+    if (!data.game_id || !data.version_number) {
+        showToast('请填写游戏和版本号', 'warning');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_BASE}/game-versions/${id}` : `${API_BASE}/game-versions`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await authFetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(id ? '更新成功' : '添加成功', 'success');
+            closeModal('game-version-modal');
+            await loadGameVersions();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存游戏版本失败:', error);
+        showToast('保存失败', 'error');
+    }
+}
+
+async function deleteGameVersion(id) {
+    if (!confirm('确定要删除这个版本吗？')) return;
+    try {
+        const response = await authFetch(`${API_BASE}/game-versions/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            await loadGameVersions();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除游戏版本失败:', error);
+        showToast('删除失败', 'error');
+    }
+}
+
+async function releaseGameVersion(id, versionNumber) {
+    if (!confirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`)) return;
+    try {
+        const response = await authFetch(`${API_BASE}/game-versions/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'released' })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('发布成功', 'success');
+            await loadGameVersions();
+        } else {
+            showToast(result.message || '发布失败', 'error');
+        }
+    } catch (error) {
+        console.error('发布游戏版本失败:', error);
+        showToast('发布失败', 'error');
+    }
+}
+
+
+// ========== 交织问题管理 ==========
+let allInterlaceIssuesData = [];
+
+async function loadInterlaceIssues() {
+    try {
+        const resp = await authFetch(`${API_BASE}/interlace-issues`);
+        const data = await resp.json();
+        allInterlaceIssuesData = data.data || data || [];
+        renderInterlaceIssuesTable(allInterlaceIssuesData);
+        updateInterlaceIssuesStats();
+    } catch (e) {
+        console.error('加载交织问题失败:', e);
+        renderInterlaceIssuesTable([]);
+    }
+}
+
+function renderInterlaceIssuesTable(data) {
+    const tbody = document.getElementById('interlace-issues-table');
+    if (!tbody) return;
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无交织问题数据</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = data.map((item, idx) => `
+        <tr data-id="${item.id}">
+            <td>${idx + 1}</td>
+            <td>${getIssueTypeBadge(item.issue_type)}</td>
+            <td>${getPriorityBadge(item.priority)}</td>
+            <td class="desc-cell" title="${escapeHtml(item.issue_desc || '')}">${escapeHtml(item.issue_desc || '-')}</td>
+            <td>${escapeHtml(item.version || '-')}</td>
+            <td>${escapeHtml(item.owner || '-')}</td>
+            <td>${getGameIssueStatusBadge(item.status)}</td>
+            <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
+            <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
+            <td>
+                <button class="action-btn" onclick="editInterlaceIssue(${item.id})" title="编辑">✏️</button>
+                <button class="action-btn action-btn-danger" onclick="deleteInterlaceIssue(${item.id})" title="删除">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateInterlaceIssuesStats() {
+    const statsItems = document.getElementById('interlace-issues-stats-items');
+    if (!statsItems) return;
+    
+    const total = allInterlaceIssuesData.length;
+    const pending = allInterlaceIssuesData.filter(i => i.status === '待处理').length;
+    const processing = allInterlaceIssuesData.filter(i => i.status === '处理中').length;
+    const resolved = allInterlaceIssuesData.filter(i => i.status === '已解决').length;
+    
+    statsItems.innerHTML = `
+        <span class="stat-item"><span class="stat-label">总数:</span><span class="stat-value">${total}</span></span>
+        <span class="stat-item"><span class="stat-label">待处理:</span><span class="stat-value" style="color:#ffc107">${pending}</span></span>
+        <span class="stat-item"><span class="stat-label">处理中:</span><span class="stat-value" style="color:#17a2b8">${processing}</span></span>
+        <span class="stat-item"><span class="stat-label">已解决:</span><span class="stat-value" style="color:#28a745">${resolved}</span></span>
+    `;
+}
+
+function filterInterlaceIssues() {
+    const search = (document.getElementById('interlace-issue-search')?.value || '').toLowerCase();
+    const status = document.getElementById('interlace-issue-status-filter')?.value || '';
+    const type = document.getElementById('interlace-issue-type-filter')?.value || '';
+    const priority = document.getElementById('interlace-issue-priority-filter')?.value || '';
+    
+    let filtered = allInterlaceIssuesData;
+    if (search) {
+        filtered = filtered.filter(i => 
+            (i.issue_desc || '').toLowerCase().includes(search) ||
+            (i.owner || '').toLowerCase().includes(search)
+        );
+    }
+    if (status) filtered = filtered.filter(i => i.status === status);
+    if (type) filtered = filtered.filter(i => i.issue_type === type);
+    if (priority) filtered = filtered.filter(i => i.priority === priority);
+    
+    renderInterlaceIssuesTable(filtered);
+}
+
+async function openInterlaceIssueModal(id = null) {
+    document.getElementById('interlace-issue-id').value = '';
+    document.getElementById('interlace-issue-form').reset();
+    document.getElementById('interlace-issue-modal-title').textContent = id ? '编辑交织问题' : '新增交织问题';
+    
+    // 填充负责人下拉框
+    if (!allMembersData || allMembersData.length === 0) {
+        try {
+            const membersResp = await authFetch(`${API_BASE}/members`);
+            const membersResult = await membersResp.json();
+            allMembersData = membersResult.data || membersResult || [];
+        } catch (e) { console.error('加载成员数据失败:', e); }
+    }
+    const ownerSelect = document.getElementById('interlace-issue-owner');
+    ownerSelect.innerHTML = '<option value="">选择负责人</option>';
+    if (allMembersData && allMembersData.length > 0) {
+        allMembersData.forEach(m => {
+            ownerSelect.innerHTML += `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`;
+        });
+    }
+    
+    // 填充版本下拉框
+    const versionSelect = document.getElementById('interlace-issue-version');
+    versionSelect.innerHTML = '<option value="">选择版本</option>';
+    if (allInterlaceVersionsData && allInterlaceVersionsData.length > 0) {
+        allInterlaceVersionsData.forEach(v => {
+            versionSelect.innerHTML += `<option value="${escapeHtml(v.version_number)}">${escapeHtml(v.version_number)}</option>`;
+        });
+    }
+    
+    openModal('interlace-issue-modal');
+}
+
+async function editInterlaceIssue(id) {
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-issues/${id}`);
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            showToast('获取问题详情失败', 'error');
+            return;
+        }
+        const item = result.data;
+        await openInterlaceIssueModal(id);
+        document.getElementById('interlace-issue-id').value = item.id;
+        document.getElementById('interlace-issue-type').value = item.issue_type || '';
+        document.getElementById('interlace-issue-version').value = item.version || '';
+        document.getElementById('interlace-issue-priority').value = item.priority || '';
+        document.getElementById('interlace-issue-owner').value = item.owner || '';
+        document.getElementById('interlace-issue-status').value = item.status || '待处理';
+        document.getElementById('interlace-issue-desc').value = item.issue_desc || '';
+        document.getElementById('interlace-issue-remarks').value = item.remarks || '';
+    } catch (error) {
+        console.error('获取问题详情失败:', error);
+        showToast('获取问题详情失败', 'error');
+    }
+}
+
+async function submitInterlaceIssueForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('interlace-issue-id').value;
+    const data = {
+        issue_type: document.getElementById('interlace-issue-type').value,
+        version: document.getElementById('interlace-issue-version').value,
+        priority: document.getElementById('interlace-issue-priority').value,
+        owner: document.getElementById('interlace-issue-owner').value,
+        status: document.getElementById('interlace-issue-status').value,
+        issue_desc: document.getElementById('interlace-issue-desc').value.trim(),
+        remarks: document.getElementById('interlace-issue-remarks').value.trim()
+    };
+
+    if (!data.issue_type || !data.owner || !data.issue_desc) {
+        showToast('请填写必填字段', 'warning');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_BASE}/interlace-issues/${id}` : `${API_BASE}/interlace-issues`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await authFetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(id ? '更新成功' : '添加成功', 'success');
+            closeModal('interlace-issue-modal');
+            await loadInterlaceIssues();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存交织问题失败:', error);
+        showToast('保存失败', 'error');
+    }
+}
+
+async function deleteInterlaceIssue(id) {
+    if (!confirm('确定要删除这条问题记录吗？')) return;
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-issues/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            await loadInterlaceIssues();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除交织问题失败:', error);
+        showToast('删除失败', 'error');
+    }
+}
+
+
+// ========== 交织版本管理 ==========
+let allInterlaceVersionsData = [];
+let interlaceVersionsReleasedData = [];
+let interlaceVersionsTestingData = [];
+let currentInterlaceVersionSubTab = 'interlace-ver-released';
+
+function switchInterlaceVersionTab(subTab) {
+    document.querySelectorAll('#interlace-versions .um-sub-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#interlace-versions .um-subtab-content').forEach(c => c.classList.remove('active'));
+    const btn = document.querySelector(`#interlace-versions .um-sub-tab[data-subtab="${subTab}"]`);
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById(subTab);
+    if (content) content.classList.add('active');
+    currentInterlaceVersionSubTab = subTab;
+}
+
+async function loadInterlaceVersions() {
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-versions`);
+        const result = await response.json();
+        allInterlaceVersionsData = result.data || result || [];
+        
+        interlaceVersionsReleasedData = allInterlaceVersionsData.filter(v => v.status === 'released');
+        interlaceVersionsTestingData = allInterlaceVersionsData.filter(v => v.status === 'testing');
+        
+        renderInterlaceVersionsTable('released', interlaceVersionsReleasedData);
+        renderInterlaceVersionsTable('testing', interlaceVersionsTestingData);
+    } catch (error) {
+        console.error('加载交织版本数据失败:', error);
+        renderInterlaceVersionsTable('released', []);
+        renderInterlaceVersionsTable('testing', []);
+    }
+}
+
+function renderInterlaceVersionsTable(status, data) {
+    const tbodyId = status === 'released' ? 'interlace-ver-released-table' : 'interlace-ver-testing-table';
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    if (data && data.length > 0) {
+        tbody.innerHTML = data.map((v, index) => {
+            const actions = status === 'testing'
+                ? `<button class="action-icon-btn edit" onclick="editInterlaceVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn" onclick="releaseInterlaceVersion(${v.id}, '${escapeHtml(v.version_number)}')" title="发布" style="color:#52c41a">🚀</button>
+                   <button class="action-icon-btn delete" onclick="deleteInterlaceVersion(${v.id})" title="删除">🗑️</button>`
+                : `<button class="action-icon-btn edit" onclick="editInterlaceVersion(${v.id})" title="编辑">✏️</button>
+                   <button class="action-icon-btn delete" onclick="deleteInterlaceVersion(${v.id})" title="删除">🗑️</button>`;
+            return `
+            <tr data-id="${v.id}">
+                <td class="text-center"><strong>${index + 1}</strong></td>
+                <td><strong>${escapeHtml(v.version_number)}</strong></td>
+                <td>${escapeHtml(v.version_date || '-')}</td>
+                <td>${escapeHtml(v.updater_name || '-')}</td>
+                <td class="editable-cell" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
+                <td class="text-center action-icons">${actions}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        const emptyMsg = status === 'released' ? '还没有已发布的版本' : '还没有测试中的版本';
+        const emptyIcon = status === 'released' ? '🚀' : '🧪';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-state">
+                    <div class="empty-icon">${emptyIcon}</div>
+                    <div class="empty-text">${emptyMsg}</div>
+                    <div class="empty-sub">点击上方按钮添加新版本</div>
+                    <div class="empty-action">
+                        <button class="btn btn-primary" onclick="openInterlaceVersionModal('${status}')">➕ 添加版本</button>
+                    </div>
+                </td>
+            </tr>`;
+    }
+}
+
+function filterInterlaceVersions(status) {
+    const searchInput = document.getElementById(`interlace-ver-${status}-search`);
+    const keyword = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    
+    const source = status === 'released' ? interlaceVersionsReleasedData : interlaceVersionsTestingData;
+    const filtered = source.filter(v => {
+        if (keyword && !(v.version_number || '').toLowerCase().includes(keyword)) return false;
+        return true;
+    });
+    renderInterlaceVersionsTable(status, filtered);
+}
+
+function openInterlaceVersionModal(targetStatus) {
+    document.getElementById('interlace-version-id').value = '';
+    document.getElementById('interlace-version-target-status').value = targetStatus || 'testing';
+    document.getElementById('interlace-version-modal-title').textContent = targetStatus === 'released' ? '新增已发布版本' : '新增测试版本';
+    document.getElementById('interlace-version-form').reset();
+    document.getElementById('interlace-version-date').value = new Date().toISOString().slice(0, 10);
+    openModal('interlace-version-modal');
+}
+
+async function editInterlaceVersion(id) {
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-versions/${id}`);
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            showToast('获取版本详情失败', 'error');
+            return;
+        }
+        const v = result.data;
+        document.getElementById('interlace-version-id').value = v.id;
+        document.getElementById('interlace-version-target-status').value = v.status;
+        document.getElementById('interlace-version-modal-title').textContent = '编辑交织版本';
+        document.getElementById('interlace-version-number').value = v.version_number || '';
+        document.getElementById('interlace-version-date').value = v.version_date || '';
+        document.getElementById('interlace-version-changelog').value = v.changelog || '';
+        document.getElementById('interlace-version-notes').value = v.notes || '';
+        openModal('interlace-version-modal');
+    } catch (error) {
+        console.error('获取版本详情失败:', error);
+        showToast('获取版本详情失败', 'error');
+    }
+}
+
+async function submitInterlaceVersionForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('interlace-version-id').value;
+    const targetStatus = document.getElementById('interlace-version-target-status').value;
+    const data = {
+        version_number: document.getElementById('interlace-version-number').value.trim(),
+        status: targetStatus,
+        version_date: document.getElementById('interlace-version-date').value,
+        changelog: document.getElementById('interlace-version-changelog').value.trim(),
+        notes: document.getElementById('interlace-version-notes').value.trim()
+    };
+
+    if (!data.version_number) {
+        showToast('请填写版本号', 'warning');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_BASE}/interlace-versions/${id}` : `${API_BASE}/interlace-versions`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await authFetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(id ? '更新成功' : '添加成功', 'success');
+            closeModal('interlace-version-modal');
+            await loadInterlaceVersions();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存交织版本失败:', error);
+        showToast('保存失败', 'error');
+    }
+}
+
+async function deleteInterlaceVersion(id) {
+    if (!confirm('确定要删除这个版本吗？')) return;
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-versions/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            await loadInterlaceVersions();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除交织版本失败:', error);
+        showToast('删除失败', 'error');
+    }
+}
+
+async function releaseInterlaceVersion(id, versionNumber) {
+    if (!confirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`)) return;
+    try {
+        const response = await authFetch(`${API_BASE}/interlace-versions/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'released' })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('发布成功', 'success');
+            await loadInterlaceVersions();
+        } else {
+            showToast(result.message || '发布失败', 'error');
+        }
+    } catch (error) {
+        console.error('发布交织版本失败:', error);
+        showToast('发布失败', 'error');
+    }
+}
+
+
+// ========== 客户端问题管理 ==========
+let allClientIssuesData = [];
+
+async function loadClientIssues() {
+    try {
+        const resp = await authFetch(`${API_BASE}/client-issues`);
+        const data = await resp.json();
+        allClientIssuesData = data.data || data || [];
+        renderClientIssuesTable(allClientIssuesData);
+        updateClientIssuesStats();
+    } catch (e) {
+        console.error('加载客户端问题失败:', e);
+        renderClientIssuesTable([]);
+    }
+}
+
+function renderClientIssuesTable(data) {
+    const tbody = document.getElementById('client-issues-table');
+    if (!tbody) return;
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无客户端问题数据</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = data.map((item, idx) => `
+        <tr data-id="${item.id}">
+            <td>${idx + 1}</td>
+            <td>${getClientIssueTypeBadge(item.issue_type)}</td>
+            <td>${getPriorityBadge(item.priority)}</td>
+            <td class="desc-cell" title="${escapeHtml(item.issue_desc || '')}">${escapeHtml(item.issue_desc || '-')}</td>
+            <td>${escapeHtml(item.version || '-')}</td>
+            <td>${escapeHtml(item.owner || '-')}</td>
+            <td>${getGameIssueStatusBadge(item.status)}</td>
+            <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
+            <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
+            <td>
+                <button class="action-btn" onclick="editClientIssue(${item.id})" title="编辑">✏️</button>
+                <button class="action-btn action-btn-danger" onclick="deleteClientIssue(${item.id})" title="删除">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getClientIssueTypeBadge(type) {
+    const colors = {
+        '界面问题': '#17a2b8',
+        '功能异常': '#ffc107',
+        '性能问题': '#6f42c1',
+        '崩溃闪退': '#dc3545',
+        '其他': '#6c757d'
+    };
+    if (!type) return '<span class="badge" style="background:#6c757d">-</span>';
+    return `<span class="badge" style="background:${colors[type] || '#6c757d'}">${escapeHtml(type)}</span>`;
+}
+
+function updateClientIssuesStats() {
+    const statsItems = document.getElementById('client-issues-stats-items');
+    if (!statsItems) return;
+    
+    const total = allClientIssuesData.length;
+    const pending = allClientIssuesData.filter(i => i.status === '待处理').length;
+    const processing = allClientIssuesData.filter(i => i.status === '处理中').length;
+    const resolved = allClientIssuesData.filter(i => i.status === '已解决').length;
+    
+    statsItems.innerHTML = `
+        <span class="stat-item"><span class="stat-label">总数:</span><span class="stat-value">${total}</span></span>
+        <span class="stat-item"><span class="stat-label">待处理:</span><span class="stat-value" style="color:#ffc107">${pending}</span></span>
+        <span class="stat-item"><span class="stat-label">处理中:</span><span class="stat-value" style="color:#17a2b8">${processing}</span></span>
+        <span class="stat-item"><span class="stat-label">已解决:</span><span class="stat-value" style="color:#28a745">${resolved}</span></span>
+    `;
+}
+
+function filterClientIssues() {
+    const search = (document.getElementById('client-issue-search')?.value || '').toLowerCase();
+    const status = document.getElementById('client-issue-status-filter')?.value || '';
+    const type = document.getElementById('client-issue-type-filter')?.value || '';
+    const priority = document.getElementById('client-issue-priority-filter')?.value || '';
+    
+    let filtered = allClientIssuesData;
+    if (search) {
+        filtered = filtered.filter(i => 
+            (i.issue_desc || '').toLowerCase().includes(search) ||
+            (i.owner || '').toLowerCase().includes(search)
+        );
+    }
+    if (status) filtered = filtered.filter(i => i.status === status);
+    if (type) filtered = filtered.filter(i => i.issue_type === type);
+    if (priority) filtered = filtered.filter(i => i.priority === priority);
+    
+    renderClientIssuesTable(filtered);
+}
+
+async function openClientIssueModal(id = null) {
+    document.getElementById('client-issue-id').value = '';
+    document.getElementById('client-issue-form').reset();
+    document.getElementById('client-issue-modal-title').textContent = id ? '编辑客户端问题' : '新增客户端问题';
+    
+    // 填充负责人下拉框
+    if (!allMembersData || allMembersData.length === 0) {
+        try {
+            const membersResp = await authFetch(`${API_BASE}/members`);
+            const membersResult = await membersResp.json();
+            allMembersData = membersResult.data || membersResult || [];
+        } catch (e) { console.error('加载成员数据失败:', e); }
+    }
+    const ownerSelect = document.getElementById('client-issue-owner');
+    ownerSelect.innerHTML = '<option value="">选择负责人</option>';
+    if (allMembersData && allMembersData.length > 0) {
+        allMembersData.forEach(m => {
+            ownerSelect.innerHTML += `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`;
+        });
+    }
+    
+    // 填充版本下拉框（使用客户端版本）
+    const versionSelect = document.getElementById('client-issue-version');
+    versionSelect.innerHTML = '<option value="">选择版本</option>';
+    if (allVersionsData && allVersionsData.length > 0) {
+        allVersionsData.forEach(v => {
+            versionSelect.innerHTML += `<option value="${escapeHtml(v.version_number)}">${escapeHtml(v.version_number)}</option>`;
+        });
+    }
+    
+    openModal('client-issue-modal');
+}
+
+async function editClientIssue(id) {
+    try {
+        const response = await authFetch(`${API_BASE}/client-issues/${id}`);
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            showToast('获取问题详情失败', 'error');
+            return;
+        }
+        const item = result.data;
+        await openClientIssueModal(id);
+        document.getElementById('client-issue-id').value = item.id;
+        document.getElementById('client-issue-type').value = item.issue_type || '';
+        document.getElementById('client-issue-version').value = item.version || '';
+        document.getElementById('client-issue-priority').value = item.priority || '';
+        document.getElementById('client-issue-owner').value = item.owner || '';
+        document.getElementById('client-issue-status').value = item.status || '待处理';
+        document.getElementById('client-issue-desc').value = item.issue_desc || '';
+        document.getElementById('client-issue-remarks').value = item.remarks || '';
+    } catch (error) {
+        console.error('获取问题详情失败:', error);
+        showToast('获取问题详情失败', 'error');
+    }
+}
+
+async function submitClientIssueForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('client-issue-id').value;
+    const data = {
+        issue_type: document.getElementById('client-issue-type').value,
+        version: document.getElementById('client-issue-version').value,
+        priority: document.getElementById('client-issue-priority').value,
+        owner: document.getElementById('client-issue-owner').value,
+        status: document.getElementById('client-issue-status').value,
+        issue_desc: document.getElementById('client-issue-desc').value.trim(),
+        remarks: document.getElementById('client-issue-remarks').value.trim()
+    };
+
+    if (!data.issue_type || !data.owner || !data.issue_desc) {
+        showToast('请填写必填字段', 'warning');
+        return;
+    }
+
+    try {
+        const url = id ? `${API_BASE}/client-issues/${id}` : `${API_BASE}/client-issues`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await authFetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(id ? '更新成功' : '添加成功', 'success');
+            closeModal('client-issue-modal');
+            await loadClientIssues();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存客户端问题失败:', error);
+        showToast('保存失败', 'error');
+    }
+}
+
+async function deleteClientIssue(id) {
+    if (!confirm('确定要删除这条问题记录吗？')) return;
+    try {
+        const response = await authFetch(`${API_BASE}/client-issues/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            await loadClientIssues();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除客户端问题失败:', error);
+        showToast('删除失败', 'error');
+    }
+}
+
+console.log('✅ 新模块（游戏版本、交织问题、交织版本、客户端问题）已加载');
 
 
 
