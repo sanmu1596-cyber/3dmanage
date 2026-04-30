@@ -480,6 +480,9 @@ async function loadTabData(tabId, switchId) {
         case 'bugs':
             await loadBugs();
             break;
+        case 'game-issues':
+            await loadGameIssues();
+            break;
         case 'config-plan':
             // 配置计划需要设备和游戏数据（穿梭框选择用）
             if (!allDevicesData || allDevicesData.length === 0) await loadDevices();
@@ -2033,10 +2036,12 @@ function closeModal(modalId) {
     resetForm(modalId.replace('-modal', '-form'));
 }
 
-// 点击模态框外部关闭
+// 点击模态框外部关闭 - 已禁用自动关闭功能
+// 用户必须点击关闭按钮或取消按钮来关闭模态框，防止误触
+// 如果需要恢复点击背景关闭功能，取消下面的注释
+/*
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
-        // 尝试获取 modal id 以正确重置表单
         const modalId = event.target.id;
         if (modalId) {
             closeModal(modalId);
@@ -2045,6 +2050,7 @@ window.onclick = function(event) {
         }
     }
 }
+*/
 
 // 重置表单
 function resetForm(formId) {
@@ -5880,6 +5886,11 @@ function gsNavigate(type, id) {
 // ==================== P1: 键盘快捷键系统 ====================
 
 document.addEventListener('keydown', function(e) {
+    // 忽略单独的修饰键（Shift、Ctrl、Alt、Meta）
+    if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(e.key)) {
+        return;
+    }
+    
     const overlay = document.getElementById('global-search-overlay');
     const isSearchOpen = overlay && overlay.style.display !== 'none';
     const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
@@ -5920,8 +5931,18 @@ document.addEventListener('keydown', function(e) {
         return; // 搜索面板打开时不响应其他快捷键
     }
 
-    // Escape: 关闭当前弹窗
+    // Escape: 关闭当前弹窗（但如果焦点在输入框内，先让输入框处理）
     if (e.key === 'Escape') {
+        const activeEl = document.activeElement;
+        const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+        
+        // 如果在输入框内，先让输入框失去焦点而不是直接关闭弹窗
+        if (isInInput && activeEl.closest('.modal')) {
+            activeEl.blur();
+            e.preventDefault();
+            return;
+        }
+        
         const openModal = document.querySelector('.modal[style*="flex"], .modal[style*="block"]');
         if (openModal) {
             e.preventDefault();
@@ -9941,9 +9962,467 @@ async function startVersionInlineEdit(cell, id, field) {
     });
 }
 
+// ==========================
+// ======= 游戏问题管理 =======
+// ==========================
 
+let allGameIssuesData = [];
 
+async function loadGameIssues() {
+    try {
+        const resp = await authFetch(`${API_BASE}/game-issues`);
+        const data = await resp.json();
+        allGameIssuesData = data || [];
+        renderGameIssuesTable(allGameIssuesData);
+        updateGameIssuesStats();
+    } catch (e) {
+        console.error('加载游戏问题失败:', e);
+        showToast('加载游戏问题失败', 'error');
+    }
+}
 
+function renderGameIssuesTable(data) {
+    const tbody = document.getElementById('game-issues-table');
+    if (!tbody) return;
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无游戏问题数据</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = data.map((item, idx) => `
+        <tr data-id="${item.id}">
+            <td>${idx + 1}</td>
+            <td>${escapeHtml(item.game_name || '-')}</td>
+            <td>${getIssueTypeBadge(item.issue_type)}</td>
+            <td>${getPriorityBadge(item.priority)}</td>
+            <td class="desc-cell" title="${escapeHtml(item.issue_desc || '')}">${escapeHtml(item.issue_desc || '-')}</td>
+            <td>${escapeHtml(item.owner || '-')}</td>
+            <td>${getGameIssueStatusBadge(item.status)}</td>
+            <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
+            <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
+            <td>
+                <button class="action-btn" onclick="editGameIssue(${item.id})" title="编辑">✏️</button>
+                <button class="action-btn action-btn-danger" onclick="deleteGameIssue(${item.id})" title="删除">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getIssueTypeBadge(type) {
+    const colors = {
+        '画面问题': '#17a2b8',
+        '性能问题': '#ffc107',
+        '适配问题': '#6f42c1',
+        '崩溃闪退': '#dc3545',
+        '其他': '#6c757d'
+    };
+    if (!type) return '<span class="badge" style="background:#6c757d">-</span>';
+    return `<span class="badge" style="background:${colors[type] || '#6c757d'}">${escapeHtml(type)}</span>`;
+}
+
+function getPriorityBadge(priority) {
+    const colors = { '高': '#dc3545', '中': '#ffc107', '低': '#28a745' };
+    if (!priority) return '<span class="badge" style="background:#6c757d">-</span>';
+    return `<span class="badge" style="background:${colors[priority] || '#6c757d'}">${priority}</span>`;
+}
+
+function getGameIssueStatusBadge(status) {
+    const colors = {
+        '待处理': '#ffc107',
+        '处理中': '#17a2b8',
+        '已解决': '#28a745',
+        '已关闭': '#6c757d'
+    };
+    if (!status) return '<span class="badge" style="background:#ffc107">待处理</span>';
+    return `<span class="badge" style="background:${colors[status] || '#6c757d'}">${escapeHtml(status)}</span>`;
+}
+
+function updateGameIssuesStats() {
+    const statsItems = document.getElementById('gi-stats-items');
+    if (!statsItems) return;
+    
+    const total = allGameIssuesData.length;
+    const pending = allGameIssuesData.filter(i => i.status === '待处理').length;
+    const processing = allGameIssuesData.filter(i => i.status === '处理中').length;
+    const resolved = allGameIssuesData.filter(i => i.status === '已解决').length;
+    
+    statsItems.innerHTML = `
+        <span class="stat-item"><span class="stat-label">总数:</span><span class="stat-value">${total}</span></span>
+        <span class="stat-item"><span class="stat-label">待处理:</span><span class="stat-value" style="color:#ffc107">${pending}</span></span>
+        <span class="stat-item"><span class="stat-label">处理中:</span><span class="stat-value" style="color:#17a2b8">${processing}</span></span>
+        <span class="stat-item"><span class="stat-label">已解决:</span><span class="stat-value" style="color:#28a745">${resolved}</span></span>
+    `;
+}
+
+function filterGameIssues() {
+    const search = (document.getElementById('gi-search')?.value || '').toLowerCase();
+    const status = document.getElementById('gi-status-filter')?.value || '';
+    const type = document.getElementById('gi-type-filter')?.value || '';
+    const priority = document.getElementById('gi-priority-filter')?.value || '';
+    
+    let filtered = allGameIssuesData;
+    if (search) {
+        filtered = filtered.filter(i => 
+            (i.game_name || '').toLowerCase().includes(search) ||
+            (i.issue_desc || '').toLowerCase().includes(search) ||
+            (i.owner || '').toLowerCase().includes(search)
+        );
+    }
+    if (status) filtered = filtered.filter(i => i.status === status);
+    if (type) filtered = filtered.filter(i => i.issue_type === type);
+    if (priority) filtered = filtered.filter(i => i.priority === priority);
+    
+    renderGameIssuesTable(filtered);
+}
+
+async function openGameIssueModal(id = null) {
+    document.getElementById('gi-id').value = '';
+    document.getElementById('game-issue-form').reset();
+    document.getElementById('game-issue-modal-title').textContent = id ? '编辑游戏问题' : '新增游戏问题';
+    
+    // 确保游戏和成员数据已加载
+    if (!allGamesForProgress || allGamesForProgress.length === 0) {
+        try {
+            const gamesResp = await authFetch(`${API_BASE}/games`);
+            const gamesResult = await gamesResp.json();
+            allGamesForProgress = gamesResult.data || [];
+        } catch (e) { console.error('加载游戏数据失败:', e); }
+    }
+    if (!allMembersData || allMembersData.length === 0) {
+        try {
+            const membersResp = await authFetch(`${API_BASE}/members`);
+            const membersResult = await membersResp.json();
+            allMembersData = membersResult.data || membersResult || [];
+        } catch (e) { console.error('加载成员数据失败:', e); }
+    }
+    
+    // 填充游戏下拉框
+    const gameSelect = document.getElementById('gi-game-name');
+    gameSelect.innerHTML = '<option value="">选择游戏</option>';
+    if (allGamesForProgress && allGamesForProgress.length > 0) {
+        allGamesForProgress.forEach(g => {
+            const gameName = g.name || g.game_name || '';
+            gameSelect.innerHTML += `<option value="${escapeHtml(gameName)}">${escapeHtml(gameName)}</option>`;
+        });
+    }
+    
+    // 填充负责人下拉框
+    const ownerSelect = document.getElementById('gi-owner');
+    ownerSelect.innerHTML = '<option value="">选择负责人</option>';
+    if (allMembersData && allMembersData.length > 0) {
+        allMembersData.forEach(m => {
+            ownerSelect.innerHTML += `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`;
+        });
+    }
+    
+    openModal('game-issue-modal');
+}
+
+async function editGameIssue(id) {
+    const item = allGameIssuesData.find(i => i.id === id);
+    if (!item) return;
+    
+    await openGameIssueModal(id);
+    
+    document.getElementById('gi-id').value = item.id;
+    document.getElementById('gi-game-name').value = item.game_name || '';
+    document.getElementById('gi-issue-type').value = item.issue_type || '';
+    document.getElementById('gi-priority').value = item.priority || '';
+    document.getElementById('gi-owner').value = item.owner || '';
+    document.getElementById('gi-status').value = item.status || '待处理';
+    document.getElementById('gi-issue-desc').value = item.issue_desc || '';
+    document.getElementById('gi-remarks').value = item.remarks || '';
+}
+
+async function submitGameIssueForm(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('gi-id').value;
+    const data = {
+        game_name: document.getElementById('gi-game-name').value,
+        issue_type: document.getElementById('gi-issue-type').value,
+        priority: document.getElementById('gi-priority').value,
+        owner: document.getElementById('gi-owner').value,
+        status: document.getElementById('gi-status').value,
+        issue_desc: document.getElementById('gi-issue-desc').value,
+        remarks: document.getElementById('gi-remarks').value
+    };
+    
+    try {
+        const url = id ? `${API_BASE}/game-issues/${id}` : `${API_BASE}/game-issues`;
+        const method = id ? 'PUT' : 'POST';
+        const resp = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.success || result.id) {
+            showToast(id ? '更新成功' : '创建成功', 'success');
+            closeModal('game-issue-modal');
+            await loadGameIssues();
+        } else {
+            showToast(result.error || '操作失败', 'error');
+        }
+    } catch (e) {
+        console.error('保存游戏问题失败:', e);
+        showToast('保存失败', 'error');
+    }
+}
+
+async function deleteGameIssue(id) {
+    if (!confirm('确定要删除这条游戏问题吗？')) return;
+    try {
+        const resp = await authFetch(`${API_BASE}/game-issues/${id}`, { method: 'DELETE' });
+        const result = await resp.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            await loadGameIssues();
+        } else {
+            showToast(result.error || '删除失败', 'error');
+        }
+    } catch (e) {
+        showToast('删除失败', 'error');
+    }
+}
+
+// ========== 易用性增强功能 (UX Enhancement) ==========
+
+/**
+ * 显示骨架屏加载状态
+ * @param {string} tableId - 表格 tbody 的 ID
+ * @param {number} rows - 骨架屏行数
+ * @param {number} cols - 骨架屏列数
+ */
+function showTableSkeleton(tableId, rows = 5, cols = 6) {
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+    
+    let html = '';
+    for (let i = 0; i < rows; i++) {
+        html += '<tr class="skeleton-row">';
+        for (let j = 0; j < cols; j++) {
+            const widthClass = j === 0 ? 'short' : (j === cols - 1 ? 'short' : (j === 1 ? 'long' : 'medium'));
+            html += `<td><div class="skeleton skeleton-cell ${widthClass}"></div></td>`;
+        }
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+/**
+ * 按钮加载状态切换
+ * @param {HTMLElement|string} btn - 按钮元素或选择器
+ * @param {boolean} loading - 是否加载中
+ * @param {string} loadingText - 加载中显示的文本（可选）
+ */
+function setButtonLoading(btn, loading, loadingText = '') {
+    const button = typeof btn === 'string' ? document.querySelector(btn) : btn;
+    if (!button) return;
+    
+    if (loading) {
+        button.classList.add('loading');
+        button.disabled = true;
+        if (loadingText) {
+            button.dataset.originalText = button.textContent;
+            button.textContent = loadingText;
+        }
+    } else {
+        button.classList.remove('loading');
+        button.disabled = false;
+        if (button.dataset.originalText) {
+            button.textContent = button.dataset.originalText;
+            delete button.dataset.originalText;
+        }
+    }
+}
+
+/**
+ * 表单验证错误高亮
+ * @param {HTMLElement} input - 输入框元素
+ * @param {string} message - 错误信息
+ */
+function showFieldError(input, message) {
+    input.classList.add('error');
+    
+    // 移除已有的错误信息
+    const existingError = input.parentElement.querySelector('.form-error-message');
+    if (existingError) existingError.remove();
+    
+    // 添加错误信息
+    const errorEl = document.createElement('div');
+    errorEl.className = 'form-error-message';
+    errorEl.textContent = message;
+    input.parentElement.appendChild(errorEl);
+    
+    // 聚焦到错误字段
+    input.focus();
+    
+    // 输入时自动清除错误状态
+    const clearError = () => {
+        input.classList.remove('error');
+        const err = input.parentElement.querySelector('.form-error-message');
+        if (err) err.remove();
+        input.removeEventListener('input', clearError);
+    };
+    input.addEventListener('input', clearError);
+}
+
+/**
+ * 清除表单所有错误状态
+ * @param {HTMLElement} form - 表单元素
+ */
+function clearFormErrors(form) {
+    form.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+    form.querySelectorAll('.form-error-message').forEach(el => el.remove());
+}
+
+/**
+ * 行操作成功闪烁效果
+ * @param {HTMLElement} row - 表格行元素
+ */
+function flashRowSuccess(row) {
+    row.classList.add('success-flash');
+    setTimeout(() => row.classList.remove('success-flash'), 600);
+}
+
+/**
+ * 显示批量操作进度
+ * @param {number} current - 当前进度
+ * @param {number} total - 总数
+ */
+function showBatchProgress(current, total) {
+    let progressBar = document.querySelector('.batch-progress');
+    if (!progressBar) {
+        progressBar = document.createElement('div');
+        progressBar.className = 'batch-progress';
+        progressBar.innerHTML = '<div class="batch-progress-bar"></div>';
+        document.body.appendChild(progressBar);
+    }
+    
+    const bar = progressBar.querySelector('.batch-progress-bar');
+    const percent = (current / total) * 100;
+    bar.style.width = percent + '%';
+    
+    if (current >= total) {
+        setTimeout(() => {
+            progressBar.remove();
+        }, 500);
+    }
+}
+
+/**
+ * 键盘快捷键支持
+ */
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + K: 快速搜索
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            const searchInput = document.querySelector('.search-input:visible, .filter-input:visible, input[type="search"]');
+            if (searchInput) searchInput.focus();
+        }
+        
+        // Escape: 关闭模态框
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.modal.show, .modal[style*="display: flex"], .modal[style*="display: block"]');
+            if (openModal) {
+                const closeBtn = openModal.querySelector('.modal-close, .close-btn, [onclick*="closeModal"]');
+                if (closeBtn) closeBtn.click();
+            }
+        }
+        
+        // Ctrl/Cmd + S: 保存（如果有打开的表单）
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            const openModal = document.querySelector('.modal.show, .modal[style*="display: flex"]');
+            if (openModal) {
+                e.preventDefault();
+                const saveBtn = openModal.querySelector('.btn-primary, [type="submit"]');
+                if (saveBtn) saveBtn.click();
+            }
+        }
+    });
+}
+
+// 页面加载后初始化键盘快捷键
+document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
+
+/**
+ * 记住用户的筛选偏好
+ * @param {string} module - 模块名
+ * @param {object} filters - 筛选条件
+ */
+function saveFilterPreference(module, filters) {
+    try {
+        const key = `filter_pref_${module}`;
+        localStorage.setItem(key, JSON.stringify(filters));
+    } catch (e) {
+        // QuotaExceeded 或其他错误，忽略
+    }
+}
+
+/**
+ * 获取用户的筛选偏好
+ * @param {string} module - 模块名
+ * @returns {object|null} 筛选条件
+ */
+function getFilterPreference(module) {
+    try {
+        const key = `filter_pref_${module}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * 增强版确认弹窗（支持危险操作样式）
+ * @param {string} message - 确认信息
+ * @param {object} options - 配置选项
+ */
+function showDangerConfirm(message, options = {}) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
+        
+        const box = document.createElement('div');
+        box.className = 'confirm-dialog-danger';
+        box.style.cssText = 'background:var(--bg-card);border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3);';
+        
+        const title = options.title || '确认操作';
+        const confirmText = options.confirmText || '确定删除';
+        const cancelText = options.cancelText || '取消';
+        
+        box.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <span style="font-size:24px;">⚠️</span>
+                <span style="font-size:16px;font-weight:600;color:var(--text-primary);">${escapeHtml(title)}</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px;">${escapeHtml(message)}</div>
+            <div style="display:flex;justify-content:flex-end;gap:12px;">
+                <button class="btn confirm-cancel-btn">${escapeHtml(cancelText)}</button>
+                <button class="btn confirm-ok-btn" style="background:var(--danger);color:#fff;border-color:var(--danger);">${escapeHtml(confirmText)}</button>
+            </div>
+        `;
+        
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        
+        const close = (result) => {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 200);
+            resolve(result);
+        };
+        
+        box.querySelector('.confirm-cancel-btn').onclick = () => close(false);
+        box.querySelector('.confirm-ok-btn').onclick = () => close(true);
+        overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+    });
+}
+
+console.log('✅ UX Enhancement 模块已加载');
 
 
 

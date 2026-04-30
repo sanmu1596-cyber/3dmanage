@@ -211,13 +211,16 @@ devicesRouter.put('/:id', auth.checkPermission('devices', 'edit'), (req, res) =>
                                  completed_adaptations = ?, total_games = ?, status = ?, assigned_to = ?,
                                  updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
+  console.log('[PUT /devices/:id] 请求数据:', req.body);
   db.run(sql, [manufacturer, device_type, name, requirements, quantity, keeper,
                notes, adapter_completion_rate, total_bugs, completed_adaptations,
                total_games, status, assigned_to, req.params.id], function(err) {
     if (err) {
+      console.error('[PUT /devices/:id] 数据库错误:', err.message);
       res.status(500).json({ error: err.message });
       return;
     }
+    console.log('[PUT /devices/:id] 更新成功, ID:', req.params.id);
     res.json({ success: true });
   });
 });

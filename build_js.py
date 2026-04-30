@@ -1,25 +1,20 @@
-// ==================== 游戏问题模块（旧版，已迁移到 app.js）====================
-// isAdmin 函数：判断当前用户是否为管理员
-function isAdmin() {
-    try {
-        const u = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        return u && (u.role === '超级管理员' || u.role_id === 1 || u.username === 'admin');
-    } catch(e) { return false; }
-}
-window.isAdmin = isAdmin;
+import os
 
+output = []
+
+# ==================== 游戏问题模块 ====================
+output.append("""// ==================== 游戏问题模块 ====================
 let gameIssuesData = [];
 let gameIssuesPage = 1;
 const gameIssuesPageSize = 20;
 
-// 旧版函数已废弃，游戏问题模块现由 app.js 中的 loadGameIssues 处理
-async function loadGameIssues_OLD() {
+async function loadGameIssues() {
     const res = await authFetch('/api/game-issues');
     gameIssuesData = await res.json();
-    renderGameIssuesPage_OLD();
+    renderGameIssuesPage();
 }
 
-function renderGameIssuesPage_OLD() {
+function renderGameIssuesPage() {
     const q = (document.getElementById('gi-search')?.value || '').toLowerCase();
     const statusFilter = document.getElementById('gi-filter-status')?.value || '';
     const typeFilter = document.getElementById('gi-filter-type')?.value || '';
@@ -73,15 +68,16 @@ function renderGameIssuesPage_OLD() {
         '</div>';
     document.getElementById('content').innerHTML = html;
 }
+""")
 
-function showGameIssueModal(issueId) {
+output.append("""function showGameIssueModal(issueId) {
     const isEdit = !!issueId;
     const data = isEdit ? gameIssuesData.find(r => r.id === issueId) : {};
     const statusOpts = ['待处理','处理中','已解决','已关闭'];
     const typeOpts = ['Bug','优化','新功能','美术','音效','其他'];
     const prioOpts = ['P0-紧急','P1-高','P2-中','P3-低'];
     let html = '<div class="modal show" id="gi-modal"><div class="modal-content">' +
-        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑问题':'新建问题') + '</span><span class="modal-close" onclick="closeGameIssueModal()">\u00d7</span></div>' +
+        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑问题':'新建问题') + '</span><span class="modal-close" onclick="closeGameIssueModal()">\\u00d7</span></div>' +
         '<div class="modal-body">' +
         '<input type="hidden" id="gi-id" value="' + (data.id||'') + '">' +
         '<label>游戏名 *</label><input type="text" id="gi-game-name" value="' + escapeHtml(data.game_name||'') + '" placeholder="输入游戏名称">' +
@@ -99,8 +95,9 @@ function showGameIssueModal(issueId) {
     document.getElementById('content').insertAdjacentHTML('beforeend', html);
 }
 function closeGameIssueModal() { const m = document.getElementById('gi-modal'); if (m) m.remove(); }
+""")
 
-async function saveGameIssue() {
+output.append("""async function saveGameIssue() {
     const id = document.getElementById('gi-id').value;
     const body = {
         game_name: document.getElementById('gi-game-name').value.trim(),
@@ -124,11 +121,12 @@ async function deleteGameIssue(id) {
     try { await authFetch('/api/game-issues/' + id, { method: 'DELETE' }); showToast('删除成功', 'success'); loadGameIssues(); }
     catch(e) { showToast('删除失败: ' + e.message, 'error'); }
 }
+""")
 
-function showGameIssueDetail(id) {
+output.append("""function showGameIssueDetail(id) {
     const data = gameIssuesData.find(r => r.id === id); if (!data) return;
     let html = '<div class="modal show" id="gi-detail-modal"><div class="modal-content" style="max-width:600px">' +
-        '<div class="modal-header"><span class="modal-title">问题详情 #' + data.id + '</span><span class="modal-close" onclick="document.getElementById(\'gi-detail-modal\').remove()">\u00d7</span></div>' +
+        '<div class="modal-header"><span class="modal-title">问题详情 #' + data.id + '</span><span class="modal-close" onclick="document.getElementById(\\'gi-detail-modal\\').remove()">\\u00d7</span></div>' +
         '<div class="modal-body">' +
         '<p><strong>游戏名:</strong> ' + escapeHtml(data.game_name) + '</p>' +
         '<p><strong>问题类型:</strong> ' + escapeHtml(data.issue_type||'') + '</p>' +
@@ -143,15 +141,17 @@ function showGameIssueDetail(id) {
     document.getElementById('content').insertAdjacentHTML('beforeend', html);
 }
 function exportGameIssuesToExcel() {
-    const headers = ['ID','游戏名','问题类型','优先级','问题描述','负责人','状态','创建时间'];
-    const rows = gameIssuesData.map(r => [r.id,r.game_name,r.issue_type,r.priority,r.issue_desc,r.owner,r.status,(r.created_at||'').substring(0,10)]);
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '游戏问题');
-    XLSX.writeFile(wb, '游戏问题_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    const rows = [['ID','游戏名','问题类型','优先级','问题描述','负责人','状态','创建时间']];
+    for (const r of gameIssuesData) rows.push([r.id,r.game_name,r.issue_type,r.priority,r.issue_desc,r.owner,r.status,(r.created_at||'').substring(0,10)]);
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\\n');
+    const blob = new Blob(['\\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = '游戏问题_' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
 }
+""")
 
-// ==================== 设备管理模块 ====================
+# ==================== 设备管理模块 ====================
+output.append("""// ==================== 设备管理模块 ====================
 let equipmentData = [];
 let equipmentPage = 1;
 const equipmentPageSize = 20;
@@ -196,12 +196,13 @@ function renderEquipmentPage() {
         '</div>';
     document.getElementById('content').innerHTML = html;
 }
+""")
 
-function showEquipmentModal(eqId) {
+output.append("""function showEquipmentModal(eqId) {
     const isEdit = !!eqId;
     const data = isEdit ? equipmentData.find(r => r.id === eqId) : {};
     let html = '<div class="modal show" id="eq-modal"><div class="modal-content">' +
-        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑设备':'新增设备') + '</span><span class="modal-close" onclick="closeEquipmentModal()">\u00d7</span></div>' +
+        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑设备':'新增设备') + '</span><span class="modal-close" onclick="closeEquipmentModal()">\\u00d7</span></div>' +
         '<div class="modal-body">' +
         '<input type="hidden" id="eq-id" value="' + (data.id||'') + '">' +
         '<label>设备名 *</label><input type="text" id="eq-name" value="' + escapeHtml(data.name||'') + '">' +
@@ -217,8 +218,9 @@ function showEquipmentModal(eqId) {
     document.getElementById('content').insertAdjacentHTML('beforeend', html);
 }
 function closeEquipmentModal() { const m = document.getElementById('eq-modal'); if (m) m.remove(); }
+""")
 
-async function saveEquipment() {
+output.append("""async function saveEquipment() {
     const id = document.getElementById('eq-id').value;
     const body = {
         name: document.getElementById('eq-name').value.trim(),
@@ -240,28 +242,38 @@ async function deleteEquipment(id) {
     try { await authFetch('/api/equipment/' + id, { method: 'DELETE' }); showToast('删除成功', 'success'); loadEquipment(); }
     catch(e) { showToast('删除失败: ' + e.message, 'error'); }
 }
+""")
 
-// ==================== Hook into switchTab ====================
+# ==================== Hook into switchTab ====================
+output.append("""// ==================== Hook into switchTab ====================
 (function(){
-    // 保存原始 switchTab 引用（兼容 function 声明和 window.switchTab 赋值两种方式）
-    const _orig = window.switchTab || switchTab;
+    const _orig = window.switchTab;
     window.switchTab = function(tabId) {
-        // game-issues 现在由 app.js 处理，不再拦截
+        if (tabId === 'game-issues') { if(typeof loadGameIssues==='function') loadGameIssues(); return; }
         if (tabId === 'equipment') { if(typeof loadEquipment==='function') loadEquipment(); return; }
-        if (_orig) _orig.apply(this, arguments);
+        _orig.apply(this, arguments);
     };
 })();
+""")
 
-// ==================== 侧边栏菜单注入 ====================
+# ==================== 侧边栏菜单注入 ====================
+output.append("""// ==================== 侧边栏菜单注入 ====================
 function injectNewMenuItems() {
     const menu = document.getElementById('sidebar-menu');
     if (!menu || document.getElementById('menu-game-issues')) return;
-    const gameMgmtLink = menu.querySelector('a[onclick*="game-management"]');
+    const gameMgmtLink = menu.querySelector('a[onclick*=\"game-management\"]');
     if (gameMgmtLink && gameMgmtLink.parentElement) {
         gameMgmtLink.parentElement.insertAdjacentHTML('afterend',
-            '<li id="menu-game-issues"><a onclick="switchTab(&quot;game-issues&quot;)">\uD83C\uDFAE 游戏问题</a></li>' +
-            '<li id="menu-equipment"><a onclick="switchTab(&quot;equipment&quot;)">\uD83D\uDDA5\uFE0F 设备管理</a></li>');
+            '<li id=\"menu-game-issues\"><a onclick=\"switchTab(&quot;game-issues&quot;)\">\\uD83C\\uDFAE 游戏问题</a></li>' +
+            '<li id=\"menu-equipment\"><a onclick=\"switchTab(&quot;equipment&quot;)\">\\uD83D\\uDDA5\\uFE0F 设备管理</a></li>');
     }
 }
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', injectNewMenuItems); }
 else { setTimeout(injectNewMenuItems, 0); }
+""")
+
+full_js = '\n'.join(output)
+with open('public/modules-extra.js', 'w', encoding='utf-8') as f:
+    f.write(full_js)
+
+print(f'modules-extra.js created: {len(full_js)} bytes, {full_js.count(chr(10))} lines')

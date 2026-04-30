@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260427">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260410">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -70,25 +70,16 @@
                         <a class="sidebar-item" data-tab="bugs" onclick="switchTab('bugs')">
                             <span class="sidebar-icon">🐛</span>缺陷列表
                         </a>
-                        <a class="sidebar-item" data-tab="game-issues" onclick="switchTab('game-issues')">
-                            <span class="sidebar-icon">⚠️</span>游戏问题
-                        </a>
                     </div>
                 </div>
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">项目管理</div>
                     <div class="sidebar-nav">
-                        <a class="sidebar-item" data-tab="requirements" onclick="switchTab('requirements')">
-                            <span class="sidebar-icon">📄</span>需求管理
-                        </a>
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
                         <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
                             <span class="sidebar-icon">📋</span>配置计划
-                        </a>
-                        <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
-                            <span class="sidebar-icon">📦</span>版本管理
                         </a>
                         <a class="sidebar-item" data-tab="field-settings" onclick="switchTab('field-settings')">
                             <span class="sidebar-icon">⚙️</span>字段设置
@@ -190,18 +181,12 @@
                     <!-- 工具栏 -->
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>创建</button>
-                            <div class="more-actions-wrapper">
-                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
-                                <div class="more-actions-dropdown">
-                                    <div class="dropdown-item" onclick="toggleColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
-                                    <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
-                                    <div class="dropdown-item" onclick="document.getElementById('excel-upload').click(); closeAllMoreActions();"><span class="drop-icon">📥</span>导入</div>
-                                    <div class="dropdown-item" onclick="exportToExcel('games'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('games'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
-                                </div>
-                            </div>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>添加一行</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="toggleColumnSettings()"><span class="tool-icon">⚙</span>字段设置</button>
+                            <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
+                            <button class="tool-btn" onclick="document.getElementById('excel-upload').click()"><span class="tool-icon">📥</span>导入</button>
+                            <button class="tool-btn" onclick="exportToExcel('games')"><span class="tool-icon">📤</span>导出</button>
                         </div>
                         <div class="toolbar-right">
                             <div class="pagination-compact">
@@ -277,7 +262,6 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quality" checked><span>品质</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_account" checked><span>游戏账号</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="storage_location" checked><span>存储位置</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_engine" checked><span>游戏引擎</span></label></div>
                         </div>
                     </div>
 
@@ -303,7 +287,6 @@
                                     <th data-field="quality">品质</th>
                                     <th data-field="game_account">游戏账号</th>
                                     <th data-field="storage_location">存储位置</th>
-                                    <th data-field="game_engine">游戏引擎</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -319,15 +302,9 @@
                 <section id="members" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>创建</button>
-                            <div class="more-actions-wrapper">
-                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
-                                <div class="more-actions-dropdown">
-                                    <div class="dropdown-item" onclick="exportToExcel('members'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
-                                </div>
-                            </div>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>添加成员</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('members')"><span class="tool-icon">📤</span>导出</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="members-search" class="filter-input" placeholder="搜索姓名/角色..." style="width:180px" oninput="filterModule('members')">
                             <select id="members-status-filter" class="compact-select" onchange="filterModule('members')">
@@ -360,128 +337,101 @@
 
                 <!-- ========== 测试用例管理 ========== -->
                 <section id="test-cases" class="tab-content">
-                    <div style="display:flex;gap:0;height:calc(100vh - 120px);">
-                        <!-- 左侧：测试套件树 -->
-                        <div class="tc-suite-panel" id="tc-suite-panel">
-                            <div class="tc-suite-header">
-                                <span class="tc-suite-title">📂 测试套件</span>
-                                <button class="tc-suite-add-btn" onclick="openSuiteModal()" title="新建套件">＋</button>
-                            </div>
-                            <div class="tc-suite-list" id="tc-suite-list">
-                                <!-- 动态渲染 -->
-                            </div>
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openTestCaseModal()"><span class="tool-icon">＋</span>新增用例</button>
+                            <button class="tool-btn" onclick="openBatchTestCaseModal()"><span class="tool-icon">📋</span>批量添加</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportTestCasesToExcel()"><span class="tool-icon">📤</span>导出</button>
                         </div>
-                        <!-- 右侧：用例列表 -->
-                        <div class="tc-cases-panel" style="flex:1;min-width:0;display:flex;flex-direction:column;">
-                            <div class="toolbar">
-                                <div class="toolbar-left">
-                                    <button class="tool-btn tool-btn-primary" onclick="openTestCaseModal()"><span class="tool-icon">＋</span>新增用例</button>
-                                    <button class="tool-btn" onclick="openBatchTestCaseModal()"><span class="tool-icon">📋</span>批量添加</button>
-                                    <span class="toolbar-divider"></span>
-                                    <button class="tool-btn" onclick="exportTestCasesToExcel()"><span class="tool-icon">📤</span>导出</button>
-                                    <span class="toolbar-divider"></span>
-                                    <button class="tool-btn" onclick="batchMoveTestCases()" id="tc-batch-move-btn" style="display:none;"><span class="tool-icon">📁</span>移动到套件</button>
-                                </div>
-                                <div class="toolbar-right">
-                                    <input type="text" id="tc-search" class="filter-input" placeholder="搜索用例名称/编号/标签..." style="width:200px" oninput="filterTestCases()">
-                                </div>
-                            </div>
-                            <!-- 当前套件面包屑 -->
-                            <div class="tc-breadcrumb" id="tc-breadcrumb">
-                                <span class="tc-breadcrumb-item active" onclick="selectSuite(null)">📂 全部用例</span>
-                            </div>
-                            <!-- 筛选面板 -->
-                            <div class="filter-panel show" style="padding: 8px 16px;">
-                                <div class="filter-row">
-                                    <div class="filter-group">
-                                        <label>分类</label>
-                                        <select id="tc-category-filter" class="filter-select" onchange="filterTestCases()">
-                                            <option value="">全部分类</option>
-                                            <option value="功能测试">功能测试</option>
-                                            <option value="性能测试">性能测试</option>
-                                            <option value="兼容性测试">兼容性测试</option>
-                                            <option value="UI测试">UI测试</option>
-                                            <option value="安装卸载">安装卸载</option>
-                                            <option value="适配验收">适配验收</option>
-                                        </select>
-                                    </div>
-                                    <div class="filter-group">
-                                        <label>优先级</label>
-                                        <select id="tc-priority-filter" class="filter-select" onchange="filterTestCases()">
-                                            <option value="">全部优先级</option>
-                                            <option value="high">高</option>
-                                            <option value="medium">中</option>
-                                            <option value="low">低</option>
-                                        </select>
-                                    </div>
-                                    <div class="filter-group">
-                                        <label>类型</label>
-                                        <select id="tc-template-filter" class="filter-select" onchange="filterTestCases()">
-                                            <option value="">全部类型</option>
-                                            <option value="0">普通用例</option>
-                                            <option value="1">模板用例</option>
-                                        </select>
-                                    </div>
-                                    <button class="tool-btn" onclick="resetTestCaseFilters()">重置</button>
-                                </div>
-                            </div>
-                            <!-- 统计卡片 -->
-                            <div class="tc-stats-bar" id="tc-stats-bar">
-                                <div class="tc-stat-card">
-                                    <span class="tc-stat-num" id="tc-stat-total">0</span>
-                                    <span class="tc-stat-label">总用例数</span>
-                                </div>
-                                <div class="tc-stat-card tc-stat-high">
-                                    <span class="tc-stat-num" id="tc-stat-high">0</span>
-                                    <span class="tc-stat-label">高优先级</span>
-                                </div>
-                                <div class="tc-stat-card tc-stat-template">
-                                    <span class="tc-stat-num" id="tc-stat-template">0</span>
-                                    <span class="tc-stat-label">模板用例</span>
-                                </div>
-                            </div>
-                            <!-- 用例列表 -->
-                            <div class="table-container" style="flex:1;overflow-y:auto;">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th width="40"><input type="checkbox" id="tc-select-all" onchange="toggleSelectAllTestCases()"></th>
-                                            <th width="50">序号</th>
-                                            <th width="100">用例编号</th>
-                                            <th>用例名称</th>
-                                            <th width="100">分类</th>
-                                            <th width="80">优先级</th>
-                                            <th>前置条件</th>
-                                            <th>测试步骤</th>
-                                            <th>预期结果</th>
-                                            <th width="80">类型</th>
-                                            <th width="120">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="test-cases-table">
-                                        <tr><td colspan="11" class="empty-state"><div class="empty-icon">📝</div><div>暂无测试用例</div><div class="empty-sub">点击"新增用例"创建第一个测试用例</div></td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="module-stats" id="test-cases-stats">
-                                <div class="stats-items" id="test-cases-stats-items"></div>
-                            </div>
+                        <div class="toolbar-right">
+                            <input type="text" id="tc-search" class="filter-input" placeholder="搜索用例名称/编号/标签..." style="width:200px" oninput="filterTestCases()">
                         </div>
+                    </div>
+                    <!-- 筛选面板 -->
+                    <div class="filter-panel show" style="padding: 12px 16px;">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>分类</label>
+                                <select id="tc-category-filter" class="filter-select" onchange="filterTestCases()">
+                                    <option value="">全部分类</option>
+                                    <option value="功能测试">功能测试</option>
+                                    <option value="性能测试">性能测试</option>
+                                    <option value="兼容性测试">兼容性测试</option>
+                                    <option value="UI测试">UI测试</option>
+                                    <option value="安装卸载">安装卸载</option>
+                                    <option value="适配验收">适配验收</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>优先级</label>
+                                <select id="tc-priority-filter" class="filter-select" onchange="filterTestCases()">
+                                    <option value="">全部优先级</option>
+                                    <option value="high">高</option>
+                                    <option value="medium">中</option>
+                                    <option value="low">低</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="tc-template-filter" class="filter-select" onchange="filterTestCases()">
+                                    <option value="">全部类型</option>
+                                    <option value="0">普通用例</option>
+                                    <option value="1">模板用例</option>
+                                </select>
+                            </div>
+                            <button class="tool-btn" onclick="resetTestCaseFilters()">重置</button>
+                        </div>
+                    </div>
+                    <!-- 统计卡片 -->
+                    <div class="tc-stats-bar" id="tc-stats-bar">
+                        <div class="tc-stat-card">
+                            <span class="tc-stat-num" id="tc-stat-total">0</span>
+                            <span class="tc-stat-label">总用例数</span>
+                        </div>
+                        <div class="tc-stat-card tc-stat-high">
+                            <span class="tc-stat-num" id="tc-stat-high">0</span>
+                            <span class="tc-stat-label">高优先级</span>
+                        </div>
+                        <div class="tc-stat-card tc-stat-template">
+                            <span class="tc-stat-num" id="tc-stat-template">0</span>
+                            <span class="tc-stat-label">模板用例</span>
+                        </div>
+                    </div>
+                    <!-- 用例列表 -->
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="tc-select-all" onchange="toggleSelectAllTestCases()"></th>
+                                    <th width="50">序号</th>
+                                    <th width="100">用例编号</th>
+                                    <th>用例名称</th>
+                                    <th width="100">分类</th>
+                                    <th width="80">优先级</th>
+                                    <th>前置条件</th>
+                                    <th>测试步骤</th>
+                                    <th>预期结果</th>
+                                    <th width="80">类型</th>
+                                    <th width="120">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="test-cases-table">
+                                <tr><td colspan="11" class="empty-state"><div class="empty-icon">📝</div><div>暂无测试用例</div><div class="empty-sub">点击"新增用例"创建第一个测试用例</div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="module-stats" id="test-cases-stats">
+                        <div class="stats-items" id="test-cases-stats-items"></div>
                     </div>
                 </section>
 
                 <section id="devices" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>创建</button>
-                            <div class="more-actions-wrapper">
-                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
-                                <div class="more-actions-dropdown">
-                                    <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
-                                </div>
-                            </div>
+                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>添加设备</button>
+                            <span class="toolbar-divider"></span>
+                            <button class="tool-btn" onclick="exportToExcel('devices')"><span class="tool-icon">📤</span>导出</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
@@ -668,188 +618,6 @@
                     </div>
                 </section>
 
-                <!-- ========== 游戏问题 ========== -->
-                <section id="game-issues" class="tab-content">
-                    <div class="toolbar">
-                        <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openGameIssueModal()"><span class="tool-icon">＋</span>新增游戏问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="gi-search" class="filter-input" placeholder="搜索游戏/问题描述..." style="width:200px" oninput="filterGameIssues()">
-                            <select id="gi-status-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="gi-type-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部类型</option>
-                                <option value="画面问题">画面问题</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="适配问题">适配问题</option>
-                                <option value="崩溃闪退">崩溃闪退</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="gi-priority-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="50">序号</th>
-                                    <th>游戏名称</th>
-                                    <th>问题类型</th>
-                                    <th>优先级</th>
-                                    <th>问题描述</th>
-                                    <th>负责人</th>
-                                    <th>状态</th>
-                                    <th>备注</th>
-                                    <th>创建时间</th>
-                                    <th width="120">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="game-issues-table"></tbody>
-                        </table>
-                    </div>
-                    <div class="module-stats" id="gi-stats">
-                        <div class="stats-items" id="gi-stats-items"></div>
-                    </div>
-                </section>
-
-                <!-- ========== 需求管理 ========== -->
-                <section id="requirements" class="tab-content">
-                    <!-- 需求列表视图 -->
-                    <div id="req-list-view">
-                        <div class="toolbar">
-                            <div class="toolbar-left">
-                                <button class="tool-btn tool-btn-primary" onclick="showReqCreateView()"><span class="tool-icon">＋</span>新增需求</button>
-                                <span class="toolbar-divider"></span>
-                                <select id="req-status-filter" class="compact-select" onchange="filterRequirements()">
-                                    <option value="">全部状态</option>
-                                    <option value="draft">草稿</option>
-                                    <option value="published">已发布</option>
-                                    <option value="in_progress">进行中</option>
-                                    <option value="closed">已完成</option>
-                                </select>
-                                <select id="req-priority-filter" class="compact-select" onchange="filterRequirements()">
-                                    <option value="">全部优先级</option>
-                                    <option value="high">高</option>
-                                    <option value="medium">中</option>
-                                    <option value="low">低</option>
-                                </select>
-                            </div>
-                            <div class="toolbar-right">
-                                <div class="view-toggle" id="req-view-toggle">
-                                    <button class="view-toggle-btn active" data-view="list" onclick="toggleReqView('list')" title="列表视图">☰</button>
-                                    <button class="view-toggle-btn" data-view="card" onclick="toggleReqView('card')" title="卡片视图">▦</button>
-                                </div>
-                                <div class="plans-summary" id="req-summary-bar"></div>
-                            </div>
-                        </div>
-                        <!-- 列表视图 -->
-                        <div id="req-table-container" class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="50">序号</th>
-                                        <th style="width:10%">编号</th>
-                                        <th style="width:20%">标题</th>
-                                        <th style="width:7%">优先级</th>
-                                        <th style="width:9%">指派给</th>
-                                        <th style="width:9%">状态</th>
-                                        <th style="width:10%">截止日期</th>
-                                        <th style="width:8%">关联计划</th>
-                                        <th style="width:10%">进度</th>
-                                        <th style="width:10%">创建时间</th>
-                                        <th style="width:110px">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="req-table">
-                                    <tr><td colspan="11" class="empty-state"><div class="empty-icon">📄</div><div>暂无需求</div><div class="empty-sub">点击"新增需求"创建第一个需求</div></td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <!-- 卡片视图 -->
-                        <div id="req-cards-container" class="plan-cards-grid" style="display:none;">
-                        </div>
-                    </div>
-                    <!-- 需求详情视图 -->
-                    <div id="req-detail-view" style="display:none;">
-                        <div class="detail-back-bar">
-                            <button class="tool-btn" onclick="backToReqList()"><span class="tool-icon">←</span>返回需求列表</button>
-                            <span class="detail-plan-title" id="req-detail-title"></span>
-                            <div style="margin-left:auto;display:flex;gap:8px;" id="req-detail-actions"></div>
-                        </div>
-                        <div class="plan-detail-info" id="req-detail-info"></div>
-                        <!-- 关联的配置计划列表 -->
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="50">序号</th>
-                                        <th width="150">计划编号</th>
-                                        <th>计划标题</th>
-                                        <th width="80">状态</th>
-                                        <th width="100">日期</th>
-                                        <th width="80">游戏数</th>
-                                        <th width="100">完成进度</th>
-                                        <th width="100">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="req-plans-table">
-                                    <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无关联的配置计划</div><div class="empty-sub">项目经理可基于此需求创建配置计划</div></td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <!-- 创建/编辑需求视图 -->
-                    <div id="req-create-view" style="display:none;">
-                        <div class="toolbar">
-                            <div class="toolbar-left">
-                                <button class="tool-btn" onclick="backToReqList()"><span class="tool-icon">←</span>返回</button>
-                                <span class="toolbar-title" id="req-form-title">新增需求</span>
-                            </div>
-                        </div>
-                        <div class="plan-form-container">
-                            <form id="req-form" onsubmit="return false;">
-                                <input type="hidden" id="req-edit-id">
-                                <div class="form-row">
-                                    <div class="form-group"><label>标题 *</label><input type="text" id="req-title" placeholder="请输入需求标题" required></div>
-                                    <div class="form-group"><label>截止日期</label><input type="date" id="req-deadline"></div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>优先级</label>
-                                        <select id="req-priority">
-                                            <option value="high">高</option>
-                                            <option value="medium" selected>中</option>
-                                            <option value="low">低</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>指派项目经理</label>
-                                        <select id="req-assigned-to">
-                                            <option value="">不指定</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-group"><label>描述</label><textarea id="req-description" rows="5" placeholder="请输入需求描述..."></textarea></div>
-                                <div class="form-actions">
-                                    <button type="button" class="tool-btn" onclick="backToReqList()">取消</button>
-                                    <button type="button" class="tool-btn" onclick="submitRequirement('draft')">💾 保存草稿</button>
-                                    <button type="button" class="tool-btn tool-btn-primary" onclick="submitRequirement('published')">🚀 创建并发布</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- ========== 我的任务 ========== -->
                 <section id="my-tasks" class="tab-content">
                     <div class="toolbar">
@@ -864,33 +632,12 @@
                             </select>
                         </div>
                         <div class="toolbar-right">
-                            <div class="view-toggle" id="mytask-view-toggle">
-                                <button class="view-toggle-btn" data-view="list" onclick="toggleMyTaskView('list')" title="列表视图">☰</button>
-                                <button class="view-toggle-btn active" data-view="card" onclick="toggleMyTaskView('card')" title="卡片视图">▦</button>
-                            </div>
                             <div class="my-tasks-summary" id="my-tasks-summary-bar"></div>
                         </div>
                     </div>
                     <!-- 计划卡片列表（一级） -->
                     <div id="my-tasks-plan-cards" class="plan-cards-grid">
                         <div class="empty-state-full"><div class="empty-icon">📌</div><div>暂无分配给您的任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></div>
-                    </div>
-                    <!-- 计划列表表格（一级列表模式） -->
-                    <div id="my-tasks-plan-table" class="table-container" style="display:none;">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="50">序号</th>
-                                    <th style="width:30%">计划标题</th>
-                                    <th style="width:20%">编号</th>
-                                    <th style="width:12%">日期</th>
-                                    <th style="width:12%">游戏数</th>
-                                    <th style="width:15%">进度</th>
-                                    <th style="width:80px">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="my-tasks-plan-list-table"></tbody>
-                        </table>
                     </div>
                     <!-- 任务详情视图（二级） -->
                     <div id="my-tasks-detail-view" style="display:none;">
@@ -907,13 +654,12 @@
                                 <thead>
                                     <tr>
                                         <th width="50">序号</th>
-                                        <th style="width:18%">游戏名称</th>
-                                        <th style="width:10%">负责人</th>
-                                        <th style="width:10%">游戏平台</th>
-                                        <th style="width:12%">适配进展</th>
-                                        <th style="width:18%">适配进度</th>
-                                        <th style="width:22%">问题备注</th>
-                                        <th style="width:70px">操作</th>
+                                        <th>游戏名称</th>
+                                        <th>游戏平台</th>
+                                        <th>适配进展</th>
+                                        <th>适配进度</th>
+                                        <th>问题备注</th>
+                                        <th width="80">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="my-tasks-table"></tbody>
@@ -941,37 +687,12 @@
                                 </select>
                             </div>
                             <div class="toolbar-right">
-                                <div class="view-toggle" id="plan-view-toggle">
-                                    <button class="view-toggle-btn" data-view="list" onclick="togglePlanView('list')" title="列表视图">☰</button>
-                                    <button class="view-toggle-btn active" data-view="card" onclick="togglePlanView('card')" title="卡片视图">▦</button>
-                                </div>
                                 <div class="plans-summary" id="plans-summary-bar"></div>
                             </div>
                         </div>
                         <!-- 计划列表卡片 -->
                         <div id="plan-cards-container" class="plan-cards-grid">
                             <div class="empty-state-full"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建第一个计划</div></div>
-                        </div>
-                        <!-- 计划列表表格 -->
-                        <div id="plan-table-container" class="table-container" style="display:none;">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="50">序号</th>
-                                        <th style="width:12%">编号</th>
-                                        <th style="width:18%">标题</th>
-                                        <th style="width:8%">状态</th>
-                                        <th style="width:10%">日期</th>
-                                        <th style="width:7%">游戏数</th>
-                                        <th style="width:7%">参与人</th>
-                                        <th style="width:10%">进度</th>
-                                        <th style="width:10%">关联需求</th>
-                                        <th style="width:8%">创建者</th>
-                                        <th style="width:120px">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="plan-list-table"></tbody>
-                            </table>
                         </div>
                     </div>
                     <!-- 计划详情视图 -->
@@ -1047,15 +768,6 @@
                                     </select>
                                     <small class="form-hint">选中后，所有游戏将默认分配给此人；也可在计划详情中逐个修改</small>
                                 </div>
-                                <div class="form-group" id="plan-tc-template-section">
-                                    <label>关联测试用例</label>
-                                    <div style="display:flex;align-items:center;gap:10px;">
-                                        <button type="button" class="tool-btn tool-btn-primary" onclick="openPlanTcSelectModal()">📋 选择测试用例</button>
-                                        <span id="plan-tc-selected-summary" style="color:var(--text-muted);font-size:13px;">未选择（后续手动添加）</span>
-                                    </div>
-                                    <div id="plan-tc-selected-tags" class="plan-tc-tags" style="margin-top:8px;display:none;"></div>
-                                    <small class="form-hint">点击选择后，创建计划时会自动将所选用例关联到每个游戏</small>
-                                </div>
                                 <div class="form-actions">
                                     <button type="button" class="tool-btn" onclick="showPlanListView()">取消</button>
                                     <button type="button" class="tool-btn" onclick="submitPlan(event, 'draft')">💾 保存草稿</button>
@@ -1087,240 +799,6 @@
                     </div>
                     <div id="field-cards-container" class="field-cards-container"></div>
                 </section>
-
-                <!-- ========== 版本管理 ========== -->
-                <section id="versions" class="tab-content">
-                    <!-- 子Tab切换 -->
-                    <div class="um-sub-tabs">
-                        <button class="um-sub-tab active" data-subtab="ver-released" onclick="switchVersionTab('ver-released')">
-                            🚀 已发布
-                        </button>
-                        <button class="um-sub-tab" data-subtab="ver-testing" onclick="switchVersionTab('ver-testing')">
-                            🧪 测试中
-                        </button>
-                    </div>
-
-                    <!-- === 子页面1：已发布 === -->
-                    <div id="ver-released" class="um-subtab-content active">
-                        <div class="toolbar">
-                            <div class="toolbar-left">
-                                <button class="tool-btn tool-btn-primary" onclick="openVersionModal('released')"><span class="tool-icon">＋</span>新增已发布版本</button>
-                                <span class="toolbar-divider"></span>
-                                <input type="text" id="ver-released-search" class="filter-input" placeholder="搜索版本号/设备..." style="width:180px" oninput="filterVersions('released')">
-                                <select id="ver-released-device-filter" class="compact-select" onchange="filterVersions('released')">
-                                    <option value="">全部设备</option>
-                                </select>
-                                <select id="ver-released-type-filter" class="compact-select" onchange="filterVersions('released')">
-                                    <option value="">全部类型</option>
-                                    <option value="整合版">整合版</option>
-                                    <option value="Gateway">Gateway</option>
-                                    <option value="LITE">LITE</option>
-                                    <option value="Transformer">Transformer</option>
-                                    <option value="TransformerPlus">TransformerPlus</option>
-                                    <option value="HooK">HooK</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="50">序号</th>
-                                        <th>设备名称</th>
-                                        <th>版本号</th>
-                                        <th>版本类型</th>
-                                        <th>发布日期</th>
-                                        <th>更新者</th>
-                                        <th>文件大小</th>
-                                        <th>更新日志</th>
-                                        <th>问题备注</th>
-                                        <th width="100">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ver-released-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- === 子页面2：测试中 === -->
-                    <div id="ver-testing" class="um-subtab-content">
-                        <div class="toolbar">
-                            <div class="toolbar-left">
-                                <button class="tool-btn tool-btn-primary" onclick="openVersionModal('testing')"><span class="tool-icon">＋</span>新增测试版本</button>
-                                <span class="toolbar-divider"></span>
-                                <input type="text" id="ver-testing-search" class="filter-input" placeholder="搜索版本号/设备..." style="width:180px" oninput="filterVersions('testing')">
-                                <select id="ver-testing-device-filter" class="compact-select" onchange="filterVersions('testing')">
-                                    <option value="">全部设备</option>
-                                </select>
-                                <select id="ver-testing-type-filter" class="compact-select" onchange="filterVersions('testing')">
-                                    <option value="">全部类型</option>
-                                    <option value="整合版">整合版</option>
-                                    <option value="Gateway">Gateway</option>
-                                    <option value="LITE">LITE</option>
-                                    <option value="Transformer">Transformer</option>
-                                    <option value="TransformerPlus">TransformerPlus</option>
-                                    <option value="HooK">HooK</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="50">序号</th>
-                                        <th>设备名称</th>
-                                        <th>版本号</th>
-                                        <th>版本类型</th>
-                                        <th>日期</th>
-                                        <th>更新者</th>
-                                        <th>文件大小</th>
-                                        <th>更新日志</th>
-                                        <th>问题备注</th>
-                                        <th width="130">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ver-testing-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 版本新增/编辑弹窗 -->
-                <div class="modal" id="version-modal">
-                    <div class="modal-overlay" onclick="closeModal('version-modal')"></div>
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3 id="version-modal-title">新增版本</h3>
-                            <button class="modal-close" onclick="closeModal('version-modal')">✕</button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="version-form" onsubmit="submitVersionForm(event)">
-                                <input type="hidden" id="version-id">
-                                <input type="hidden" id="version-target-status">
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label>设备名称 <span class="required">*</span></label>
-                                        <select id="version-device" required>
-                                            <option value="">请选择设备</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>版本号 <span class="required">*</span></label>
-                                        <input type="text" id="version-number" placeholder="如：v1.2.0" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>版本类型</label>
-                                        <select id="version-type">
-                                            <option value="整合版">整合版</option>
-                                            <option value="Gateway">Gateway</option>
-                                            <option value="LITE">LITE</option>
-                                            <option value="Transformer">Transformer</option>
-                                            <option value="TransformerPlus">TransformerPlus</option>
-                                            <option value="HooK">HooK</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>日期</label>
-                                        <input type="date" id="version-date">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>下载链接</label>
-                                        <input type="text" id="version-download-url" placeholder="下载地址（可选）">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>文件大小</label>
-                                        <input type="text" id="version-file-size" placeholder="如：256MB">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label>更新日志</label>
-                                    <textarea id="version-changelog" rows="3" placeholder="版本更新内容描述"></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label>问题备注</label>
-                                    <textarea id="version-notes" rows="3" placeholder="已知问题或注意事项"></textarea>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="button" class="btn" onclick="closeModal('version-modal')">取消</button>
-                                    <button type="submit" class="btn btn-primary">保存</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ========== 游戏问题弹窗 ========== -->
-                <div class="modal" id="game-issue-modal">
-                    <div class="modal-overlay" onclick="closeModal('game-issue-modal')"></div>
-                    <div class="modal-container" style="max-width:600px">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3 id="game-issue-modal-title">新增游戏问题</h3>
-                                <button class="modal-close" onclick="closeModal('game-issue-modal')">✕</button>
-                            </div>
-                            <form id="game-issue-form" onsubmit="submitGameIssueForm(event)">
-                                <input type="hidden" id="gi-id">
-                                <div class="form-row">
-                                    <div class="form-group" style="flex:2">
-                                        <label>游戏名称 <span class="required">*</span></label>
-                                        <select id="gi-game-name" required>
-                                            <option value="">选择游戏</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="flex:1">
-                                        <label>问题类型</label>
-                                        <select id="gi-issue-type">
-                                            <option value="">选择类型</option>
-                                            <option value="画面问题">画面问题</option>
-                                            <option value="性能问题">性能问题</option>
-                                            <option value="适配问题">适配问题</option>
-                                            <option value="崩溃闪退">崩溃闪退</option>
-                                            <option value="其他">其他</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group" style="flex:1">
-                                        <label>优先级</label>
-                                        <select id="gi-priority">
-                                            <option value="">选择优先级</option>
-                                            <option value="高">高</option>
-                                            <option value="中">中</option>
-                                            <option value="低">低</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="flex:1">
-                                        <label>负责人 <span class="required">*</span></label>
-                                        <select id="gi-owner" required>
-                                            <option value="">选择负责人</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="flex:1">
-                                        <label>状态</label>
-                                        <select id="gi-status">
-                                            <option value="待处理">待处理</option>
-                                            <option value="处理中">处理中</option>
-                                            <option value="已解决">已解决</option>
-                                            <option value="已关闭">已关闭</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label>问题描述 <span class="required">*</span></label>
-                                    <textarea id="gi-issue-desc" rows="3" required placeholder="详细描述问题现象..."></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label>备注</label>
-                                    <textarea id="gi-remarks" rows="2" placeholder="其他备注信息..."></textarea>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="button" class="btn" onclick="closeModal('game-issue-modal')">取消</button>
-                                    <button type="submit" class="btn btn-primary">保存</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- ========== 用户管理 ========== -->
                 <section id="user-management" class="tab-content">
@@ -1449,12 +927,6 @@
                             <option value="low">低</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>所属套件</label>
-                        <select id="tc-suite-id">
-                            <option value="">未归类</option>
-                        </select>
-                    </div>
                     <div class="form-group full-width">
                         <label>前置条件</label>
                         <textarea id="tc-precondition" rows="2" placeholder="执行用例前需满足的条件"></textarea>
@@ -1515,170 +987,45 @@
         </div>
     </div>
 
-    <!-- 测试套件新增/编辑弹窗 -->
-    <div id="suite-modal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
-            <div class="modal-header">
-                <h3 id="suite-modal-title">新建测试套件</h3>
-                <span class="close-btn" onclick="closeModal('suite-modal')">&times;</span>
-            </div>
-            <form id="suite-form" onsubmit="submitSuiteForm(event)">
-                <input type="hidden" id="suite-id">
-                <div style="padding:16px;">
-                    <div class="form-group">
-                        <label>套件名称 *</label>
-                        <input type="text" id="suite-name" placeholder="如：基础功能测试集、3D适配验收集" required>
-                    </div>
-                    <div class="form-group">
-                        <label>描述</label>
-                        <textarea id="suite-desc" rows="3" placeholder="套件说明..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>排序</label>
-                        <input type="number" id="suite-order" value="0" min="0" placeholder="数字越小越靠前">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('suite-modal')">取消</button>
-                    <button type="submit" class="tool-btn tool-btn-primary">保存</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 移动到套件弹窗 -->
-    <div id="move-to-suite-modal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>移动到套件</h3>
-                <span class="close-btn" onclick="closeModal('move-to-suite-modal')">&times;</span>
-            </div>
-            <div style="padding:16px;">
-                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">
-                    将选中的 <strong id="move-tc-count">0</strong> 条用例移动到：
-                </p>
-                <select id="move-target-suite" class="filter-select" style="width:100%;padding:8px;">
-                    <option value="">未归类（从套件中移除）</option>
-                </select>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('move-to-suite-modal')">取消</button>
-                <button class="tool-btn tool-btn-primary" onclick="confirmMoveToSuite()">确认移动</button>
-            </div>
-        </div>
-    </div>
-
     <!-- 关联测试用例弹窗（配置计划用） -->
     <div id="link-test-case-modal" class="modal">
-        <div class="modal-content" style="max-width: 960px; max-height: 80vh;">
+        <div class="modal-content" style="max-width: 900px; max-height: 80vh;">
             <div class="modal-header">
                 <h3 id="link-tc-modal-title">关联测试用例</h3>
                 <span class="close-btn" onclick="closeModal('link-test-case-modal')">&times;</span>
             </div>
-            <div style="display:flex;height:480px;border-top:1px solid var(--border-light);">
-                <!-- 左侧：套件树 -->
-                <div class="link-tc-suite-panel" id="link-tc-suite-panel">
-                    <div class="link-tc-suite-header">📂 测试套件</div>
-                    <div class="link-tc-suite-list" id="link-tc-suite-list">
-                        <!-- 动态渲染 -->
-                    </div>
+            <div style="padding: 16px;">
+                <div class="filter-row" style="margin-bottom: 12px;">
+                    <input type="text" id="link-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:200px;" oninput="filterLinkTestCases()">
+                    <select id="link-tc-category" class="filter-select" onchange="filterLinkTestCases()">
+                        <option value="">全部分类</option>
+                        <option value="功能测试">功能测试</option>
+                        <option value="性能测试">性能测试</option>
+                        <option value="兼容性测试">兼容性测试</option>
+                        <option value="UI测试">UI测试</option>
+                        <option value="安装卸载">安装卸载</option>
+                        <option value="适配验收">适配验收</option>
+                    </select>
+                    <span style="margin-left:auto;color:var(--text-muted);font-size:13px;">已选 <strong id="link-tc-selected-count">0</strong> 条</span>
                 </div>
-                <!-- 右侧：用例列表 -->
-                <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
-                    <div style="padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-light);background:var(--bg-card);">
-                        <div class="link-tc-breadcrumb" id="link-tc-breadcrumb">
-                            <span class="tc-breadcrumb-item active">📂 全部用例</span>
-                        </div>
-                        <span style="margin-left:auto;"></span>
-                        <input type="text" id="link-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:180px;height:30px;font-size:12px;" oninput="filterLinkTestCases()">
-                        <select id="link-tc-category" class="filter-select" style="height:30px;font-size:12px;" onchange="filterLinkTestCases()">
-                            <option value="">全部分类</option>
-                            <option value="功能测试">功能测试</option>
-                            <option value="性能测试">性能测试</option>
-                            <option value="兼容性测试">兼容性测试</option>
-                            <option value="UI测试">UI测试</option>
-                            <option value="安装卸载">安装卸载</option>
-                            <option value="适配验收">适配验收</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:12px;white-space:nowrap;">已选 <strong id="link-tc-selected-count">0</strong></span>
-                    </div>
-                    <div class="table-container" style="flex:1;overflow-y:auto;">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="36"><input type="checkbox" id="link-tc-select-all" onchange="toggleLinkTcSelectAll()"></th>
-                                    <th width="70">编号</th>
-                                    <th>用例名称</th>
-                                    <th width="80">分类</th>
-                                    <th width="60">优先级</th>
-                                </tr>
-                            </thead>
-                            <tbody id="link-tc-table"></tbody>
-                        </table>
-                    </div>
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th width="40"><input type="checkbox" id="link-tc-select-all" onchange="toggleLinkTcSelectAll()"></th>
+                                <th width="80">编号</th>
+                                <th>用例名称</th>
+                                <th width="90">分类</th>
+                                <th width="70">优先级</th>
+                            </tr>
+                        </thead>
+                        <tbody id="link-tc-table"></tbody>
+                    </table>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('link-test-case-modal')">取消</button>
                 <button class="tool-btn tool-btn-primary" onclick="confirmLinkTestCases()">确定关联</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 创建计划时选择测试用例弹窗 -->
-    <div id="plan-tc-select-modal" class="modal">
-        <div class="modal-content" style="max-width: 960px; max-height: 80vh;">
-            <div class="modal-header">
-                <h3>选择测试用例</h3>
-                <span class="close-btn" onclick="closeModal('plan-tc-select-modal')">&times;</span>
-            </div>
-            <div style="display:flex;height:480px;border-top:1px solid var(--border-light);">
-                <!-- 左侧：套件树 -->
-                <div class="link-tc-suite-panel" id="plan-tc-suite-panel">
-                    <div class="link-tc-suite-header">📂 测试套件</div>
-                    <div class="link-tc-suite-list" id="plan-tc-suite-list">
-                        <!-- 动态渲染 -->
-                    </div>
-                </div>
-                <!-- 右侧：用例列表 -->
-                <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
-                    <div style="padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-light);background:var(--bg-card);">
-                        <div class="link-tc-breadcrumb" id="plan-tc-breadcrumb">
-                            <span class="tc-breadcrumb-item active">📂 全部用例</span>
-                        </div>
-                        <span style="margin-left:auto;"></span>
-                        <input type="text" id="plan-tc-search" class="filter-input" placeholder="搜索用例名称/编号..." style="width:180px;height:30px;font-size:12px;" oninput="filterPlanTcCases()">
-                        <select id="plan-tc-category" class="filter-select" style="height:30px;font-size:12px;" onchange="filterPlanTcCases()">
-                            <option value="">全部分类</option>
-                            <option value="功能测试">功能测试</option>
-                            <option value="性能测试">性能测试</option>
-                            <option value="兼容性测试">兼容性测试</option>
-                            <option value="UI测试">UI测试</option>
-                            <option value="安装卸载">安装卸载</option>
-                            <option value="适配验收">适配验收</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:12px;white-space:nowrap;">已选 <strong id="plan-tc-sel-count">0</strong></span>
-                    </div>
-                    <div class="table-container" style="flex:1;overflow-y:auto;">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="36"><input type="checkbox" id="plan-tc-select-all" onchange="togglePlanTcSelectAll()"></th>
-                                    <th width="70">编号</th>
-                                    <th>用例名称</th>
-                                    <th width="80">分类</th>
-                                    <th width="60">优先级</th>
-                                </tr>
-                            </thead>
-                            <tbody id="plan-tc-table"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('plan-tc-select-modal')">取消</button>
-                <button class="tool-btn" onclick="planTcSelectNone()">不关联</button>
-                <button class="tool-btn tool-btn-primary" onclick="confirmPlanTcSelect()">✓ 确定选择</button>
             </div>
         </div>
     </div>
@@ -1893,7 +1240,7 @@
                 <div class="form-grid">
                     <div class="form-group"><label>姓名 *</label><input type="text" id="member-name" required></div>
                     <div class="form-group"><label>企业微信ID</label><input type="text" id="member-wechat-id"></div>
-                    <div class="form-group"><label>角色</label><select id="member-role"><option value="">请选择角色</option></select></div>
+                    <div class="form-group"><label>角色</label><input type="text" id="member-role"></div>
                     <div class="form-group"><label>状态</label><select id="member-status"><option value="active">活跃</option><option value="inactive">非活跃</option></select></div>
                     <div class="form-group full-width"><label>职责</label><textarea id="member-duty" rows="3"></textarea></div>
                     <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('member-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
@@ -1957,7 +1304,6 @@
                     <div class="form-group"><label>品质</label><select id="game-quality"><option value="normal">一般</option><option value="recommended">推荐</option></select></div>
                     <div class="form-group"><label>游戏账号</label><textarea id="game-account" rows="2" placeholder="每行一个账号，支持多账号"></textarea></div>
                     <div class="form-group"><label>存储位置</label><select id="game-storage-location"><option value="硬盘1号">硬盘1号</option><option value="硬盘2号">硬盘2号</option><option value="硬盘3号">硬盘3号</option><option value="硬盘4号">硬盘4号</option><option value="硬盘5号">硬盘5号</option><option value="硬盘6号">硬盘6号</option><option value="硬盘7号">硬盘7号</option><option value="硬盘8号">硬盘8号</option><option value="硬盘9号">硬盘9号</option><option value="硬盘10号">硬盘10号</option></select></div>
-                    <div class="form-group"><label>游戏引擎</label><input type="text" id="game-engine" placeholder="如 Unreal Engine 5、Unity 等"></div>
                     <div class="form-group full-width"><label>游戏简介</label><textarea id="game-description" rows="2"></textarea></div>
                     <div class="form-group full-width"><label>适配备注</label><textarea id="game-adaptation-notes" rows="3"></textarea></div>
                     <div class="form-submit"><button type="button" class="btn btn-secondary" onclick="closeModal('game-modal')">取消</button><button type="submit" class="tool-btn tool-btn-primary">保存</button></div>
@@ -2144,7 +1490,6 @@
     </div>
 
     <script src="gameAccountsData.js"></script>
-    <script src="app.js?v=20260427"></script>
-    <script src="modules-extra.js?v=20260427"></script>
+    <script src="app.js?v=20260410"></script>
 </body>
 </html>
