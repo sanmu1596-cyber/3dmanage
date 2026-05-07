@@ -3,6 +3,9 @@ const db = require('./database');
 const auth = require('./auth');
 const router = express.Router();
 
+// 所有路由需要认证（开发模式自动跳过）
+router.use(auth.verifyToken);
+
 // 获取设备列表
 router.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
   const { search, keeper } = req.query;

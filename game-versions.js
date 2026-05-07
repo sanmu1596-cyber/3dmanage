@@ -6,6 +6,9 @@ const db = require('./database');
 const auth = require('./auth');
 const router = express.Router();
 
+// 所有路由需要认证（开发模式自动跳过）
+router.use(auth.verifyToken);
+
 // 获取游戏版本列表
 router.get('/', auth.checkPermission('games', 'view'), (req, res) => {
   const { search, status, game_id } = req.query;

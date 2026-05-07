@@ -3,6 +3,9 @@ const db = require('./database');
 const auth = require('./auth');
 const router = express.Router();
 
+// 所有路由需要认证（开发模式自动跳过）
+router.use(auth.verifyToken);
+
 // 获取游戏问题列表
 router.get('/', auth.checkPermission('bugs', 'view'), (req, res) => {
   const { search, status, issue_type, priority } = req.query;
