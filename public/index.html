@@ -242,7 +242,10 @@
                                     <div class="dropdown-item" onclick="toggleColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
                                     <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
                                     <div class="dropdown-item" onclick="document.getElementById('excel-upload').click(); closeAllMoreActions();"><span class="drop-icon">📥</span>导入</div>
-                                    <div class="dropdown-item" onclick="exportToExcel('games'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-item" onclick="exportToExcel('games'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('游戏列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('games'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
@@ -368,7 +371,10 @@
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
-                                    <div class="dropdown-item" onclick="exportToExcel('members'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-item" onclick="exportToExcel('members'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('项目成员'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
@@ -522,7 +528,10 @@
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
-                                    <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出</div>
+                                    <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('设备列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
@@ -636,6 +645,8 @@
                             <button class="tool-btn tool-btn-primary" onclick="openModal('test-modal')"><span class="tool-icon">＋</span>添加测试</button>
                             <span class="toolbar-divider"></span>
                             <button class="tool-btn" onclick="exportToExcel('tests')"><span class="tool-icon">📤</span>导出</button>
+                            <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
+                            <button class="tool-btn" onclick="exportToPDF('测试列表')"><span class="tool-icon">📄</span>PDF</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="tests-search" class="filter-input" placeholder="搜索测试名称/游戏..." style="width:180px" oninput="filterModule('tests')">
                             <select id="tests-status-filter" class="compact-select" onchange="filterModule('tests')">
@@ -678,6 +689,8 @@
                             <button class="tool-btn tool-btn-primary" onclick="openModal('bug-modal')"><span class="tool-icon">＋</span>添加缺陷</button>
                             <span class="toolbar-divider"></span>
                             <button class="tool-btn" onclick="exportToExcel('bugs')"><span class="tool-icon">📤</span>导出</button>
+                            <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
+                            <button class="tool-btn" onclick="exportToPDF('缺陷列表')"><span class="tool-icon">📄</span>PDF</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="bugs-search" class="filter-input" placeholder="搜索描述/设备/负责人..." style="width:180px" oninput="filterModule('bugs')">
                             <select id="bugs-status-filter" class="compact-select" onchange="filterModule('bugs')">
@@ -851,6 +864,17 @@
                                     <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><div>暂无关联的配置计划</div><div class="empty-sub">项目经理可基于此需求创建配置计划</div></td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <!-- 附件区 -->
+                        <div class="attachment-section" id="req-attachment-section">
+                            <div class="attachment-header">
+                                <span class="attachment-title">📎 附件</span>
+                                <label class="attach-upload-btn">
+                                    ＋ 上传附件
+                                    <input type="file" id="req-file-input" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.log" onchange="handleFileUpload(event, 'requirement')">
+                                </label>
+                            </div>
+                            <div class="attachment-list" id="req-attachment-list"></div>
                         </div>
                         <!-- 评论区 -->
                         <div class="comments-section" id="req-comments-section">
@@ -1182,6 +1206,17 @@
                         </div>
                         <div class="module-stats" id="plan-detail-stats">
                             <div class="stats-items" id="plan-detail-stats-items"></div>
+                        </div>
+                        <!-- 附件区 -->
+                        <div class="attachment-section" id="plan-attachment-section">
+                            <div class="attachment-header">
+                                <span class="attachment-title">📎 附件</span>
+                                <label class="attach-upload-btn">
+                                    ＋ 上传附件
+                                    <input type="file" id="plan-file-input" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.log" onchange="handleFileUpload(event, 'plan')">
+                                </label>
+                            </div>
+                            <div class="attachment-list" id="plan-attachment-list"></div>
                         </div>
                         <!-- 评论区 -->
                         <div class="comments-section" id="plan-comments-section">

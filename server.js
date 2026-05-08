@@ -13,6 +13,7 @@ const gameVersionsRouter = require('./game-versions');
 const interlaceIssuesRouter = require('./interlace-issues');
 const interlaceVersionsRouter = require('./interlace-versions');
 const clientIssuesRouter = require('./client-issues');
+const { validate, rules } = require('./validator');
 
 const app = express();
 const PORT = 3000;
@@ -114,7 +115,11 @@ membersRouter.get('/', auth.checkPermission('members', 'view'), (req, res) => {
   });
 });
 
-membersRouter.post('/', auth.checkPermission('members', 'edit'), (req, res) => {
+membersRouter.post('/', auth.checkPermission('members', 'edit'),
+  validate({
+    name: rules.name(50).required(),
+  }),
+  (req, res) => {
   const { name, wechat_id, role, duty, status } = req.body;
   const sql = `INSERT INTO users (real_name, wechat_id, project_role, duty, status, is_member)
                VALUES (?, ?, ?, ?, ?, 1)`;
@@ -127,7 +132,9 @@ membersRouter.post('/', auth.checkPermission('members', 'edit'), (req, res) => {
   });
 });
 
-membersRouter.put('/:id', auth.checkPermission('members', 'edit'), (req, res) => {
+membersRouter.put('/:id', auth.checkPermission('members', 'edit'),
+  validate({ name: rules.name(50) }),
+  (req, res) => {
   const { name, wechat_id, role, duty, status } = req.body;
   const sql = `UPDATE users SET real_name = ?, wechat_id = ?, project_role = ?, duty = ?, status = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ? AND is_member = 1`;
@@ -190,7 +197,13 @@ devicesRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
   });
 });
 
-devicesRouter.post('/', auth.checkPermission('devices', 'edit'), (req, res) => {
+devicesRouter.post('/', auth.checkPermission('devices', 'edit'),
+  validate({
+    name: rules.name(100),
+    manufacturer: rules.required().maxLen(100),
+    device_type: rules.optional(50),
+  }),
+  (req, res) => {
   const { manufacturer, device_type, name, requirements, quantity, keeper,
           notes, adapter_completion_rate, total_bugs, completed_adaptations,
           total_games, status, assigned_to } = req.body;
@@ -209,7 +222,9 @@ devicesRouter.post('/', auth.checkPermission('devices', 'edit'), (req, res) => {
   });
 });
 
-devicesRouter.put('/:id', auth.checkPermission('devices', 'edit'), (req, res) => {
+devicesRouter.put('/:id', auth.checkPermission('devices', 'edit'),
+  validate({ name: rules.name(100), manufacturer: rules.required().maxLen(100) }),
+  (req, res) => {
   const { manufacturer, device_type, name, requirements, quantity, keeper,
           notes, adapter_completion_rate, total_bugs, completed_adaptations,
           total_games, status, assigned_to } = req.body;
@@ -280,7 +295,14 @@ gamesRouter.get('/', auth.checkPermission('games', 'view'), (req, res) => {
   });
 });
 
-gamesRouter.post('/', auth.checkPermission('games', 'edit'), (req, res) => {
+gamesRouter.post('/', auth.checkPermission('games', 'edit'),
+  validate({
+    name: rules.name(100),
+    platform: rules.optional(30),
+    game_type: rules.optional(50),
+    description: rules.textArea(2000),
+  }),
+  (req, res) => {
   const { name, english_name, platform, game_id, game_type, description,
           developer, operator, release_date, config_path, adapter_progress,
           version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
@@ -303,7 +325,9 @@ gamesRouter.post('/', auth.checkPermission('games', 'edit'), (req, res) => {
   });
 });
 
-gamesRouter.put('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
+gamesRouter.put('/:id', auth.checkPermission('games', 'edit'),
+  validate({ name: rules.name(100), platform: rules.optional(30) }),
+  (req, res) => {
   const { name, english_name, platform, game_id, game_type, description,
           developer, operator, release_date, config_path, adapter_progress,
           version, package_size, adaptation_status, adaptation_notes, owner_id, online_status, quality,
@@ -386,7 +410,14 @@ testsRouter.get('/', auth.checkPermission('tests', 'view'), (req, res) => {
   });
 });
 
-testsRouter.post('/', auth.checkPermission('tests', 'edit'), (req, res) => {
+testsRouter.post('/', auth.checkPermission('tests', 'edit'),
+  validate({
+    name: rules.name(100),
+    status: rules.statusEnum(['pending','in_progress','passed','failed','blocked','skipped']),
+    priority: rules.requiredEnum(['low','medium','high'], '优先级'),
+    description: rules.textArea(2000),
+  }),
+  (req, res) => {
   const { name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description } = req.body;
   const sql = `INSERT INTO tests (name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -399,7 +430,9 @@ testsRouter.post('/', auth.checkPermission('tests', 'edit'), (req, res) => {
   });
 });
 
-testsRouter.put('/:id', auth.checkPermission('tests', 'edit'), (req, res) => {
+testsRouter.put('/:id', auth.checkPermission('tests', 'edit'),
+  validate({ name: rules.name(100), priority: rules.requiredEnum(['low','medium','high'], '优先级') }),
+  (req, res) => {
   const { name, game_id, device_id, tester_id, test_date, status, priority, result, bugs_count, description } = req.body;
   const sql = `UPDATE tests SET name = ?, game_id = ?, device_id = ?, tester_id = ?, test_date = ?, status = ?, priority = ?, result = ?, bugs_count = ?, description = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
@@ -439,7 +472,15 @@ bugsRouter.get('/', auth.checkPermission('bugs', 'view'), (req, res) => {
   });
 });
 
-bugsRouter.post('/', auth.checkPermission('bugs', 'edit'), (req, res) => {
+bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
+  validate({
+    device_name: rules.name(100),
+    priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
+    bug_status: rules.statusEnum(['new','in_progress','fixed','verified','closed','wontfix','reopened']),
+    description: rules.textArea(2000),
+    steps: rules.textArea(3000),
+  }),
+  (req, res) => {
   const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
   const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
@@ -466,7 +507,14 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'), (req, res) => {
   });
 });
 
-bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'), (req, res) => {
+bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'),
+  validate({
+    device_name: rules.name(100),
+    priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
+    bug_status: rules.statusEnum(['new','in_progress','fixed','verified','closed','wontfix','reopened']),
+    description: rules.textArea(2000),
+  }),
+  (req, res) => {
   const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
   const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?,
@@ -675,7 +723,13 @@ adaptationRouter.get('/device/:deviceId', (req, res) => {
 });
 
 // 添加适配记录
-adaptationRouter.post('/', (req, res) => {
+adaptationRouter.post('',
+  validate({
+    device_id: rules.id(),
+    game_id: rules.id(),
+    adapter_progress: rules.optional().isInt().min(0).max(100),
+  }),
+  (req, res) => {
   const { device_id, game_id, adapter_progress, owner_name, online_status, quality } = req.body;
   const sql = `INSERT OR REPLACE INTO adaptation_records (device_id, game_id, adapter_progress, owner_name, online_status, quality)
                VALUES (?, ?, ?, ?, ?, ?)`;
@@ -700,7 +754,9 @@ adaptationRouter.post('/batch', (req, res) => {
 });
 
 // 更新适配记录
-adaptationRouter.put('/:id', (req, res) => {
+adaptationRouter.put('/:id',
+  validate({ adapter_progress: rules.optional().isInt().min(0).max(100) }),
+  (req, res) => {
   const { adapter_progress, owner_name, online_status, quality } = req.body;
   const sql = `UPDATE adaptation_records SET adapter_progress = COALESCE(?, adapter_progress), 
                owner_name = COALESCE(?, owner_name), online_status = COALESCE(?, online_status), 
@@ -758,7 +814,13 @@ plansRouter.get('/:id', (req, res) => {
 });
 
 // 创建计划（默认草稿状态，自动生成编号）
-plansRouter.post('/', (req, res) => {
+plansRouter.post('',
+  validate({
+    title: rules.name(200),
+    status: rules.statusEnum(['draft','planned','in_progress','completed','cancelled']),
+    goal: rules.textArea(2000),
+  }),
+  (req, res) => {
   const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, games, status, requirement_id } = req.body;
   const planStatus = status || 'draft';
   const creatorId = req.user ? req.user.id : null;
@@ -794,7 +856,9 @@ plansRouter.post('/', (req, res) => {
 });
 
 // 更新计划元信息
-plansRouter.put('/:id', (req, res) => {
+plansRouter.put('/:id',
+  validate({ title: rules.name(200), status: rules.statusEnum(['draft','planned','in_progress','completed','cancelled']) }),
+  (req, res) => {
   const { title, plan_date, devices_json, interlace_version, client_version, goal, tab_name, status } = req.body;
   const sql = `UPDATE plans SET title = COALESCE(?, title), plan_date = COALESCE(?, plan_date), 
                devices_json = COALESCE(?, devices_json), interlace_version = COALESCE(?, interlace_version),
@@ -1017,7 +1081,12 @@ myTasksRouter.get('/:planGameId/test-cases', (req, res) => {
 });
 
 // 负责人提交进展（单条）
-myTasksRouter.put('/:planGameId', (req, res) => {
+myTasksRouter.put('/:planGameId',
+  validate({
+    adapt_status: rules.statusEnum(['not_started','in_progress','testing','completed','blocked']),
+    adapt_progress: rules.optional().isInt().min(0).max(100),
+  }),
+  (req, res) => {
   const userId = req.user ? req.user.id : null;
   const devMode = req.isDevMode; // 使用动态判断结果
   const { adapt_status, adapt_progress, remark } = req.body;
@@ -1321,7 +1390,14 @@ testCasesRouter.get('/:id', (req, res) => {
 });
 
 // 创建测试用例
-testCasesRouter.post('/', (req, res) => {
+testCasesRouter.post('',
+  validate({
+    name: rules.name(200),
+    priority: rules.requiredEnum(['low','medium','high','critical'], '优先级'),
+    steps: rules.textArea(5000),
+    expected_result: rules.textArea(3000),
+  }),
+  (req, res) => {
   const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags } = req.body;
   if (!name) return res.status(400).json({ error: '用例名称不能为空' });
   
@@ -1366,7 +1442,9 @@ testCasesRouter.post('/batch', (req, res) => {
 });
 
 // 更新测试用例
-testCasesRouter.put('/:id', (req, res) => {
+testCasesRouter.put('/:id',
+  validate({ name: rules.name(200), priority: rules.requiredEnum(['low','medium','high','critical'], '优先级') }),
+  (req, res) => {
   const { name, code, category, game_type, priority, precondition, steps, expected_result, is_template, tags, suite_id } = req.body;
   // suite_id 需要特殊处理：允许设为 null（从套件中移除）
   const hasSuiteId = suite_id !== undefined;
@@ -1495,7 +1573,12 @@ testCasesRouter.post('/plan-game/:planGameId/link', (req, res) => {
 });
 
 // 更新单条 plan_test_case 的执行状态 (pass/fail/block/pending)
-testCasesRouter.put('/execution/:ptcId', (req, res) => {
+testCasesRouter.put('/execution/:ptcId',
+  validate({
+    status: rules.requiredEnum(['pass','fail','block','pending','skipped'], '执行结果'),
+    remark: rules.textArea(1000),
+  }),
+  (req, res) => {
   const { status, remark } = req.body;
   const executorId = req.user ? req.user.id : null;
   const executedAt = (status && status !== 'pending') ? new Date().toISOString() : null;
@@ -1899,7 +1982,15 @@ requirementsRouter.get('/:id', (req, res) => {
 });
 
 // 创建需求
-requirementsRouter.post('/', (req, res) => {
+requirementsRouter.post('',
+  validate({
+    title: rules.name(200),
+    priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
+    status: rules.statusEnum(['draft','assigned','in_progress','planned','completed','closed','cancelled']),
+    description: rules.textArea(5000),
+    deadline: rules.optional(), // 日期格式由前端保证
+  }),
+  (req, res) => {
   const { title, description, priority, assigned_to, deadline, status } = req.body;
   if (!title) return res.status(400).json({ error: '需求标题不能为空' });
   const creatorId = req.user ? req.user.id : null;
@@ -1927,7 +2018,13 @@ requirementsRouter.post('/', (req, res) => {
 });
 
 // 更新需求
-requirementsRouter.put('/:id', (req, res) => {
+requirementsRouter.put('/:id',
+  validate({
+    title: rules.name(200),
+    priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
+    status: rules.statusEnum(['draft','assigned','in_progress','planned','completed','closed','cancelled']),
+  }),
+  (req, res) => {
   const { title, description, priority, assigned_to, deadline, status } = req.body;
   const sql = `UPDATE requirements SET 
     title = COALESCE(?, title), description = COALESCE(?, description),
@@ -2023,7 +2120,16 @@ versionsRouter.get('/:id', auth.checkPermission('devices', 'view'), (req, res) =
 });
 
 // 创建版本
-versionsRouter.post('/', auth.checkPermission('devices', 'edit'), (req, res) => {
+versionsRouter.post('/', auth.checkPermission('devices', 'edit'),
+  validate({
+    device_id: rules.id(),
+    version_number: rules.name(50),
+    version_type: rules.statusEnum(['firmware','driver','adapter','config','game','other']),
+    status: rules.statusEnum(['draft','testing','released','deprecated']),
+    changelog: rules.textArea(2000),
+    notes: rules.textArea(1000),
+  }),
+  (req, res) => {
   const { device_id, version_number, version_type, status, version_date,
           download_url, file_size, changelog, notes } = req.body;
   if (!device_id || !version_number) {
@@ -2046,7 +2152,14 @@ versionsRouter.post('/', auth.checkPermission('devices', 'edit'), (req, res) => 
 });
 
 // 更新版本（完整更新）
-versionsRouter.put('/:id', auth.checkPermission('devices', 'edit'), (req, res) => {
+versionsRouter.put('/:id', auth.checkPermission('devices', 'edit'),
+  validate({
+    device_id: rules.id(),
+    version_number: rules.name(50),
+    version_type: rules.statusEnum(['firmware','driver','adapter','config','game','other']),
+    status: rules.statusEnum(['draft','testing','released','deprecated']),
+  }),
+  (req, res) => {
   const { device_id, version_number, version_type, status, version_date,
           download_url, file_size, changelog, notes } = req.body;
   const updater_id = req.user ? req.user.id : null;

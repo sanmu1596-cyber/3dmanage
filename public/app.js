@@ -190,8 +190,77 @@ async function authFetch(url, options = {}) {
         throw new Error('权限不足');
     }
 
+    // 处理 400 请求参数错误（校验失败）
+    if (response.status === 400) {
+        try {
+            const errorData = await response.json();
+            const msg = errorData.error || '请求数据不合法';
+            showToast(msg, 'warning', 4000);
+        } catch(e) {
+            showToast('请求参数有误', 'warning');
+        }
+        throw new Error('请求参数错误');
+    }
+
+    // 处理 500+ 服务器错误
+    if (response.status >= 500) {
+        try {
+            const errorData = await response.json();
+            console.error('[服务器错误]', response.status, errorData);
+            showToast(errorData.error || '服务器内部错误，请稍后重试', 'danger', 4000);
+        } catch(e) {
+            console.error('[服务器错误]', response.status);
+            showToast(`服务器错误(${response.status})`, 'danger', 4000);
+        }
+        throw new Error('服务器错误');
+    }
+
     return response;
 }
+
+// ========== 全局错误处理增强 ==========
+
+/**
+ * 安全API调用包装器 — 统一错误提示 + 控制台日志
+ * @param {string} label - 操作名称（用于toast提示）
+ * @param {Function} fn - 返回Promise的异步函数
+ * @returns {Promise<any>} 返回原结果或抛出异常
+ * 用法: const data = await safeApiCall('保存成员', () => { return resp.json(); });
+ */
+async function safeApiCall(label, fn) {
+    try {
+        return await fn();
+    } catch (e) {
+        console.error(`[${label}] 操作失败:`, e);
+        // 网络错误特殊提示
+        if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
+            showToast('网络连接失败，请检查网络', 'danger', 5000);
+        }
+        // 401/403 已在 authFetch 中处理，这里不重复 toast
+        // 其他未知错误给一个通用提示（如果还没显示过）
+        throw e;
+    }
+}
+
+// 全局未捕获异常处理
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('[未捕获异常]', e.reason);
+    // 防止重复toast（authFetch已处理的401/403不再重复提示）
+    const msg = e.reason?.message || String(e.reason);
+    if (!msg.includes('未认证') && !msg.includes('权限不足')) {
+        showToast(`操作异常: ${msg.slice(0, 50)}`, 'danger');
+    }
+});
+
+window.addEventListener('error', function(e) {
+    if (e.error) {
+        console.error('[全局错误]', e.error);
+        // 只对非资源加载错误做用户提示
+        if (!e.target?.src && !e.target?.href) {
+            showToast(`页面出错: ${e.message}`, 'danger');
+        }
+    }
+});
 
 // 检查登录状态
 async function checkLoginStatus() {
@@ -1390,6 +1459,75 @@ const exportConfigs = {
         ]
     }
 };
+
+// ========== 打印 & PDF 导出 ==========
+
+/** 打印当前激活的Tab页面 */
+function printCurrentPage() {
+    const activeTab = document.querySelector('.tab-content.active');
+    if (!activeTab) { showToast('没有可打印的内容', 'warning'); return; }
+
+    // 设置打印日期水印
+    document.body.setAttribute('data-print-date',
+        '打印时间: ' + new Date().toLocaleString('zh-CN'));
+
+    window.print();
+
+    // 延迟清除（等打印对话框关闭）
+    setTimeout(() => { document.body.removeAttribute('data-print-date'); }, 1000);
+}
+
+/**
+ * 导出当前页面为PDF
+ * 使用 html2pdf.js (CDN动态加载)
+ */
+async function exportToPDF(moduleName) {
+    const activeTab = document.querySelector('.tab-content.active');
+    if (!activeTab) { showToast('没有可导出的内容', 'warning'); return; }
+
+    showToast('正在生成PDF，请稍候...', 'info');
+
+    try {
+        // 动态加载 html2pdf.js
+        if (typeof html2pdf === 'undefined') {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+        }
+
+        const element = activeTab.cloneNode(true);
+        // 清理不需要的元素
+        element.querySelectorAll('.more-actions-wrapper, .toolbar, .filter-panel, button, .more-actions-dropdown')
+            .forEach(el => el.remove());
+        element.style.background = 'white';
+        element.style.padding = '16px';
+
+        const opt = {
+            margin: [10, 10, 10, 10],
+            filename: `${moduleName || 'report'}_${new Date().toISOString().slice(0, 10)}.pdf`,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+
+        await html2pdf().set(opt).from(element).save();
+        showToast('PDF导出成功 ✅', 'success');
+    } catch (e) {
+        console.error('[PDF导出失败]', e);
+        // 降级：使用浏览器打印功能作为替代
+        showToast('PDF生成失败，将使用浏览器打印', 'warning');
+        printCurrentPage();
+    }
+}
+
+/** 动态加载JS脚本 */
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
 
 function exportToExcel(moduleName) {
     moduleName = moduleName || 'games';
@@ -6103,6 +6241,127 @@ document.addEventListener('click', function(e) {
         closeAllMoreActions();
     }
 });
+
+// ========== 附件上传/管理 ==========
+const ATTACH_API = '/api/attachments';
+
+/**
+ * 处理文件上传（从input file change触发）
+ * @param {Event} e - 文件选择事件
+ * @param {string} entityType - 实体类型: requirement, plan, bug, test 等
+ */
+async function handleFileUpload(e, entityType) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // 获取当前查看的实体ID
+    const entityId = getCurrentEntityId(entityType);
+    if (!entityId) { showToast('请先选择或保存一条记录', 'warning'); return; }
+
+    let successCount = 0;
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('entity_type', entityType);
+        formData.append('entity_id', String(entityId));
+
+        try {
+            const resp = await fetch(`${ATTACH_API}/upload`, { method: 'POST', body: formData });
+            const result = await resp.json();
+            if (result.success) successCount++;
+            else showToast(`上传「${file.name}」失败: ${result.error}`, 'danger');
+        } catch (err) {
+            showToast(`上传「${file.name}」失败: 网络错误`, 'danger');
+        }
+    }
+
+    if (successCount > 0) {
+        showToast(`成功上传 ${successCount}/${files.length} 个附件`, 'success');
+        loadAttachments(entityType, entityId);
+    }
+    // 清空input以便重复选择同一文件
+    e.target.value = '';
+}
+
+/**
+ * 获取当前正在查看的实体ID
+ */
+function getCurrentEntityId(entityType) {
+    // 从全局状态获取当前详情ID
+    if (entityType === 'requirement' && window.currentRequirementId) return window.currentRequirementId;
+    if (entityType === 'plan' && window.currentPlanId) return window.currentPlanId;
+    if (entityType === 'bug' && window.currentBugId) return window.currentBugId;
+    // 尝试从URL hash参数获取
+    const match = location.hash.match(/detail=(\d+)/);
+    return match ? parseInt(match[1]) : null;
+}
+
+/**
+ * 加载并渲染某实体的附件列表
+ */
+async function loadAttachments(entityType, entityId) {
+    if (!entityId) return;
+    try {
+        const resp = await fetch(`${ATTACH_API}/list/${entityType}/${entityId}`);
+        const result = await resp.json();
+        renderAttachmentList(result.data || [], entityType);
+    } catch (e) { console.error('[加载附件失败]', e); }
+}
+
+/** 渲染附件列表 */
+function renderAttachmentList(attachments, entityType) {
+    const listMap = {
+        requirement: 'req-attachment-list',
+        plan: 'plan-attachment-list',
+        bug: 'bug-attachment-list'
+    };
+    const container = document.getElementById(listMap[entityType]);
+    if (!container) return;
+
+    if (attachments.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-tertiary);font-size:12px;">暂无附件</span>';
+        return;
+    }
+
+    container.innerHTML = attachments.map(a => {
+        const icon = getFileIcon(a.original_name);
+        const sizeStr = a.size_bytes > 1024*1024 ? (a.size_bytes/1024/1024).toFixed(1)+'MB'
+                     : a.size_bytes > 1024 ? Math.round(a.size_bytes/1024)+'KB' : a.size_bytes+'B';
+        return `<div class="attachment-item">
+            <span class="attach-icon">${icon}</span>
+            <span class="attach-name" title="${escapeHtml(a.original_name)} (${sizeStr})">${escapeHtml(a.original_name)}</span>
+            <span class="attach-delete" onclick="deleteAttachment(${a.id}, '${entityType}')">✕</span>
+        </div>`;
+    }).join('');
+}
+
+/** 根据扩展名返回图标 */
+function getFileIcon(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    const map = { jpg:'🖼️', jpeg:'🖼️', png:'🖼️', gif:'🎬', webp:'🖼️', svg:'🎨',
+                 pdf:'📕', doc:'📘', docx:'📘', xls:'📊', xlsx:'📊', ppt:'📙', pptx:'📙',
+                 txt:'📝', csv:'📊', zip:'📦', log:'📋', json:'{}', default:'📎' };
+    return map[ext] || map.default;
+}
+
+/** 删除附件 */
+async function deleteAttachment(id, entityType) {
+    showConfirm('确定要删除此附件吗？', async () => {
+        try {
+            const resp = await fetch(`${ATTACH_API}/${id}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('附件已删除', 'success');
+                const eid = getCurrentEntityId(entityType);
+                loadAttachments(entityType, eid);
+            } else showToast(result.error, 'danger');
+        } catch (e) { showToast('删除失败', 'danger'); }
+    });
+}
+
+/** AOP拦截：加载详情时自动加载附件列表 */
+const _origLoadReqDetail = typeof loadRequirementDetail === 'function';
+// 在 switchTab AOP中已处理，这里通过 loadAttachments 按需调用
 
 // ==================== P1: 批量操作系统 ====================
 

@@ -11,9 +11,57 @@ function mountP0Routes(app) {
 
   const db = require('./database');
   const auth = require('./auth');
+  const { validate, rules } = require('./validator');
+  const path = require('path');
+  const multer = require('multer');
+  const fs = require('fs');
+
+  // 确保上传目录存在
+  const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
+  if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+  // Multer 配置：文件存储到 public/uploads/
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => { cb(null, UPLOAD_DIR); },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9\u4e00-\u9fff._-]/g, '_').slice(0, 50);
+      cb(null, `${Date.now()}_${safeName}${ext}`);
+    }
+  });
+  const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB限制
+    fileFilter: (req, file, cb) => {
+      const allowed = [
+        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.txt', '.csv', '.zip', '.log', '.json'
+      ];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowed.includes(ext)) return cb(null, true);
+      return cb(new Error(`不支持的文件类型: ${ext}`));
+    }
+  });
+
+  // ========== 附件表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    original_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime_type TEXT DEFAULT '',
+    size_bytes INTEGER DEFAULT 0,
+    uploaded_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)');
 
   // ========== 需求：指派给PM ==========
-  app.put('/api/requirements/:id/assign', auth.verifyToken, auth.checkPermission('config_plan', 'edit'), (req, res) => {
+  app.put('/api/requirements/:id/assign', auth.verifyToken, auth.checkPermission('config_plan', 'edit'),
+    validate({ assigned_pm_id: rules.optionalId() }),
+    (req, res) => {
     const { assigned_pm_id } = req.body;
     db.run("UPDATE requirements SET assigned_pm_id = ?, status = CASE WHEN ? IS NOT NULL AND status='draft' THEN 'assigned' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [assigned_pm_id || null, assigned_pm_id, req.params.id],
@@ -32,7 +80,9 @@ function mountP0Routes(app) {
   });
 
   // ========== 需求：关联计划 ==========
-  app.put('/api/requirements/:id/link-plan', auth.verifyToken, auth.checkPermission('config_plan', 'edit'), (req, res) => {
+  app.put('/api/requirements/:id/link-plan', auth.verifyToken, auth.checkPermission('config_plan', 'edit'),
+    validate({ plan_id: rules.optionalId() }),
+    (req, res) => {
     const { plan_id } = req.body;
     db.run("UPDATE plans SET requirement_id = NULL WHERE requirement_id = ?", [req.params.id], () => {
       if (plan_id) {
@@ -70,7 +120,13 @@ function mountP0Routes(app) {
     });
   });
 
-  commentsRouter.post('/', (req, res) => {
+  commentsRouter.post('',
+    validate({
+      entity_type: rules.requiredEnum(['game','plan','requirement','test','bug','device','member'], '实体类型'),
+      entity_id: rules.id(),
+      content: rules.required().maxLen(5000).minLen(1),
+    }),
+    (req, res) => {
     const { entity_type, entity_id, content } = req.body;
     if (!entity_type || !entity_id || !content) return res.status(400).json({ error: '参数不完整' });
     const mentionIds = (content.match(/@\d+/g) || []).map(m => parseInt(m.substring(1)));
@@ -186,6 +242,49 @@ function mountP0Routes(app) {
 
   // ========== 工作流引擎核心（暴露给其他路由复用） ==========
   global.triggerWorkflow = triggerWorkflow;
+
+  // ========== 附件上传/管理 API ==========
+  app.post('/api/attachments/upload', auth.verifyToken, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: '请选择文件' });
+    const { entity_type, entity_id } = req.body;
+    if (!entity_type || !entity_id) return res.status(400).json({ error: '缺少entity_type或entity_id' });
+    db.run(`INSERT INTO attachments (entity_type, entity_id, original_name, stored_name, mime_type, size_bytes, uploaded_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [entity_type, entity_id, req.file.originalname, req.file.filename,
+       req.file.mimetype || '', req.file.size, req.user?.id || null],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, id: this.lastID, filename: req.file.originalname, size: req.file.size });
+      });
+  });
+
+  app.get('/api/attachments/list/:entityType/:entityId', auth.verifyToken, (req, res) => {
+    db.all('SELECT * FROM attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC',
+      [req.params.entityType, req.params.entityId], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const items = (rows || []).map(a => ({ ...a, url: `/uploads/${a.stored_name}` }));
+        res.json({ success: true, data: items });
+      });
+  });
+
+  app.get('/api/attachments/:id', auth.verifyToken, (req, res) => {
+    db.get('SELECT * FROM attachments WHERE id = ?', [req.params.id], (err, row) => {
+      if (err || !row) return res.status(404).json({ error: '附件不存在' });
+      res.json({ success: true, data: { ...row, url: `/uploads/${row.stored_name}` } });
+    });
+  });
+
+  app.delete('/api/attachments/:id', auth.verifyToken, (req, res) => {
+    db.get('SELECT * FROM attachments WHERE id = ?', [req.params.id], (err, row) => {
+      if (err || !row) return res.status(404).json({ error: '附件不存在' });
+      fs.unlink(path.join(UPLOAD_DIR, row.stored_name), () => {});
+      db.run('DELETE FROM attachments WHERE id = ?', [req.params.id], function(err2) {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({ success: true });
+      });
+    });
+  });
+  app.use('/uploads', require('express').static(UPLOAD_DIR));
 }
 
 // ========== 工作流引擎 ==========

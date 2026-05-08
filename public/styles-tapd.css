@@ -2685,6 +2685,63 @@ tr:hover .action-icon-btn:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
+/* ========== 附件上传 Attachments ========== */
+.attachment-section {
+    margin-top: 16px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+}
+.attachment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.attachment-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+.attach-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    font-size: 12px;
+    color: var(--primary);
+    background: white;
+    border: 1px dashed var(--primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.attach-upload-btn:hover { background: var(--primary); color: white; }
+.attachment-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 24px; }
+.attachment-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: default;
+    max-width: 220px;
+    transition: border-color 0.15s;
+}
+.attachment-item:hover { border-color: var(--primary); }
+.attachment-item .attach-icon { font-size: 14px; flex-shrink: 0; }
+.attachment-item .attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-item .attach-delete {
+    cursor: pointer; color: var(--text-tertiary); flex-shrink: 0;
+    padding: 0 2px; font-size: 14px; line-height: 1;
+}
+.attachment-item .attach-delete:hover { color: #e24b4a; }
+
 /* ========== 评论组件 Comments ========== */
 .comments-section {
     margin-top: 20px;
@@ -4966,4 +5023,62 @@ tr:hover .action-icon-btn:hover {
 
 [data-theme="dark"] .filter-group label {
     color: var(--text-secondary);
+}
+
+/* ========== 打印样式 ========== */
+@media print {
+    /* 隐藏非内容区域 */
+    .sidebar, .top-bar, .toolbar, .more-actions-wrapper,
+    .more-actions-dropdown, #global-search, .search-overlay,
+    .toast-container, .modal-overlay, .btn, button,
+    .filter-panel { display: none !important; }
+
+    /* 全屏显示内容区 */
+    .main-body { overflow: visible !important; }
+    .tab-content {
+        display: block !important;
+        position: static !important;
+        overflow: visible !important;
+        background: white !important;
+        backdrop-filter: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    /* 表格打印优化 */
+    .table-container {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+    .data-table {
+        width: 100% !important;
+        font-size: 10pt !important;
+        border-collapse: collapse !important;
+    }
+    .data-table th, .data-table td {
+        padding: 6px 10px !important;
+        border: 1px solid #ccc !important;
+    }
+    .data-table th {
+        background: #f5f5f5 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .data-table tr { page-break-inside: avoid; }
+
+    /* 统计卡片 */
+    .stat-card { border: 1px solid #ddd; page-break-inside: avoid; }
+
+    /* 页脚信息 */
+    body::after {
+        content: attr(data-print-date);
+        position: fixed;
+        bottom: 8mm;
+        right: 8mm;
+        font-size: 8pt;
+        color: #999;
+    }
 }
