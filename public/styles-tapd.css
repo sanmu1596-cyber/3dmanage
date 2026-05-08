@@ -347,7 +347,7 @@ body {
     display: none;
     flex: 1;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
     padding: 16px;
     background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(2px);
