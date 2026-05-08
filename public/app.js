@@ -11403,5 +11403,241 @@ setTimeout(initAdminNav, 500);
 console.log('✅ 管理者看板模块已加载');
 
 
+// ==================== 评论组件 Comments Module ====================
+let currentReqId = null;      // 当前查看的需求ID
+let currentPlanId = null;     // 当前查看的计划ID
+let _membersCache = [];       // 成员缓存（用于@提及）
+
+/**
+ * 加载评论列表
+ * @param {string} entityType - 实体类型: requirement | plan | bug | task
+ * @param {number} entityId   - 实体ID
+ * @param {string} prefix     - 前缀: req | plan (对应DOM ID)
+ */
+async function loadComments(entityType, entityId, prefix) {
+    if (!entityId) return;
+    try {
+        const resp = await authFetch(`${API_BASE}/comments?entity_type=${entityType}&entity_id=${entityId}`);
+        const result = await resp.json();
+        const list = document.getElementById(`${prefix}-comments-list`);
+        const countEl = document.getElementById(`${prefix}-comments-count`);
+        if (!list) return;
+
+        if (result.success && result.data && result.data.length > 0) {
+            countEl.textContent = result.data.length;
+            list.innerHTML = result.data.map(c => renderCommentItem(c, entityType, entityId, prefix)).join('');
+        } else {
+            countEl.textContent = '0';
+            list.innerHTML = '<li class="comments-empty"><div class="comments-empty-icon">💬</div>暂无评论，来写第一条吧~</li>';
+        }
+    } catch (e) {
+        console.error('加载评论失败:', e);
+    }
+}
+
+/** 渲染单条评论 */
+function renderCommentItem(c, entityType, entityId, prefix) {
+    const user = getCurrentUser();
+    const isOwner = (c.user_id === user.id);
+    const isAdmin = IS_DEV_MODE || user.role_id === 1;
+    const canDelete = isOwner || isAdmin;
+    // 处理@mention高亮
+    let textHtml = escHtml(c.content || '');
+    textHtml = textHtml.replace(/@(\d+)/g, '<span class="mention-highlight">@$1</span>');
+    // 格式化时间
+    const timeStr = formatCommentTime(c.created_at);
+    // 头像取名字首字
+    const avatarChar = (c.user_name || '?').charAt(0).toUpperCase();
+
+    return `<li class="comment-item" id="comment-${c.id}">
+        <div class="comment-avatar-sm">${avatarChar}</div>
+        <div class="comment-body">
+            <div class="comment-meta">
+                <span class="comment-author">${escHtml(c.user_name || '未知用户')}</span>
+                <span class="comment-time">${timeStr}</span>
+            </div>
+            <div class="comment-text">${textHtml}</div>
+            ${canDelete ? `<div class="comment-actions"><button class="comment-action-btn" onclick="deleteComment(${c.id}, '${entityType}', ${entityId}, '${prefix}')">🗑️ 删除</button></div>` : ''}
+        </div></li>`;
+}
+
+/** 提交评论 */
+async function submitComment(entityType, entityId, prefix) {
+    const input = document.getElementById(`${prefix}-comment-input`);
+    const content = (input.value || '').trim();
+    if (!content) return showToast('请输入评论内容', 'warning');
+    if (!entityId) return showToast('数据异常，请刷新页面', 'danger');
+
+    try {
+        const btn = input.parentElement.querySelector('.comment-submit-btn');
+        if (btn) { btn.disabled = true; btn.textContent = '发送中...'; }
+
+        const resp = await authFetch(`${API_BASE}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity_type: entityType, entity_id: entityId, content })
+        });
+        const result = await resp.json();
+
+        if (result.success) {
+            input.value = '';
+            showToast('评论发表成功', 'success');
+            await loadComments(entityType, entityId, prefix);
+        } else {
+            showToast(result.error || '发送失败', 'danger');
+        }
+    } catch (e) {
+        showToast('网络错误', 'danger');
+    } finally {
+        const btn2 = input.parentElement.querySelector('.comment-submit-btn');
+        if (btn2) { btn2.disabled = false; btn2.textContent = '发送'; }
+    }
+}
+
+/** 删除评论 */
+async function deleteComment(commentId, entityType, entityId, prefix) {
+    showConfirm('确定要删除这条评论吗？', async () => {
+        try {
+            const resp = await authFetch(`${API_BASE}/comments/${commentId}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.success) {
+                showToast('评论已删除', 'success');
+                await loadComments(entityType, entityId, prefix);
+            } else {
+                showToast(result.error || '删除失败', 'danger');
+            }
+        } catch (e) {
+            showToast('操作失败', 'danger');
+        }
+    });
+}
+
+/** 初始化@提及功能 */
+function initMentionPicker(inputId, dropdownId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+
+    let hideTimer = null;
+
+    input.addEventListener('keyup', function(e) {
+        const val = this.value;
+        const pos = this.selectionStart;
+        // 找光标前的@符号
+        const beforeCursor = val.substring(0, pos);
+        const atIdx = beforeCursor.lastIndexOf('@');
+
+        if (atIdx >= 0 && (pos - atIdx - 1) <= 15) {
+            const query = val.substring(atIdx + 1, pos).toLowerCase();
+            showMentionDropdown(dropdown, query, input, atIdx);
+        } else {
+            hideMentionDropdown(dropdown);
+        }
+    });
+
+    input.addEventListener('blur', function() {
+        hideTimer = setTimeout(() => hideMentionDropdown(dropdown), 150);
+    });
+    input.addEventListener('focus', function() {
+        if (hideTimer) clearTimeout(hideTimer);
+    });
+}
+
+/** 显示@提及下拉 */
+function showMentionDropdown(dropdown, query, input, atIdx) {
+    if (_membersCache.length === 0) return;
+
+    const filtered = _membersCache.filter(m =>
+        m.real_name.toLowerCase().includes(query) || m.username.toLowerCase().includes(query)
+    ).slice(0, 8);
+
+    if (filtered.length === 0) { hideMentionDropdown(dropdown); return; }
+
+    dropdown.innerHTML = filtered.map(m =>
+        `<div class="mention-item" data-id="${m.id}" data-name="${escHtml(m.real_name)}">
+            <span class="mi-name">${escHtml(m.real_name)}</span>
+            <span class="mi-role">@${m.username}</span>
+        </div>`
+    ).join('');
+
+    dropdown.classList.add('show');
+
+    // 点击选择
+    dropdown.querySelectorAll('.mention-item').forEach(item => {
+        item.onclick = function() {
+            const uid = this.dataset.id;
+            const name = this.dataset.name;
+            const val = input.value;
+            // 替换@xxx为@uid
+            const beforeAt = val.substring(0, atIdx);
+            input.value = beforeAt + '@' + uid + ' ' + val.substring(input.selectionStart);
+            hideMentionDropdown(dropdown);
+            input.focus();
+        };
+    });
+}
+
+function hideMentionDropdown(dropdown) {
+    if (dropdown) dropdown.classList.remove('show');
+}
+
+/** 缓存成员列表（用于@提及） */
+async function cacheMembersForMention() {
+    if (_membersCache.length > 0) return;
+    try {
+        const resp = await authFetch(`${API_BASE}/users?is_member=true`);
+        const result = await resp.json();
+        if (result.data) _membersCache = result.data;
+    } catch (e) { /* 静默 */ }
+}
+
+/** 格式化评论时间 */
+function formatCommentTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr.replace(/-/g, '/'));
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+    return dateStr.slice(5, 16).replace('-', '-'); // MM-DD HH:mm
+}
+
+// ===== 集成到详情视图：需求详情 =====
+const _origOpenReqDetail = typeof openReqDetail === 'function' ? openReqDetail : null;
+if (_origOpenReqDetail) {
+    window.openReqDetail = async function(id) {
+        currentReqId = id;
+        await _origOpenReqDetail(id);
+        loadComments('requirement', id, 'req');
+        cacheMembersForMention();
+        initMentionPicker('req-comment-input', 'req-mention-dropdown');
+        // 设置头像
+        const user = getCurrentUser();
+        const avEl = document.getElementById('req-comment-avatar');
+        if (avEl) avEl.textContent = (user.real_name || user.username || '?').charAt(0).toUpperCase();
+    };
+}
+
+// ===== 集成到详情视图：计划详情 =====
+const _origOpenPlanDetail = typeof openPlanDetail === 'function' ? openPlanDetail : null;
+if (_origOpenPlanDetail) {
+    window.openPlanDetail = async function(planIndex) {
+        const plan = configPlans[planIndex];
+        if (!plan) return;
+        currentPlanId = plan.id;
+        await _origOpenPlanDetail(planIndex);
+        loadComments('plan', plan.id, 'plan');
+        cacheMembersForMention();
+        initMentionPicker('plan-comment-input', 'plan-mention-dropdown');
+        // 设置头像
+        const user = getCurrentUser();
+        const avEl = document.getElementById('plan-comment-avatar');
+        if (avEl) avEl.textContent = (user.real_name || user.username || '?').charAt(0).toUpperCase();
+    };
+}
+
+console.log('✅ 评论组件模块已加载（支持需求/计划评论区 + @提及）');
 
 
