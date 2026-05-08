@@ -75,9 +75,9 @@ function mountP0Routes(app) {
     if (!entity_type || !entity_id || !content) return res.status(400).json({ error: '参数不完整' });
     const mentionIds = (content.match(/@\d+/g) || []).map(m => parseInt(m.substring(1)));
     const userId = req.user ? req.user.id : null;
-    db.run("INSERT INTO comments (entity_type, entity_id, user_id, content, mentions) VALUES (?, ?, ?, ?, ?)",
+    const stmt = db.run("INSERT INTO comments (entity_type, entity_id, user_id, content, mentions) VALUES (?, ?, ?, ?, ?)",
       [entity_type, entity_id, userId, content, JSON.stringify(mentionIds)],
-      (err) => {
+      function(err) {  // 用function()确保this绑定到Statement对象
         if (err) return res.status(500).json({ error: err.message });
         const commentId = this.lastID;
         mentionIds.forEach((uid) => {
