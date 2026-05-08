@@ -6040,20 +6040,39 @@ function toggleMoreActions(btn) {
     const dropdown = wrapper.querySelector('.more-actions-dropdown');
     const isOpen = dropdown.classList.contains('show');
 
-    // 先关闭所有已打开的
+    // 先关闭所有已打开的（会把之前portal出去的下拉菜单归位）
     closeAllMoreActions();
 
     if (!isOpen) {
+        // Portal：将 dropdown 移到 <body> 层级，彻底跳出所有父容器 overflow/backdrop-filter 裁剪
+        const rect = btn.getBoundingClientRect();
+        // 用 JS 属性记录原始父容器（属性不受 DOM 移动影响）
+        dropdown._originalParent = wrapper;
+        document.body.appendChild(dropdown);
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+
         dropdown.classList.add('show');
         btn.classList.add('active');
     }
 }
 
 /**
- * 关闭所有"更多操作"下拉菜单
+ * 关闭所有"更多操作"下拉菜单，并 Portal 归位
  */
 function closeAllMoreActions() {
-    document.querySelectorAll('.more-actions-dropdown.show').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.more-actions-dropdown.show').forEach(d => {
+        d.classList.remove('show');
+        d.style.position = '';
+        d.style.top = '';
+        d.style.left = '';
+        // 归位到原始父容器
+        if (d._originalParent && !d._originalParent.contains(d)) {
+            d._originalParent.appendChild(d);
+        }
+        delete d._originalParent;
+    });
     document.querySelectorAll('.more-actions-btn.active').forEach(b => b.classList.remove('active'));
 }
 
