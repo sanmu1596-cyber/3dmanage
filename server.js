@@ -2139,6 +2139,9 @@ app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
 
+// [P0] 挂载增强功能：需求指派/关联计划 + 评论CRUD + 管理者看板 + 工作流引擎
+require('./p0_routes').mountP0Routes(app);
+
 // 定期清理过期session（每小时执行一次）
 setInterval(() => {
   db.run('DELETE FROM sessions WHERE expires_at < datetime("now")', function(err) {
