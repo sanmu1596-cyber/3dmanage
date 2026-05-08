@@ -123,6 +123,9 @@
                         <a class="sidebar-item" data-tab="admin-dashboard" onclick="switchTab('admin-dashboard')" id="nav-admin-dashboard" style="display:none;">
                             <span class="sidebar-icon">👑</span>管理者看板
                         </a>
+                        <a class="sidebar-item" data-tab="activity-logs" onclick="switchTab('activity-logs')">
+                            <span class="sidebar-icon">📋</span>操作日志
+                        </a>
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
@@ -978,6 +981,52 @@
                         <div class="chart-card-header">📈 近7天活动趋势</div>
                         <canvas id="admin-trend-chart" height="200"></canvas>
                     </div>
+                </section>
+
+                <!-- ========== 操作日志 Activity Logs ========== -->
+                <section id="activity-logs" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <span class="toolbar-title">📋 操作日志</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <select id="log-type-filter" onchange="loadActivityLogs(1)" style="padding:6px 12px;border:1px solid var(--border-color,#ddd);border-radius:6px;font-size:13px;background:var(--bg-input,#fff);color:var(--text-primary,#333);">
+                                <option value="all">全部类型</option>
+                                <option value="requirement">需求</option>
+                                <option value="plan">计划</option>
+                                <option value="task">任务</option>
+                                <option value="bug">缺陷</option>
+                                <option value="game">游戏</option>
+                                <option value="device">设备</option>
+                            </select>
+                            <button class="tool-btn" onclick="loadActivityLogs(1)" title="刷新">🔄 刷新</button>
+                        </div>
+                    </div>
+
+                    <!-- 统计概览 -->
+                    <div class="dashboard-cards" id="log-stats-cards" style="margin-bottom:16px;"></div>
+
+                    <!-- 日志列表 -->
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">#</th>
+                                    <th width="100">操作类型</th>
+                                    <th width="120">资源类型</th>
+                                    <th>资源名称</th>
+                                    <th width="130">操作人</th>
+                                    <th width="160">时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activity-logs-tbody">
+                                <tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div>加载中...</div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页 -->
+                    <div id="log-pagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px;padding:10px 0;"></div>
                 </section>
 
                 <!-- ========== 我的任务 ========== -->

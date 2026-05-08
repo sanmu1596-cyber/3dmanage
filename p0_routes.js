@@ -103,6 +103,43 @@ function mountP0Routes(app) {
 
   app.use('/api/comments', commentsRouter);
 
+  // ========== 增强版活动日志 API（支持筛选+分页） ==========
+  app.get('/api/activity-logs', auth.verifyToken, (req, res) => {
+    const { resource_type, page = 1, limit = 30 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    let sql = 'SELECT * FROM activity_log';
+    const params = [];
+    if (resource_type && resource_type !== 'all') {
+      sql += ' WHERE resource_type = ?';
+      params.push(resource_type);
+    }
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), offset);
+
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      // 同时返回总数
+      let countSql = 'SELECT COUNT(*) as total FROM activity_log';
+      const countParams = [];
+      if (resource_type && resource_type !== 'all') {
+        countSql += ' WHERE resource_type = ?';
+        countParams.push(resource_type);
+      }
+      db.get(countSql, countParams, (err2, countRow) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({ success: true, data: rows || [], total: countRow?.total || 0 });
+      });
+    });
+  });
+
+  // ========== 活动日志统计（各类型数量） ==========
+  app.get('/api/activity-logs/stats', auth.verifyToken, (req, res) => {
+    db.all("SELECT resource_type, COUNT(*) as cnt FROM activity_log GROUP BY resource_type ORDER BY cnt DESC", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
   // ========== 管理者看板 ==========
   app.get('/api/stats/admin-dashboard', auth.verifyToken, auth.checkPermission('user_management', 'view'), (req, res) => {
 

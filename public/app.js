@@ -11641,3 +11641,151 @@ if (_origOpenPlanDetail) {
 console.log('✅ 评论组件模块已加载（支持需求/计划评论区 + @提及）');
 
 
+// ==================== 操作日志 Activity Logs Module ====================
+let _logCurrentPage = 1;
+const _logPageSize = 30;
+
+const _resourceTypeLabels = {
+    requirement: '📄 需求', plan: '📋 计划', task: '🎮 任务', bug: '🐛 缺陷',
+    game: '🕹️ 游戏', device: '📱 设备', user: '👤 用户', member: '👥 成员',
+    config_plan: '⚙️ 配置', test: '🧪 测试', version: '📦 版本'
+};
+const _actionLabels = {
+    create: '✅ 创建', update: '✏️ 编辑', delete: '🗑️ 删除', assign: '👤 指派',
+    publish: '🚀 发布', close: '🏁 完成', link: '🔗 关联', unlink: '❌ 取消关联',
+    import: '📥 导入', export: '📤 导出', login: '🔓 登录'
+};
+
+/** 加载操作日志列表 */
+async function loadActivityLogs(page) {
+    if (page) _logCurrentPage = page;
+    const type = document.getElementById('log-type-filter')?.value || 'all';
+    try {
+        // 并行请求列表和统计
+        const [listRes, statsRes] = await Promise.all([
+            authFetch(`${API_BASE}/activity-logs?resource_type=${type}&page=${_logCurrentPage}&limit=${_logPageSize}`),
+            authFetch(`${API_BASE}/activity-logs/stats`)
+        ]);
+        const listData = await listRes.json();
+        const statsData = await statsRes.json();
+
+        if (listData.success) renderActivityLogTable(listData.data);
+        if (statsData.success) renderLogStats(statsData.data);
+
+        // 分页
+        renderLogPagination(listData.total);
+    } catch (e) {
+        console.error('加载操作日志失败:', e);
+        document.getElementById('activity-logs-tbody').innerHTML =
+            '<tr><td colspan="6" class="empty-state"><div>加载失败，请重试</div></td></tr>';
+    }
+}
+
+/** 渲染日志表格 */
+function renderActivityLogTable(logs) {
+    const tbody = document.getElementById('activity-logs-tbody');
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div>暂无操作日志</div></td></tr>`;
+        return;
+    }
+    tbody.innerHTML = logs.map((log, i) => {
+        const typeLabel = _resourceTypeLabels[log.resource_type] || log.resource_type;
+        const actionLabel = _actionLabels[log.action] || log.action;
+        const timeStr = (log.created_at || '').slice(5, 16).replace('T', ' ');
+        return `<tr>
+            <td class="text-center">${(_logCurrentPage - 1) * _logPageSize + i + 1}</td>
+            <td><span style="font-size:12px;">${actionLabel}</span></td>
+            <td><span style="font-size:12px;color:var(--text-secondary);">${typeLabel}</span></td>
+            <td>${escHtml(log.resource_name || '-')}</td>
+            <td>${escHtml(log.user_name || '-')}</td>
+            <td style="color:var(--text-light,#888);font-size:12px;">${timeStr}</td>
+        </tr>`;
+    }).join('');
+}
+
+/** 渲染类型统计卡片 */
+function renderLogStats(stats) {
+    const container = document.getElementById('log-stats-cards');
+    if (!container) return;
+    if (!stats || stats.length === 0) { container.innerHTML = ''; return; }
+
+    const total = stats.reduce((s, item) => s + (item.cnt || 0), 0);
+    container.innerHTML = stats.slice(0, 6).map(s => `
+        <div class="dash-card" style="cursor:pointer;${document.getElementById('log-type-filter')?.value===s.resource_type?'border-color:var(--primary);':''}"
+             onclick="document.getElementById('log-type-filter').value='${s.resource_type}';loadActivityLogs(1);">
+            <div class="dash-card-icon">${_resourceTypeLabels[s.resource_type]?.split(' ')[0] || '📋'}</div>
+            <div class="dash-card-info">
+                <div class="dash-card-num">${s.cnt}</div>
+                <div class="dash-card-label">${_resourceTypeLabels[s.resource_type]?.substring(2) || s.resource_type}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+/** 渲染分页 */
+function renderLogPagination(total) {
+    const container = document.getElementById('log-pagination');
+    if (!container) return;
+    const totalPages = Math.ceil(total / _logPageSize);
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+    let html = `<span style="font-size:12px;color:var(--text-muted);">共 ${total} 条 / ${totalPages} 页</span>`;
+    html += `<button class="tool-btn" ${ _logCurrentPage<=1 ?'disabled':'' } onclick="loadActivityLogs(${_logCurrentPage-1})">上一页</button>`;
+    for (let p=1;p<=totalPages;p++) {
+        if(p===1||p===totalPages||(p>=_logCurrentPage-1&&p<=_logCurrentPage+1)){
+            html+=`<button class="tool-btn" ${p===_logCurrentPage ?'style="background:var(--primary);color:#fff;"':'' } onclick="loadActivityLogs(${p})">${p}</button>`;
+        } else if ([_logCurrentPage-2,_logCurrentPage+2].includes(p)) html+=`<span style="color:var(--text-muted)">...</span>`;
+    }
+    html+=`<button class="tool-btn" ${ _logCurrentPage>=totalPages ?'disabled':'' } onclick="loadActivityLogs(${_logCurrentPage+1})">下一页</button>`;
+    container.innerHTML = html;
+}
+
+// 切换到日志tab时自动加载
+const _origSwitchTab2 = window.switchTab;
+window.switchTab = function(tabId) {
+    _origSwitchTab2(tabId);
+    if (tabId === 'activity-logs') loadActivityLogs(1);
+};
+
+
+// ==================== 导出功能扩展 Export Enhancement ====================
+Object.assign(exportConfigs, {
+    requirements: {
+        sheetName: '需求列表',
+        getData: () => requirementsData || [],
+        columns: [
+            { key: 'req_no', label: '需求编号' }, { key: 'title', label: '标题' },
+            { key: 'priority', label: '优先级' }, { key: 'status', label: '状态' },
+            { key: 'assigned_name', label: '指派PM' }, { key: 'creator_name', label: '创建者' },
+            { key: 'deadline', label: '截止日期' }, { key: 'created_at', label: '创建时间' }
+        ]
+    },
+    plans: {
+        sheetName: '配置计划',
+        getData: () => configPlans || [],
+        columns: [
+            { key: 'planNo', label: '计划编号' }, { key: 'title', label: '计划标题' },
+            { key: 'status', label: '状态' }, { key: 'date', label: '日期' },
+            { key: 'goal', label: '目标说明' }, { key: 'gameCount', label: '游戏数' },
+            { key: 'requirementTitle', label: '关联需求' }
+        ]
+    }
+});
+
+
+// ==================== 全局搜索增强：支持需求/计划 ====================
+(function() {
+    // 在全局搜索初始化后注入新的搜索源
+    setTimeout(() => {
+        // 检查是否有搜索结果数组可以扩展
+        if (typeof window._searchSources !== 'undefined') {
+            window._searchSources.push(
+                { id: 'requirements', label: '需求', icon: '📄', tab: 'requirements' },
+                { id: 'plans', label: '计划', icon: '📋', tab: 'config-plan' }
+            );
+        }
+    }, 2000);
+})();
+
+console.log('✅ 通用增强模块已加载（操作日志页面 + 导出扩展 + 搜索增强）');
+
