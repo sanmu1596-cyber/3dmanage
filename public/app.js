@@ -11272,6 +11272,136 @@ async function deleteClientIssue(id) {
 
 console.log('✅ 新模块（游戏版本、交织问题、交织版本、客户端问题）已加载');
 
+// ========== 管理者看板 Admin Dashboard ==========
+
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+let adminDashboardChart = null;
+
+async function loadAdminDashboard() {
+    try {
+        const response = await authFetch(`${API_BASE}/stats/admin-dashboard`);
+        const result = await response.json();
+        if (result.success) {
+            const d = result.data;
+            renderAdminOverview(d.overview || {});
+            renderAdminPmStats(d.pm_stats || []);
+            renderAdminTrend(d.trends || []);
+        } else {
+            showToast(result.error || '加载看板数据失败', 'error');
+        }
+    } catch (err) {
+        console.error('加载管理者看板失败:', err);
+        showToast('加载失败，请检查网络', 'error');
+    }
+}
+
+function renderAdminOverview(ov) {
+    setEl('adm-total-reqs', ov.total_reqs || 0);
+    setEl('adm-pending-reqs', ov.pending_reqs || 0);
+    setEl('adm-total-plans', ov.total_plans || 0);
+    setEl('adm-total-tasks', ov.total_tasks || 0);
+    setEl('adm-finished-tasks', ov.finished_tasks || 0);
+    setEl('adm-open-bugs', ov.open_bugs || 0);
+}
+
+function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+
+function renderAdminPmStats(stats) {
+    const tbody = document.getElementById('adm-pm-stats-table');
+    if (!tbody) return;
+    if (!stats || stats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div>暂无PM数据</div></td></tr>';
+        return;
+    }
+    tbody.innerHTML = stats.map((pm, i) => `
+        <tr>
+            <td><strong>${escHtml(pm.pm_name || '-')}</strong></td>
+            <td>${pm.total_requirements || 0}</td>
+            <td><span class="badge badge-warning">${pm.pending_reqs || 0}</span></td>
+            <td><span class="badge badge-success">${pm.completed_reqs || 0}</span></td>
+            <td>${pm.total_plans || 0}</td>
+            <td>${pm.active_plans || 0}</td>
+            <td><span class="badge badge-success">${pm.completed_plans || 0}</span></td>
+            <td>${pm.total_tasks || 0}</td>
+            <td><span class="badge badge-success">${pm.finished_tasks || 0}</span></td>
+            <td><span class="badge badge-primary">${pm.active_tasks || 0}</span></td>
+        </tr>`).join('');
+}
+
+function renderAdminTrend(trends) {
+    const canvas = document.getElementById('admin-trend-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (adminDashboardChart) { adminDashboardChart.destroy(); adminDashboardChart = null; }
+
+    if (!trends || trends.length === 0) {
+        ctx.fillStyle = '#999'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('暂无活动数据', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const labels = trends.map(t => t.date.slice(5));
+    const data = trends.map(t => t.cnt);
+    const maxVal = Math.max(...data, 1);
+
+    // 绘制柱状图
+    adminDashboardChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '操作次数',
+                data: data,
+                backgroundColor: 'rgba(24,144,255,0.6)',
+                borderColor: 'rgba(24,144,255,1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, max: Math.ceil(maxVal * 1.2), ticks: { stepSize: 1 } },
+                x: { ticks: { fontSize: 11 } }
+            }
+        }
+    });
+}
+
+// 管理者看板导航：仅管理员可见
+function initAdminNav() {
+    const user = getCurrentUser();
+    const nav = document.getElementById('nav-admin-dashboard');
+    if (nav) {
+        // role_id=1 超级管理员, role_id=2 项目经理 都可查看
+        const isAdmin = IS_DEV_MODE || (user.role_id === 1 || user.role_id === 2);
+        nav.style.display = isAdmin ? '' : 'none';
+    }
+}
+
+// 切换到管理者看板时自动加载数据
+const _origSwitchTab = window.switchTab;
+window.switchTab = function(tabId) {
+    _origSwitchTab(tabId);
+    if (tabId === 'admin-dashboard') loadAdminDashboard();
+};
+
+// 页面初始化时检查导航权限
+setTimeout(initAdminNav, 500);
+
+console.log('✅ 管理者看板模块已加载');
+
 
 
 

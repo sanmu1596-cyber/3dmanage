@@ -120,6 +120,9 @@
                         <a class="sidebar-item" data-tab="requirements" onclick="switchTab('requirements')">
                             <span class="sidebar-icon">📄</span>需求管理
                         </a>
+                        <a class="sidebar-item" data-tab="admin-dashboard" onclick="switchTab('admin-dashboard')" id="nav-admin-dashboard" style="display:none;">
+                            <span class="sidebar-icon">👑</span>管理者看板
+                        </a>
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
@@ -886,6 +889,77 @@
                                 </div>
                             </form>
                         </div>
+                    </div>
+                </section>
+
+                <!-- ========== 管理者看板 Admin Dashboard ========== -->
+                <section id="admin-dashboard" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <span class="toolbar-title">👑 管理者看板</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="tool-btn" onclick="loadAdminDashboard()" title="刷新数据">🔄 刷新</button>
+                        </div>
+                    </div>
+
+                    <!-- 总览统计卡片 -->
+                    <div class="dashboard-cards" id="admin-overview-cards">
+                        <div class="dash-card dash-card-primary">
+                            <div class="dash-card-icon">📄</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-total-reqs">0</div><div class="dash-card-label">需求总数</div></div>
+                        </div>
+                        <div class="dash-card dash-card-warning">
+                            <div class="dash-card-icon">⏳</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-pending-reqs">0</div><div class="dash-card-label">待处理需求</div></div>
+                        </div>
+                        <div class="dash-card dash-card-success">
+                            <div class="dash-card-icon">📋</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-total-plans">0</div><div class="dash-card-label">配置计划</div></div>
+                        </div>
+                        <div class="dash-card dash-card-info">
+                            <div class="dash-card-icon">🎮</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-total-tasks">0</div><div class="dash-card-label">适配任务</div></div>
+                        </div>
+                        <div class="dash-card dash-card-success">
+                            <div class="dash-card-icon">✅</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-finished-tasks">0</div><div class="dash-card-label">已完成任务</div></div>
+                        </div>
+                        <div class="dash-card dash-card-danger">
+                            <div class="dash-card-icon">🐛</div>
+                            <div class="dash-card-info"><div class="dash-card-num" id="adm-open-bugs">0</div><div class="dash-card-label">待修复缺陷</div></div>
+                        </div>
+                    </div>
+
+                    <!-- PM绩效表格 -->
+                    <div class="table-container" style="margin-top:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border-light);">
+                            <strong>👥 项目经理绩效一览</strong>
+                            <span style="font-size:13px;color:var(--text-secondary);">按完成任务数排序</span>
+                        </div>
+                        <table class="data-table">
+                            <thead><tr>
+                                <th>PM姓名</th>
+                                <th>需求数</th>
+                                <th>待处理需求</th>
+                                <th>已完成需求</th>
+                                <th>计划数</th>
+                                <th>进行中计划</th>
+                                <th>已完成计划</th>
+                                <th>总任务数</th>
+                                <th>已完成任务</th>
+                                <th>进行中任务</th>
+                            </tr></thead>
+                            <tbody id="adm-pm-stats-table">
+                                <tr><td colspan="10" class="empty-state"><div>加载中...</div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 活动趋势 -->
+                    <div class="chart-card" style="margin-top:16px;">
+                        <div class="chart-card-header">📈 近7天活动趋势</div>
+                        <canvas id="admin-trend-chart" height="200"></canvas>
                     </div>
                 </section>
 
