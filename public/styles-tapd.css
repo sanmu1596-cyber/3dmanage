@@ -108,6 +108,17 @@
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+    /* 补齐缺失变量 — 兼容全量组件 */
+    --bg-white: #0c1726;
+    --bg-primary: #0c1726;
+    --bg-body: #0a0f1a;
+    --primary-bg: rgba(24, 144, 255, 0.12);
+    --text-main: #e8eaed;
+    --text-muted: #9aa0b0;
+    --text-tertiary: #606878;
+    --border-main: rgba(255, 255, 255, 0.10);
+    --border-color: rgba(255, 255, 255, 0.10);
 }
 
 body {
@@ -580,6 +591,193 @@ body {
 [data-theme="dark"] .more-actions-dropdown .dropdown-divider {
     background: var(--border);
 }
+
+/* ==================== 深色模式 — 全面组件覆盖（补齐遗漏）==================== */
+
+[data-theme="dark"] .tool-btn {
+    background: rgba(18, 30, 48, 0.9);
+    border-color: var(--border);
+}
+[data-theme="dark"] .tool-btn:hover {
+    background: var(--bg-elevated);
+}
+
+[data-theme="dark"] .compact-select,
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] textarea,
+[data-theme="dark"] .form-input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .btn {
+    background: rgba(24, 144, 255, 0.15);
+    color: var(--primary-hover);
+    border-color: rgba(24, 144, 255, 0.3);
+}
+[data-theme="dark"] .btn:hover {
+    background: rgba(24, 144, 255, 0.25);
+}
+[data-theme="dark"] .btn-secondary {
+    background: rgba(18, 30, 48, 0.9);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--bg-elevated);
+}
+
+/* 行内编辑 */
+[data-theme="dark"] .inline-edit-text,
+[data-theme="dark"] .inline-edit-input,
+[data-theme="dark"] .inline-edit-textarea,
+[data-theme="dark"] .inline-edit-select {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+}
+
+/* 模态框 */
+[data-theme="dark"] .modal-overlay { backdrop-filter: blur(4px); }
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .modal-body {
+    background: #0c1726;
+    border-color: var(--border);
+}
+[data-theme="dark"] .modal-header {
+    background: rgba(12, 22, 36, 0.95);
+    border-bottom-color: var(--border);
+}
+[data-theme="dark"] .modal-footer {
+    background: rgba(12, 22, 36, 0.95);
+    border-top-color: var(--border);
+}
+[data-theme="dark"] .confirm-modal .modal-content { background: #0c1726; }
+
+/* 表单 */
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+/* 游戏选择面板 */
+[data-theme="dark"] .game-select-panel {
+    background: #0c1726;
+    border-color: var(--border);
+}
+[data-theme="dark"] .game-select-item:hover {
+    background: var(--bg-elevated);
+}
+[data-theme="dark"] .game-search-input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+/* Tag输入 */
+[data-theme="dark"] .tag-input-container {
+    background: var(--bg-input);
+    border-color: var(--border);
+}
+[data-theme="dark"] .tag-input-container input {
+    background: transparent;
+    color: var(--text-primary);
+}
+[data-theme="dark"] .tag-item {
+    background: rgba(24, 144, 255, 0.15);
+    color: var(--primary-hover);
+}
+[data-theme="dark"] .tag-delete { color: var(--text-muted); }
+
+/* 字段设置Tab */
+[data-theme="dark"] .field-group-tab {
+    background: rgba(18, 30, 48, 0.9);
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+[data-theme="dark"] .field-group-tab.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+/* 附件 */
+[data-theme="dark"] .attach-upload-btn {
+    background: rgba(18, 30, 48, 0.9);
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+[data-theme="dark"] .attach-upload-btn:hover {
+    background: var(--bg-elevated);
+    border-color: var(--primary);
+}
+[data-theme="dark"] .attachment-item {
+    background: rgba(18, 30, 48, 0.7);
+    border-color: var(--border);
+}
+[data-theme="dark"] .attachment-item .attach-delete { color: var(--text-tertiary); }
+
+/* 计划卡片 */
+[data-theme="dark"] .my-task-plan-card {
+    background: rgba(12, 22, 36, 0.92);
+    border-color: var(--border);
+}
+
+/* 标签页（通用）*/
+[data-theme="dark"] .tab-nav .tab-item {
+    color: var(--text-secondary);
+}
+[data-theme="dark"] .tab-nav .tab-item.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* 状态标签 danger hover */
+[data-theme="dark"] .dropdown-item.danger:hover {
+    background: rgba(244, 67, 54, 0.15);
+}
+
+/* 搜索高亮 */
+[data-theme="dark"] .highlight-match {
+    background: rgba(255, 213, 79, 0.25);
+    color: #ffd34f;
+}
+
+/* 批量操作栏 */
+[data-theme="dark"] .batch-toolbar {
+    background: rgba(12, 22, 36, 0.95);
+    border-color: var(--border);
+}
+
+/* 适配矩阵单元格 */
+[data-theme="dark"] .matrix-cell {
+    background: rgba(12, 22, 36, 0.85);
+    border-color: var(--border-light);
+}
+[data-theme="dark"] .matrix-cell.selected {
+    background: rgba(24, 144, 255, 0.2);
+    border-color: var(--primary);
+}
+
+/* 测试用例选择器 */
+[data-theme="dark"] .test-case-selector {
+    background: #0c1726;
+    border-color: var(--border);
+}
+
+/* 进度条文字 */
+[data-theme="dark"] .progress-text { color: var(--text-main); }
+
+/* 评论计数背景 */
+[data-theme="dark"] .comment-count { background: rgba(24,144,255,0.12); }
+
 
 .tool-icon {
     font-size: 14px;
