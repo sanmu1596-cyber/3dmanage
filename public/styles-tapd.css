@@ -556,7 +556,7 @@ body {
 
 /* 深色主题适配 */
 [data-theme="dark"] .more-actions-btn {
-    background: var(--bg-primary);
+    background: rgba(18, 30, 48, 0.9);
     border-color: var(--border);
     color: var(--text-secondary);
 }
@@ -567,9 +567,9 @@ body {
     color: var(--primary);
 }
 [data-theme="dark"] .more-actions-dropdown {
-    background: var(--bg-primary);
+    background: #0c1726;
     border-color: var(--border);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
 }
 [data-theme="dark"] .more-actions-dropdown .dropdown-item {
     color: var(--text-primary);
