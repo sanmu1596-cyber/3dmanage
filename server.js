@@ -51,6 +51,76 @@ db.run(`CREATE TABLE IF NOT EXISTS activity_log (
 // 注：已有数据库的activity_log表可能缺少user_id/ip_address/user_agent列
 // 新建数据库已包含这些列。旧库兼容：INSERT时新列为NULL/默认值，不影响功能
 
+// ==================== 新模块表（原 migration_new_modules）====================
+// 启动时自动确保这些表存在，避免手动执行遗漏
+const newModuleTables = [
+  // 游戏版本表
+  `CREATE TABLE IF NOT EXISTS game_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER,
+    game_name TEXT,
+    version_number TEXT NOT NULL,
+    status TEXT DEFAULT 'testing',
+    version_date TEXT,
+    changelog TEXT,
+    notes TEXT,
+    updater_id INTEGER,
+    updater_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // 交织问题表
+  `CREATE TABLE IF NOT EXISTS interlace_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_type TEXT,
+    version TEXT,
+    priority TEXT,
+    issue_desc TEXT,
+    owner TEXT,
+    status TEXT DEFAULT '待处理',
+    remarks TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // 交织版本表
+  `CREATE TABLE IF NOT EXISTS interlace_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version_number TEXT NOT NULL,
+    status TEXT DEFAULT 'testing',
+    version_date TEXT,
+    changelog TEXT,
+    notes TEXT,
+    updater_id INTEGER,
+    updater_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // 客户端问题表
+  `CREATE TABLE IF NOT EXISTS client_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_type TEXT,
+    version TEXT,
+    priority TEXT,
+    issue_desc TEXT,
+    owner TEXT,
+    status TEXT DEFAULT '待处理',
+    remarks TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // 索引
+  'CREATE INDEX IF NOT EXISTS idx_game_versions_game ON game_versions(game_id)',
+  'CREATE INDEX IF NOT EXISTS idx_game_versions_status ON game_versions(status)',
+  'CREATE INDEX IF NOT EXISTS idx_interlace_issues_status ON interlace_issues(status)',
+  'CREATE INDEX IF NOT EXISTS idx_interlace_versions_status ON interlace_versions(status)',
+  'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)'
+];
+newModuleTables.forEach((sql, i) => {
+  db.run(sql, (err) => {
+    if (err) console.error(`  [启动] 新模块建表 ${i+1} 失败:`, err.message);
+  });
+});
+
 // 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
 function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
   const userName = (req && req.user) ? (req.user.real_name || req.user.username) : 'system';
