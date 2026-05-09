@@ -253,16 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * 切换下拉菜单显示/隐藏
+ * 注意：dropdown 可能被 Portal 移到 <body>，不能用 wrapper.querySelector 查找
  */
 function toggleMoreActions(btn) {
     const wrapper = btn.closest('.more-actions-wrapper');
-    const dropdown = wrapper.querySelector('.more-actions-dropdown');
-    const isOpen = dropdown.classList.contains('show');
+    // 用按钮的 active 状态判断是否已打开（可靠，不受 Portal 影响）
+    const isOpen = btn.classList.contains('active');
 
     // 先关闭所有已打开的（会把之前portal出去的下拉菜单归位）
     closeAllMoreActions();
 
     if (!isOpen) {
+        // 归位后重新查找 dropdown（此时已回到 wrapper 内）
+        const dropdown = wrapper.querySelector('.more-actions-dropdown');
+        if (!dropdown) return;
         // Portal：将 dropdown 移到 <body> 层级，彻底跳出所有父容器 overflow/backdrop-filter 裁剪
         const rect = btn.getBoundingClientRect();
         // 用 JS 属性记录原始父容器（属性不受 DOM 移动影响）
