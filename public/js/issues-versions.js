@@ -11,9 +11,6 @@ let allVersionsData = [];           // 全部版本数据
 let versionsReleasedData = [];      // 已发布
 let versionsTestingData = [];       // 测试中
 let currentVersionSubTab = 'ver-released';
-let versionsReleasedData = [];      // 已发布
-let versionsTestingData = [];       // 测试中
-let currentVersionSubTab = 'ver-released';
 
 // 切换版本管理子Tab
 function switchVersionTab(subTab) {
