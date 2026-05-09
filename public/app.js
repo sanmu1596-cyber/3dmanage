@@ -619,6 +619,9 @@ async function loadTabData(tabId, switchId) {
             await loadVersions();
             await loadClientIssues();
             break;
+        case 'activity-logs':
+            // loadActivityLogs 由 social.js 定义并通过 AOP 触发，此处确保 tab 可切换
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
