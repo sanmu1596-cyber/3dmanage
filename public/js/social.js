@@ -374,6 +374,66 @@ Object.assign(exportConfigs, {
     }
 });
 
+// ========== 纯前端 CSV / JSON 导出 ==========
+/**
+ * 导出数据为CSV文件（浏览器下载）
+ * @param {Array} data - 对象数组
+ * @param {Array} columns - [{key, label}] 列配置
+ * @param {String} filename - 文件名（不含扩展名）
+ */
+function exportToCSV(data, columns, filename) {
+    if (!data || !data.length) { showToast('没有数据可导出', 'warning'); return; }
+    const BOM = '\uFEFF'; // UTF-8 BOM for Excel
+    const header = columns.map(c => c.label).join(',');
+    const rows = data.map(row =>
+        columns.map(c => {
+            let val = row[c.key];
+            if (val === null || val === undefined) val = '';
+            val = String(val).replace(/"/g, '""');
+            return `"${val}"`;
+        }).join(',')
+    );
+    const csv = BOM + [header, ...rows].join('\n');
+    downloadFile(csv, filename + '.csv', 'text/csv;charset=utf-8;');
+}
+
+/**
+ * 导出数据为JSON文件（浏览器下载）
+ */
+function exportToJSON(data, filename) {
+    if (!data || !data.length) { showToast('没有数据可导出', 'warning'); return; }
+    const json = JSON.stringify(data, null, 2);
+    downloadFile(json, filename + '.json', 'application/json');
+}
+
+/**
+ * 通用文件下载触发器
+ */
+function downloadFile(content, mimeType, charset) {
+    const blob = new Blob([content], { type: charset || mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'download';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
+}
+
+/**
+ * 快捷导出当前列表
+ * @param {String} moduleKey - exportConfigs中的key
+ * @param {String} format - 'csv' | 'json'
+ */
+function quickExport(moduleKey, format) {
+    const config = exportConfigs[moduleKey];
+    if (!config) { showToast('不支持导出: ' + moduleKey, 'warning'); return; }
+    const data = typeof config.getData === 'function' ? config.getData() : [];
+    const fn = (config.sheetName || moduleKey) + '_' + new Date().toISOString().slice(0,10);
+    if (format === 'csv') exportToCSV(data, config.columns, fn);
+    else exportToJSON(data, fn);
+}
+
 
 // ==================== 全局搜索增强：支持需求/计划 ====================
 (function() {
