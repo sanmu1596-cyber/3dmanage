@@ -73,7 +73,7 @@ function mountP0Routes(app) {
           createNotification(db, assigned_pm_id, 'requirement_assigned', '新需求已指派给您',
             '管理者将一条需求指派给您处理，请查看并创建配置计划', 'requirement', parseInt(req.params.id));
         }
-        logActivity(db, 'assign', 'requirement', parseInt(req.params.id), '指派需求给PM');
+        logActivity(db, 'assign', 'requirement', parseInt(req.params.id), '指派需求给PM', req);
         res.json({ success: true });
       }
     );
@@ -91,7 +91,7 @@ function mountP0Routes(app) {
           db.run("UPDATE requirements SET plan_id = ?, status = 'planned', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             [plan_id, req.params.id], (err2) => {
             if (err2) return res.status(500).json({ error: err2.message });
-            logActivity(db, 'link', 'requirement', parseInt(req.params.id), '关联计划');
+            logActivity(db, 'link', 'requirement', parseInt(req.params.id), '关联计划', req);
             res.json({ success: true });
           });
         });
@@ -159,40 +159,56 @@ function mountP0Routes(app) {
 
   app.use('/api/comments', commentsRouter);
 
-  // ========== 增强版活动日志 API（支持筛选+分页） ==========
+  // ========== 增强版活动日志 API（审计日志，支持多维度筛选+分页） ==========
   app.get('/api/activity-logs', auth.verifyToken, (req, res) => {
-    const { resource_type, page = 1, limit = 30 } = req.query;
+    const { resource_type, action, user_id, date_from, date_to, keyword, page = 1, limit = 30 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let sql = 'SELECT * FROM activity_log';
+    let countSql = 'SELECT COUNT(*) as total FROM activity_log';
     const params = [];
-    if (resource_type && resource_type !== 'all') {
-      sql += ' WHERE resource_type = ?';
-      params.push(resource_type);
-    }
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    const conditions = [];
+
+    if (resource_type && resource_type !== 'all') { conditions.push('resource_type = ?'); params.push(resource_type); }
+    if (action && action !== 'all') { conditions.push('action = ?'); params.push(action); }
+    if (user_id) { conditions.push('user_id = ?'); params.push(parseInt(user_id)); }
+    if (date_from) { conditions.push("created_at >= ?"); params.push(date_from + ' 00:00:00'); }
+    if (date_to) { conditions.push("created_at <= ?"); params.push(date_to + ' 23:59:59'); }
+    if (keyword) { conditions.push("(resource_name LIKE ? OR changes_json LIKE ? OR user_name LIKE ?)"); params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`); }
+
+    const whereStr = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    sql += whereStr + ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    countSql += whereStr;
     params.push(parseInt(limit), offset);
 
     db.all(sql, params, (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
-      // 同时返回总数
-      let countSql = 'SELECT COUNT(*) as total FROM activity_log';
-      const countParams = [];
-      if (resource_type && resource_type !== 'all') {
-        countSql += ' WHERE resource_type = ?';
-        countParams.push(resource_type);
-      }
-      db.get(countSql, countParams, (err2, countRow) => {
+      db.get(countSql, params.slice(0, -2), (err2, countRow) => {
         if (err2) return res.status(500).json({ error: err2.message });
         res.json({ success: true, data: rows || [], total: countRow?.total || 0 });
       });
     });
   });
 
-  // ========== 活动日志统计（各类型数量） ==========
+  // ========== 活动日志统计（各类型数量 + 用户分布） ==========
   app.get('/api/activity-logs/stats', auth.verifyToken, (req, res) => {
-    db.all("SELECT resource_type, COUNT(*) as cnt FROM activity_log GROUP BY resource_type ORDER BY cnt DESC", [], (err, rows) => {
+    db.all("SELECT resource_type, COUNT(*) as cnt FROM activity_log GROUP BY resource_type ORDER BY cnt DESC", [], (err, typeRows) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true, data: rows || [] });
+      // 按用户统计
+      db.all("SELECT user_name, user_id, COUNT(*) as cnt FROM activity_log GROUP BY user_id, user_name ORDER BY cnt DESC LIMIT 10", [], (err2, userRows) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        // 按日期统计（最近30天）
+        db.all("SELECT DATE(created_at) as date, COUNT(*) as cnt FROM activity_log WHERE created_at >= DATE('now', '-30 days') GROUP BY DATE(created_at) ORDER BY date ASC", [], (err3, trendRows) => {
+          if (err3) return res.status(500).json({ error: err3.message });
+          res.json({
+            success: true,
+            data: {
+              by_type: typeRows || [],
+              by_user: userRows || [],
+              trends: trendRows || []
+            }
+          });
+        });
+      });
     });
   });
 
@@ -367,12 +383,13 @@ function createNotification(db, userId, type, title, message, entityType, entity
   }
 }
 
-function logActivity(db, action, entity, entityId, detail) {
+function logActivity(db, action, entity, entityId, detail, req) {
   if (typeof global.logActivity === 'function') {
-    global.logActivity(action, entity, entityId, detail);
+    global.logActivity(action, entity, entityId, detail, null, req);
   } else {
-    db.run("INSERT INTO activity_log (action, resource_type, resource_id, resource_name, user_name, created_at) VALUES (?, ?, ?, ?, '系统', datetime('now'))",
-      [action, 'requirement', entityId, detail]);
+    const userName = (req && req.user) ? (req.user.real_name || req.user.username) : '系统';
+    db.run("INSERT INTO activity_log (user_name, action, resource_type, resource_id, resource_name, ip_address, created_at) VALUES (?, ?, ?, ?, ?, '', datetime('now'))",
+      [userName, action, entity, entityId, detail]);
   }
 }
 

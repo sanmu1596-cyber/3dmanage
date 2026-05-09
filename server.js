@@ -37,22 +37,37 @@ app.use(express.static('public', {
 // ==================== 操作日志表 ====================
 db.run(`CREATE TABLE IF NOT EXISTS activity_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_name TEXT DEFAULT 'admin',
+  user_id INTEGER DEFAULT 0,
+  user_name TEXT DEFAULT 'system',
   action TEXT NOT NULL,
   resource_type TEXT NOT NULL,
   resource_id INTEGER,
   resource_name TEXT DEFAULT '',
   changes_json TEXT DEFAULT '{}',
+  ip_address TEXT DEFAULT '',
+  user_agent TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
+try { db.run(`ALTER TABLE activity_log ADD COLUMN user_id INTEGER DEFAULT 0`); } catch(e){}
+try { db.run(`ALTER TABLE activity_log ADD COLUMN ip_address TEXT DEFAULT ''`); } catch(e){}
+try { db.run(`ALTER TABLE activity_log ADD COLUMN user_agent TEXT DEFAULT ''`); } catch(e){}
 
-// 记录操作日志的辅助函数
-function logActivity(action, resourceType, resourceId, resourceName, changesJson) {
+// 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
+function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
+  const userName = (req && req.user) ? (req.user.real_name || req.user.username) : 'system';
+  const userId = (req && req.user) ? req.user.id : 0;
+  const ip = req ? (req.ip || req.headers['x-forwarded-for'] || '') : '';
+  const ua = req ? (req.headers['user-agent'] || '').slice(0, 200) : '';
   db.run(
-    `INSERT INTO activity_log (user_name, action, resource_type, resource_id, resource_name, changes_json) VALUES (?, ?, ?, ?, ?, ?)`,
-    ['admin', action, resourceType, resourceId || 0, resourceName || '', changesJson || '{}']
+    `INSERT INTO activity_log (user_id, user_name, action, resource_type, resource_id, resource_name, changes_json, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, userName, action, resourceType, resourceId || 0, resourceName || '', changesJson || '{}', ip, ua]
   );
 }
+
+// 审计日志自动清理（保留90天）
+setInterval(() => {
+  db.run("DELETE FROM activity_log WHERE created_at < datetime('now', '-90 days')", () => {});
+}, 24 * 60 * 60 * 1000);
 
 // ==================== 公开接口（不需要token） ====================
 // 前端通过此接口判断是否需要登录（根据访问来源动态判断）

@@ -5025,6 +5025,251 @@ tr:hover .action-icon-btn:hover {
     color: var(--text-secondary);
 }
 
+/* ==========================================
+   移动端响应式适配（增强版）
+   ========================================== */
+
+/* ---- 平板 & 小屏笔记本 (≤1024px) ---- */
+@media (max-width: 1024px) {
+    .sidebar { width: 180px; }
+    .sidebar-item { padding: 10px 14px; font-size: 13px; }
+    .content-area { margin-left: 180px; }
+    .stat-cards-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+    .game-select-body { flex-direction: column; }
+    .game-select-panel { min-height: 200px; }
+}
+
+/* ---- 手机横屏 & 小平板 (≤768px) 增强版 ---- */
+@media (max-width: 768px) {
+    /* 侧边栏：默认隐藏，点击☰浮出 */
+    .sidebar {
+        width: 0 !important;
+        overflow: hidden;
+        transition: width 0.25s ease;
+    }
+    .sidebar.show {
+        width: 260px !important;
+        position: fixed !important;
+        left: 0; top: 56px; bottom: 0;
+        z-index: 1000;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+    }
+
+    /* 侧边栏遮罩 */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 999;
+    }
+    .sidebar-overlay.active { display: block; }
+
+    /* 主内容区占满宽度 */
+    .content-area { margin-left: 0 !important; width: 100%; }
+
+    /* 顶栏紧凑化 */
+    .top-bar { padding: 0 12px; height: 48px; }
+    .sidebar-toggle { display: flex !important; font-size: 20px; padding: 8px 10px; }
+    .page-title { font-size: 15px; }
+
+    /* 工具栏：垂直堆叠 */
+    .toolbar {
+        flex-direction: column;
+        padding: 10px 12px;
+        gap: 8px;
+    }
+    .toolbar-left, .toolbar-right {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    .filter-input, .toolbar select {
+        flex: 1;
+        min-width: 120px;
+    }
+    .tool-btn { padding: 7px 12px; font-size: 13px; }
+
+    /* 表格：横向滚动 + 紧凑 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -12px;
+        padding: 0 12px;
+    }
+    .data-table { min-width: 700px; }
+    .data-table th, .data-table td {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    /* 统计卡片：2列或自适应 */
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .stat-card { padding: 14px; }
+
+    /* 弹窗：几乎全屏 */
+    .modal-content {
+        margin: 4% auto;
+        max-width: 96% !important;
+        max-height: 92vh;
+        width: 96% !important;
+        border-radius: var(--radius-md);
+    }
+    .modal-header { padding: 14px 16px; }
+    .modal-body { padding: 14px 16px; max-height: 60vh; overflow-y: auto; }
+
+    /* 表单网格：单列 */
+    .form-grid { grid-template-columns: 1fr; gap: 10px; }
+
+    /* 内容区内边距减小 */
+    .tab-content { padding: 12px; }
+
+    /* 计划卡片单列 */
+    .plan-cards-grid { grid-template-columns: 1fr; }
+
+    /* 字段卡片单列 */
+    .field-cards-container { grid-template-columns: 1fr; }
+
+    /* 详情面板：全屏覆盖 */
+    .detail-panel {
+        width: 100% !important;
+        max-width: none !important;
+        border-radius: 0;
+        right: 0 !important;
+    }
+
+    /* 操作按钮区域换行 */
+    .btn-group { flex-wrap: wrap; gap: 6px; }
+    .btn-group .tool-btn { flex: 0 0 auto; }
+
+    /* 附件区域适配 */
+    .attachment-list { flex-direction: column; }
+
+    /* 测试套件面板：底部抽屉模式 */
+    .tc-suite-panel {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        width: 100%;
+        height: 40vh;
+        z-index: 500;
+        border-right: none;
+        border-top: 1px solid var(--border);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    /* 搜索面板全宽 */
+    .gs-panel { max-width: 96vw; margin: 0 2vw; }
+
+    /* 游戏选择弹窗：垂直布局 */
+    .game-select-body {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .game-select-panel { min-height: 220px; }
+
+    /* 更多操作下拉菜单不超出屏幕 */
+    .more-actions-menu { right: 0 !important; left: auto !important; }
+
+    /* 评论区域 */
+    .comment-item { padding: 12px; }
+
+    /* 隐藏次要信息列 */
+    .hide-on-mobile { display: none !important; }
+}
+
+/* ---- 小屏手机 (≤480px) ---- */
+@media (max-width: 480px) {
+    body { font-size: 13px; }
+
+    .top-bar { height: 44px; padding: 0 8px; }
+    .page-title { font-size: 14px; }
+    .user-info { gap: 4px; }
+    .user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 统计卡片：单列堆叠 */
+    .stat-cards-grid { grid-template-columns: 1fr; }
+    .stat-card { padding: 12px; }
+    .stat-value { font-size: 22px; }
+
+    /* 表格更紧凑 */
+    .data-table th, .data-table td {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    .data-table { min-width: 600px; }
+
+    /* 弹窗完全全屏 */
+    .modal-content {
+        margin: 0;
+        max-width: 100% !important;
+        max-height: 100vh !important;
+        width: 100% !important;
+        height: 100vh !important;
+        border-radius: 0;
+    }
+    .modal-header { padding: 12px; }
+    .modal-body { padding: 12px; max-height: calc(100vh - 120px); }
+
+    /* 表单元素更大触摸区域（防止iOS缩放） */
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+        min-height: 44px;
+        font-size: 16px;
+    }
+    .tool-btn {
+        min-height: 40px;
+        padding: 8px 14px;
+    }
+
+    /* 侧边栏全宽浮出 */
+    .sidebar.show { width: 280px !important; }
+
+    /* 标签页内边距更小 */
+    .tab-content { padding: 8px; }
+    .toolbar { padding: 8px; }
+
+    /* 计划卡片紧凑 */
+    .plan-card { padding: 12px; }
+    .plan-card h3 { font-size: 15px; }
+
+    /* 批量操作栏底部固定 */
+    .batch-actions-bar {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        z-index: 400;
+        padding: 10px 12px;
+        background: var(--bg-card);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    }
+}
+
+/* ---- 触摸设备优化 ---- */
+@media (hover: none) and (pointer: coarse) {
+    .sidebar-item { min-height: 44px; padding: 10px 16px; }
+    .tool-btn { min-height: 36px; }
+    .data-table tbody tr { min-height: 44px; }
+    .data-table td:hover .cell-action-btn { opacity: 1; }
+    .row-action-btns { opacity: 1; }
+}
+
+/* ---- 安全区域适配（iPhone刘海屏等）---- */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .top-bar {
+        padding-top: env(safe-area-inset-top);
+        height: calc(48px + env(safe-area-inset-top));
+    }
+    @media (max-width: 768px) {
+        .top-bar {
+            height: calc(44px + env(safe-area-inset-top));
+        }
+    }
+}
+
 /* ========== 打印样式 ========== */
 @media print {
     /* 隐藏非内容区域 */

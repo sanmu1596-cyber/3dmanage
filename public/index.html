@@ -30,6 +30,8 @@
                 <span class="user-name">管理员</span>
             </div>
         </header>
+        <!-- 移动端侧边栏遮罩 -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
         <!-- ===== 主体区域 ===== -->
         <div class="main-body">
@@ -1013,8 +1015,8 @@
                         <div class="toolbar-left">
                             <span class="toolbar-title">📋 操作日志</span>
                         </div>
-                        <div class="toolbar-right">
-                            <select id="log-type-filter" onchange="loadActivityLogs(1)" style="padding:6px 12px;border:1px solid var(--border-color,#ddd);border-radius:6px;font-size:13px;background:var(--bg-input,#fff);color:var(--text-primary,#333);">
+                        <div class="toolbar-right" style="flex-wrap:wrap;gap:6px;">
+                            <select id="log-type-filter" onchange="loadActivityLogs(1)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-input);color:var(--text-primary);">
                                 <option value="all">全部类型</option>
                                 <option value="requirement">需求</option>
                                 <option value="plan">计划</option>
@@ -1022,13 +1024,25 @@
                                 <option value="bug">缺陷</option>
                                 <option value="game">游戏</option>
                                 <option value="device">设备</option>
+                                <option value="version">版本</option>
+                                <option value="member">成员</option>
                             </select>
+                            <select id="log-action-filter" onchange="loadActivityLogs(1)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-input);color:var(--text-primary);">
+                                <option value="all">全部操作</option>
+                                <option value="create">创建</option><option value="update">编辑</option>
+                                <option value="delete">删除</option><option value="assign">指派</option>
+                                <option value="publish">发布</option><option value="link">关联</option>
+                                <option value="import">导入</option><option value="export">导出</option>
+                            </select>
+                            <input type="date" id="log-date-from" onchange="loadActivityLogs(1)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;" title="起始日期">
+                            <input type="date" id="log-date-to" onchange="loadActivityLogs(1)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;" title="截止日期">
+                            <input type="text" id="log-keyword" placeholder="搜索..." oninput="debounceLoadLogs()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:120px;">
                             <button class="tool-btn" onclick="loadActivityLogs(1)" title="刷新">🔄 刷新</button>
                         </div>
                     </div>
 
                     <!-- 统计概览 -->
-                    <div class="dashboard-cards" id="log-stats-cards" style="margin-bottom:16px;"></div>
+                    <div id="log-stats-section" style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;"></div>
 
                     <!-- 日志列表 -->
                     <div class="table-container">
@@ -1036,15 +1050,16 @@
                             <thead>
                                 <tr>
                                     <th width="50">#</th>
-                                    <th width="100">操作类型</th>
-                                    <th width="120">资源类型</th>
+                                    <th width="90">操作</th>
+                                    <th width="100">类型</th>
                                     <th>资源名称</th>
-                                    <th width="130">操作人</th>
-                                    <th width="160">时间</th>
+                                    <th width="110">操作人</th>
+                                    <th width="140">时间</th>
+                                    <th width="130" class="hide-on-mobile">IP地址</th>
                                 </tr>
                             </thead>
                             <tbody id="activity-logs-tbody">
-                                <tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div>加载中...</div></td></tr>
+                                <tr><td colspan="7" class="empty-state"><div class="empty-icon">📋</div><div>加载中...</div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2855,7 +2870,20 @@
     </div>
 
     <script src="gameAccountsData.js"></script>
-    <script src="app.js?v=20260427"></script>
+    <!-- 模块化JS（按依赖顺序加载） -->
+    <script src="js/core.js?v=20260508"></script>
+    <script src="js/auth.js?v=20260508"></script>
+    <script src="js/router.js?v=20260508"></script>
+    <script src="js/entities.js?v=20260508"></script>
+    <script src="js/plans.js?v=20260508"></script>
+    <script src="js/dashboard.js?v=20260508"></script>
+    <script src="js/ui-features.js?v=20260508"></script>
+    <script src="js/admin.js?v=20260508"></script>
+    <script src="js/requirements.js?v=20260508"></script>
+    <script src="js/testcases.js?v=20260508"></script>
+    <script src="js/issues-versions.js?v=20260508"></script>
+    <script src="js/social.js?v=20260508"></script>
+    <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
 </body>
 </html>

@@ -451,9 +451,17 @@ function switchTab(tabId, fromHash) {
     const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
     clearTimeout(_revealTimer);
 
-    // 切换模块时自动关闭详情面板和下拉菜单
+    // 切换模块时自动关闭详情面板、下拉菜单和移动端侧边栏
     closeDetailPanel();
     closeAllMoreActions();
+    // 移动端：切换tab时自动收回侧边栏
+    if (window.innerWidth <= 768) {
+        const sb = document.getElementById('sidebar');
+        const ol = document.getElementById('sidebar-overlay');
+        if (sb) sb.classList.remove('show');
+        if (ol) ol.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 
     // 移除所有激活状态
     document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
@@ -621,7 +629,20 @@ async function loadTabData(tabId, switchId) {
 // 切换侧边栏
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.classList.toggle('collapsed');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) {
+        // 桌面端：切换折叠
+        if (window.innerWidth > 768) {
+            sidebar.classList.toggle('collapsed');
+        } else {
+            // 移动端：切换浮出 + 遮罩
+            const isShowing = sidebar.classList.contains('show');
+            sidebar.classList.toggle('show');
+            if (overlay) overlay.classList.toggle('active', !isShowing);
+            // 阻止body滚动
+            document.body.style.overflow = isShowing ? '' : 'hidden';
+        }
+    }
 }
 
 // 加载所有数据
@@ -11919,29 +11940,52 @@ if (_origOpenPlanDetail) {
 console.log('✅ 评论组件模块已加载（支持需求/计划评论区 + @提及）');
 
 
-// ==================== 操作日志 Activity Logs Module ====================
+// ==================== 操作日志 Activity Logs Module（审计增强版） ====================
 let _logCurrentPage = 1;
 const _logPageSize = 30;
+let _logsDebounceTimer = null;
+
+function debounceLoadLogs() {
+    clearTimeout(_logsDebounceTimer);
+    _logsDebounceTimer = setTimeout(() => loadActivityLogs(1), 400);
+}
 
 const _resourceTypeLabels = {
     requirement: '📄 需求', plan: '📋 计划', task: '🎮 任务', bug: '🐛 缺陷',
     game: '🕹️ 游戏', device: '📱 设备', user: '👤 用户', member: '👥 成员',
-    config_plan: '⚙️ 配置', test: '🧪 测试', version: '📦 版本'
+    config_plan: '⚙️ 配置', test: '🧪 测试', version: '📦 版本',
+    test_suite: '📁 套件', test_case: '📝 用例'
 };
 const _actionLabels = {
     create: '✅ 创建', update: '✏️ 编辑', delete: '🗑️ 删除', assign: '👤 指派',
     publish: '🚀 发布', close: '🏁 完成', link: '🔗 关联', unlink: '❌ 取消关联',
-    import: '📥 导入', export: '📤 导出', login: '🔓 登录'
+    import: '📥 导入', export: '📤 导出', login: '🔓 登录',
+    batch_delete: '📦 批删', batch_update: '📦 批量'
 };
+
+/** 构建筛选参数 */
+function _buildLogQueryParams() {
+    const params = [];
+    const type = document.getElementById('log-type-filter')?.value;
+    const action = document.getElementById('log-action-filter')?.value;
+    const dateFrom = document.getElementById('log-date-from')?.value;
+    const dateTo = document.getElementById('log-date-to')?.value;
+    const keyword = document.getElementById('log-keyword')?.value?.trim();
+    if (type && type !== 'all') params.push(`resource_type=${type}`);
+    if (action && action !== 'all') params.push(`action=${action}`);
+    if (dateFrom) params.push(`date_from=${dateFrom}`);
+    if (dateTo) params.push(`date_to=${dateTo}`);
+    if (keyword) params.push(`keyword=${encodeURIComponent(keyword)}`);
+    return params.join('&');
+}
 
 /** 加载操作日志列表 */
 async function loadActivityLogs(page) {
     if (page) _logCurrentPage = page;
-    const type = document.getElementById('log-type-filter')?.value || 'all';
+    const query = _buildLogQueryParams();
     try {
-        // 并行请求列表和统计
         const [listRes, statsRes] = await Promise.all([
-            authFetch(`${API_BASE}/activity-logs?resource_type=${type}&page=${_logCurrentPage}&limit=${_logPageSize}`),
+            authFetch(`${API_BASE}/activity-logs?${query}&page=${_logCurrentPage}&limit=${_logPageSize}`),
             authFetch(`${API_BASE}/activity-logs/stats`)
         ]);
         const listData = await listRes.json();
@@ -11950,12 +11994,11 @@ async function loadActivityLogs(page) {
         if (listData.success) renderActivityLogTable(listData.data);
         if (statsData.success) renderLogStats(statsData.data);
 
-        // 分页
         renderLogPagination(listData.total);
     } catch (e) {
         console.error('加载操作日志失败:', e);
         document.getElementById('activity-logs-tbody').innerHTML =
-            '<tr><td colspan="6" class="empty-state"><div>加载失败，请重试</div></td></tr>';
+            '<tr><td colspan="7" class="empty-state"><div>加载失败，请重试</div></td></tr>';
     }
 }
 
@@ -11963,41 +12006,62 @@ async function loadActivityLogs(page) {
 function renderActivityLogTable(logs) {
     const tbody = document.getElementById('activity-logs-tbody');
     if (!logs || logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div>暂无操作日志</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📋</div><div>暂无操作日志</div></td></tr>`;
         return;
     }
     tbody.innerHTML = logs.map((log, i) => {
         const typeLabel = _resourceTypeLabels[log.resource_type] || log.resource_type;
         const actionLabel = _actionLabels[log.action] || log.action;
         const timeStr = (log.created_at || '').slice(5, 16).replace('T', ' ');
+        // IP地址脱敏显示（仅管理员可见完整IP）
+        const ipDisplay = log.ip_address
+            ? (IS_DEV_MODE || (getCurrentUser()?.role_id === 1) ? log.ip_address : log.ip_address.replace(/(\d+)\.(\d+)\./, '$1.$2.*'))
+            : '-';
         return `<tr>
             <td class="text-center">${(_logCurrentPage - 1) * _logPageSize + i + 1}</td>
             <td><span style="font-size:12px;">${actionLabel}</span></td>
             <td><span style="font-size:12px;color:var(--text-secondary);">${typeLabel}</span></td>
-            <td>${escHtml(log.resource_name || '-')}</td>
+            <td title="${escHtml(log.changes_json || '')}">${escHtml(log.resource_name || '-')}</td>
             <td>${escHtml(log.user_name || '-')}</td>
-            <td style="color:var(--text-light,#888);font-size:12px;">${timeStr}</td>
+            <td style="color:var(--text-light,#888);font-size:12px;white-space:nowrap;">${timeStr}</td>
+            <td style="color:var(--text-light,#999);font-size:11px;font-family:monospace;" class="hide-on-mobile">${escHtml(ipDisplay)}</td>
         </tr>`;
     }).join('');
 }
 
-/** 渲染类型统计卡片 */
+/** 渲染统计概览（增强版：类型+用户活跃度） */
 function renderLogStats(stats) {
-    const container = document.getElementById('log-stats-cards');
+    const container = document.getElementById('log-stats-section');
     if (!container) return;
-    if (!stats || stats.length === 0) { container.innerHTML = ''; return; }
 
-    const total = stats.reduce((s, item) => s + (item.cnt || 0), 0);
-    container.innerHTML = stats.slice(0, 6).map(s => `
-        <div class="dash-card" style="cursor:pointer;${document.getElementById('log-type-filter')?.value===s.resource_type?'border-color:var(--primary);':''}"
-             onclick="document.getElementById('log-type-filter').value='${s.resource_type}';loadActivityLogs(1);">
-            <div class="dash-card-icon">${_resourceTypeLabels[s.resource_type]?.split(' ')[0] || '📋'}</div>
-            <div class="dash-card-info">
-                <div class="dash-card-num">${s.cnt}</div>
-                <div class="dash-card-label">${_resourceTypeLabels[s.resource_type]?.substring(2) || s.resource_type}</div>
-            </div>
-        </div>
-    `).join('');
+    const byType = stats.by_type || [];
+    const byUser = stats.by_user || [];
+    const total = byType.reduce((s, item) => s + (item.cnt || 0), 0);
+
+    let html = '';
+
+    // 类型统计卡片
+    html += '<div style="flex:1;min-width:200px;"><div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">📊 按类型 (' + total + '次)</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    byType.slice(0, 8).forEach(s => {
+        html += `<span style="padding:4px 10px;border-radius:12px;font-size:12px;background:var(--bg-surface);cursor:pointer;border:1px solid transparent;" onclick="document.getElementById('log-type-filter').value='${s.resource_type}';loadActivityLogs(1);" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='transparent'">${_resourceTypeLabels[s.resource_type]?.split(' ')[0]||'📋'} ${s.resource_type} (${s.cnt})</span>`;
+    });
+    html += '</div></div>';
+
+    // 用户活跃度排行
+    if (byUser.length > 0) {
+        html += '<div style="flex:1;min-width:200px;"><div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">👤 活跃用户 TOP' + Math.min(byUser.length, 5) + '</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        byUser.slice(0, 5).forEach((u, idx) => {
+            const maxCnt = byUser[0].cnt || 1;
+            const pct = ((u.cnt / maxCnt) * 100).toFixed(0);
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  ';
+            html += `<div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span>${medal}</span><span style="width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(u.user_name)}">${escHtml(u.user_name)}</span><div style="flex:1;height:16px;background:var(--bg-surface);border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${idx===0?'var(--warning)':idx===1?'#909499':'var(--primary-light)'};border-radius:3px;transition:width 0.3s;"></div></div><span style="width:36px;text-align:right;color:var(--text-secondary);">${u.cnt}</span></div>`;
+        });
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
 }
 
 /** 渲染分页 */
