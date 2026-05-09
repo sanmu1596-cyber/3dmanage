@@ -303,6 +303,7 @@ function renderActivityLogTable(logs) {
             <td style="color:var(--text-light,#888);font-size:12px;">${timeStr}</td>
         </tr>`;
     }).join('');
+    applyCellTooltips('activity-logs-tbody');
 }
 
 /** 渲染类型统计卡片 */

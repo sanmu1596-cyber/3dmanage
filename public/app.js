@@ -699,6 +699,7 @@ function renderMembersTable(data) {
                 </td>
             </tr>
         `).join('');
+        applyCellTooltips('members-table');
     } else {
         tbody.innerHTML = `
             <tr>
@@ -755,6 +756,7 @@ function renderDevicesTable(data) {
                 </td>
             </tr>
         `).join('');
+        applyCellTooltips('devices-table');
     } else {
         tbody.innerHTML = `
             <tr>

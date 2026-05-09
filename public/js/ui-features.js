@@ -638,3 +638,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// ==================== P0: 表格单元格 Tooltip 增强 ====================
+// 为表格中被截断的长文本单元格自动添加 title 属性，hover 时显示完整内容
+
+/**
+ * 为指定表格的数据单元格添加 tooltip（title 属性）
+ * 规则：
+ * - 跳过已有 title 的单元格（保留操作提示如"双击编辑"）
+ * - 跳过纯操作列（.text-center.action-icons、空状态等）
+ * - 跳过内容极短的单元格（≤4字符，无截断必要）
+ * - 仅对包含实际文本内容的 td 生效
+ *
+ * @param {string} tableId - 表格 tbody 元素的 ID（如 'games-table'）
+ */
+function applyCellTooltips(tableId) {
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+
+    const cells = tbody.querySelectorAll('td');
+    cells.forEach(td => {
+        // 跳过已有 title 的单元格
+        if (td.hasAttribute('title')) return;
+        // 跳过操作按钮列和序号列
+        if (td.classList.contains('action-icons')) return;
+        if (td.classList.contains('text-center') && td.querySelector('button,.status-badge,.priority-badge')) return;
+
+        // 获取纯文本内容
+        const text = (td.textContent || '').trim();
+        // 跳过空内容或极短内容（无需提示）
+        if (!text || text.length <= 4) return;
+
+        // 设置 title — 浏览器原生 tooltip，hover 显示完整文本
+        td.setAttribute('title', text);
+    });
+}
+

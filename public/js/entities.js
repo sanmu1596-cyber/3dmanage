@@ -338,6 +338,8 @@ function renderGamesPage() {
 
     // 更新分页信息和控件
     updatePaginationControls();
+    // P0: 为长文本单元格添加 tooltip
+    applyCellTooltips('games-table');
 }
 
 // ========== 游戏列表行内编辑 ==========
@@ -895,6 +897,7 @@ function renderTestsTable(data) {
                 </td>
             </tr>
         `).join('');
+        applyCellTooltips('tests-table');
     } else {
         tbody.innerHTML = `
             <tr>
@@ -945,6 +948,7 @@ function renderBugsTable(data) {
                 </td>
             </tr>
         `).join('');
+        applyCellTooltips('bugs-table');
     } else {
         tbody.innerHTML = `
             <tr>

@@ -111,6 +111,7 @@ function renderReqTable(filtered) {
             </td>
         </tr>`;
     }).join('');
+    applyCellTooltips('req-table');
 }
 
 // 卡片渲染
