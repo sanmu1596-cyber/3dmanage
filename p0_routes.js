@@ -301,6 +301,67 @@ function mountP0Routes(app) {
     });
   });
   app.use('/uploads', require('express').static(UPLOAD_DIR));
+
+  // ========== 批量操作 API ==========
+  const BATCH_CONFIG = {
+    games: { table: 'games', nameField: 'name', perm: 'games' },
+    requirements: { table: 'requirements', nameField: 'title', perm: 'config_plan' },
+    bugs: { table: 'bugs', nameField: 'title', perm: 'tests' },
+    test_cases: { table: 'test_cases', nameField: 'name', perm: 'test-cases' },
+    devices: { table: 'devices', nameField: 'name', perm: 'devices' }
+  };
+
+  // 批量删除
+  app.post('/api/:resource/batch-delete', auth.verifyToken, (req, res) => {
+    const { ids } = req.body;
+    const resource = req.params.resource;
+    const cfg = BATCH_CONFIG[resource];
+    if (!cfg) return res.status(400).json({ error: '不支持的资源类型' });
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择要删除的记录' });
+    if (ids.length > 50) return res.status(400).json({ error: '单次批量删除不能超过50条' });
+
+    const placeholders = ids.map(() => '?').join(',');
+    db.run(`DELETE FROM ${cfg.table} WHERE id IN (${placeholders}`, ids, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity(db, 'batch_delete', resource, 0, `批量删除 ${this.changes} 条${resource}`, req);
+      res.json({ success: true, deleted: this.changes });
+    });
+  });
+
+  // 批量更新状态
+  app.put('/api/:resource/batch-status', auth.verifyToken, (req, res) => {
+    const { ids, status } = req.body;
+    const resource = req.params.resource;
+    const cfg = BATCH_CONFIG[resource];
+    if (!cfg) return res.status(400).json({ error: '不支持的资源类型' });
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择记录' });
+    if (!status) return res.status(400).json({ error: '请指定目标状态' });
+
+    const placeholders = ids.map(() => '?').join(',');
+    db.run(`UPDATE ${cfg.table} SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+      [status, ...ids], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity(db, 'batch_update', resource, 0, `批量更新 ${this.changes} 条${resource} 状态为 ${status}`, req);
+      res.json({ success: true, updated: this.changes });
+    });
+  });
+
+  // 批量分配成员（仅支持有 assigned_to 字段的表）
+  app.put('/api/:resource/batch-assign', auth.verifyToken, (req, res) => {
+    const { ids, assignee_id } = req.body;
+    const resource = req.params.resource;
+    const cfg = BATCH_CONFIG[resource];
+    if (!cfg) return res.status(400).json({ error: '不支持的资源类型' });
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择记录' });
+
+    const placeholders = ids.map(() => '?').join('');
+    const assignField = resource === 'bugs' ? 'assigned_to' : 'assigned_to';
+    db.run(`UPDATE ${cfg.table} SET ${assignField} = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+      [assignee_id || null, ...ids], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, updated: this.changes });
+    });
+  });
 }
 
 // ========== 工作流引擎 ==========

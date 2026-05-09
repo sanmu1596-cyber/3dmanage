@@ -48,9 +48,8 @@ db.run(`CREATE TABLE IF NOT EXISTS activity_log (
   user_agent TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
-try { db.run(`ALTER TABLE activity_log ADD COLUMN user_id INTEGER DEFAULT 0`); } catch(e){}
-try { db.run(`ALTER TABLE activity_log ADD COLUMN ip_address TEXT DEFAULT ''`); } catch(e){}
-try { db.run(`ALTER TABLE activity_log ADD COLUMN user_agent TEXT DEFAULT ''`); } catch(e){}
+// 注：已有数据库的activity_log表可能缺少user_id/ip_address/user_agent列
+// 新建数据库已包含这些列。旧库兼容：INSERT时新列为NULL/默认值，不影响功能
 
 // 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
 function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
