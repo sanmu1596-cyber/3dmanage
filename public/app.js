@@ -1823,10 +1823,61 @@ async function updateStats() {
 
 // ========== 各模块底部统计 ==========
 
-function makeStatCard(label, num, highlight) {
+/**
+ * 生成统计卡片HTML，支持点击下钻
+ * @param {string} label - 标签文字
+ * @param {number|string} num - 数值
+ * @param {boolean} highlight - 是否高亮（主指标）
+ * @param {Object} [drill] - 下钻配置 { tab, filterField, filterValue, searchValue }
+ */
+function makeStatCard(label, num, highlight, drill) {
     const cls = highlight ? ' highlight' : '';
-    return `<div class="stat-card"><span class="stat-num${cls}">${num}</span><span class="stat-label">${label}</span></div>`;
+    const cursor = drill ? ' style="cursor:pointer"' : '';
+    const attr = drill ? ` data-drill='${encodeURIComponent(JSON.stringify(drill))}'` : '';
+    return `<div class="stat-card stat-clickable"${cursor}${attr}><span class="stat-num${cls}">${num}</span><span class="stat-label">${label}</span></div>`;
 }
+
+// 统计卡片下钻点击事件委托
+document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('.stat-clickable[data-drill]');
+        if (!card) return;
+        try {
+            const drill = JSON.parse(decodeURIComponent(card.getAttribute('data-drill')));
+            if (drill.tab) switchTab(drill.tab);
+            // 延迟设置筛选值，等tab切换完成
+            setTimeout(() => {
+                if (drill.filterField && drill.filterValue !== undefined) {
+                    const sel = document.getElementById(`${drill.tab}-${drill.filterField}-filter`);
+                    if (sel) { sel.value = drill.filterValue; sel.dispatchEvent(new Event('change')); }
+                }
+                if (drill.searchValue !== undefined) {
+                    const inp = document.getElementById(`${drill.tab}-search`);
+                    if (inp) { inp.value = drill.searchValue; inp.dispatchEvent(new Event('input')); }
+                }
+            }, 300);
+        } catch (err) {}
+    });
+});
+
+// 侧边栏统计 → 点击跳转模块
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebarStats = {
+        'stat-members': 'members',
+        'stat-devices': 'devices',
+        'stat-games': 'games',
+        'stat-tests': 'tests',
+        'stat-bugs': 'bugs'
+    };
+    Object.entries(sidebarStats).forEach(([id, tab]) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.cursor = 'pointer';
+            el.parentElement.style.cursor = 'pointer';
+            el.addEventListener('click', () => switchTab(tab));
+        }
+    });
+});
 
 // 游戏列表统计
 function updateGamesModuleStats() {
@@ -1861,21 +1912,22 @@ function updateGamesModuleStats() {
         else qualityCounts['一般']++;
     });
 
-    let html = makeStatCard('游戏总数', total, true);
+    let html = makeStatCard('游戏总数', total, true, { tab: 'games' });
 
-    // 平台统计（按数量降序，最多显示5个）
+    // 平台统计（按数量降序，最多显示5个）→ 下钻：搜索平台名
     const sortedPlatforms = Object.entries(platformCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
     sortedPlatforms.forEach(([name, count]) => {
-        html += makeStatCard(name, count);
+        html += makeStatCard(name, count, false, { tab: 'games', searchValue: name });
     });
 
-    // 上线状态
+    // 上线状态 → 下钻：筛选上线状态（需映射label→value）
+    const statusLabelToValue = { '待上线': 'pending', '适配中': 'in_progress', '暂停适配': 'paused', '已上线': 'online' };
     Object.entries(onlineCounts).forEach(([label, count]) => {
-        if (count > 0) html += makeStatCard(label, count);
+        if (count > 0) html += makeStatCard(label, count, false, { tab: 'games', filterField: 'online-status', filterValue: statusLabelToValue[label] || label });
     });
 
-    // 品质
-    if (qualityCounts['推荐'] > 0) html += makeStatCard('推荐', qualityCounts['推荐']);
+    // 品质 → 下钻：搜索品质值
+    if (qualityCounts['推荐'] > 0) html += makeStatCard('推荐', qualityCounts['推荐'], false, { tab: 'games', searchValue: 'recommended' });
 
     container.innerHTML = html;
 }
@@ -1898,12 +1950,12 @@ function updateMembersModuleStats() {
     const activeCnt = data.filter(m => m.status === 'active').length;
     const inactiveCnt = total - activeCnt;
 
-    let html = makeStatCard('成员总数', total, true);
-    html += makeStatCard('在职', activeCnt);
-    if (inactiveCnt > 0) html += makeStatCard('离职', inactiveCnt);
+    let html = makeStatCard('成员总数', total, true, { tab: 'members' });
+    html += makeStatCard('在职', activeCnt, false, { tab: 'members', filterField: 'status', filterValue: 'active' });
+    if (inactiveCnt > 0) html += makeStatCard('离职', inactiveCnt, false, { tab: 'members', filterField: 'status', filterValue: 'inactive' });
 
     Object.entries(roleCounts).forEach(([role, count]) => {
-        html += makeStatCard(role, count);
+        html += makeStatCard(role, count, false, { tab: 'members', searchValue: role });
     });
 
     container.innerHTML = html;
@@ -5877,7 +5929,7 @@ function renderMatrix() {
     
     if (filteredGames.length === 0 || devices.length === 0) {
         thead.innerHTML = '';
-        tbody.innerHTML = '<tr><td class="empty-state" style="padding:40px"><div class="empty-icon">🔲</div><div>暂无适配矩阵数据</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="20" class="empty-state"><div class="empty-icon">🔲</div><div class="empty-text">暂无适配矩阵数据</div><div class="empty-sub">需要同时有游戏和设备数据才能显示适配矩阵</div></td></tr>';
         return;
     }
     
@@ -6894,7 +6946,7 @@ function umRenderUserList(data) {
     if (!tbody) return;
 
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-icon">👥</div><div>暂无用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无用户</div><div class="empty-sub">添加用户以分配角色和权限</div></td></tr>';
         return;
     }
 

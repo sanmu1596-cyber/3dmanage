@@ -287,7 +287,7 @@ async function loadActivityLogs(page) {
 function renderActivityLogTable(logs) {
     const tbody = document.getElementById('activity-logs-tbody');
     if (!logs || logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div>暂无操作日志</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无操作日志</div><div class="empty-sub">系统中的操作记录会在这里显示</div></tr>`;
         return;
     }
     tbody.innerHTML = logs.map((log, i) => {

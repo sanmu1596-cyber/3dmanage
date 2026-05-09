@@ -78,7 +78,7 @@ function renderRequirements() {
 function renderReqTable(filtered) {
     const tbody = document.getElementById('req-table');
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📄</div><div>${requirementsData.length === 0 ? '暂无需求' : '没有符合筛选条件的需求'}</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📄</div><div class="empty-text">${requirementsData.length === 0 ? '暂无需求' : '没有符合筛选条件的需求'}</div><div class="empty-sub">${requirementsData.length === 0 ? '点击"发布需求"创建第一条需求记录' : '请调整筛选条件后重试'}</div></td></tr>`;
         return;
     }
     tbody.innerHTML = filtered.map((r, i) => {
@@ -497,7 +497,7 @@ function toggleMyTaskView(mode) {
 function renderMyTaskPlanListTable(filteredPlans) {
     const tbody = document.getElementById('my-tasks-plan-list-table');
     if (!filteredPlans.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📌</div><div>暂无任务</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">📌</div><div class="empty-text">暂无任务</div><div class="empty-sub">项目经理发布计划后，您的任务将显示在这里</div></td></tr>`;
         return;
     }
     tbody.innerHTML = filteredPlans.map((plan, i) => {
