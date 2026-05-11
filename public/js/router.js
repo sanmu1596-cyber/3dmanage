@@ -326,6 +326,9 @@ function renderMembersTable(data) {
                 if (ok > 0) loadMembers();
             }
         });
+        
+        // P1.7: 更新成员表分页增强控件
+        updateMembersPagination(data.length);
     } else {
         tbody.innerHTML = `
             <tr>
@@ -339,8 +342,54 @@ function renderMembersTable(data) {
                 </td>
             </tr>
         `;
+        // 清空分页控件
+        const pgDiv = document.getElementById('members-pagination');
+        if (pgDiv) pgDiv.style.display = 'none';
     }
 }
+
+// P1.7: 更新成员表分页增强控件
+function updateMembersPagination(totalItems) {
+    const pgDiv = document.getElementById('members-pagination');
+    const pageNumsDiv = document.getElementById('members-page-numbers');
+    if (!pgDiv || !pageNumsDiv) return;
+    
+    const state = getModulePaginationState('members');
+    const pageSize = state.pageSize || 20;
+    const totalPages = pageSize === -1 ? 1 : Math.ceil(totalItems / pageSize);
+    const currentPage = Math.min(state.page || 1, totalPages || 1);
+    
+    // 更新当前模块的数据长度
+    _modulePaginationState['members'] = _modulePaginationState['members'] || {};
+    _modulePaginationState['members'].totalItems = totalItems;
+    
+    if (totalItems > pageSize) {
+        pgDiv.style.display = 'flex';
+        appendPaginationExtras('members-page-numbers', currentPage, totalPages, pageSize, {
+            moduleName: 'members',
+            onPageChange: 'handleMembersPageChange',
+            onPageSizeChange: 'handleMembersPageSizeChange'
+        });
+    } else {
+        pgDiv.style.display = 'none';
+    }
+}
+
+// P1.7: 成员表页码变化处理
+function handleMembersPageChange(moduleName, pageNum) {
+    setModulePaginationState('members', { page: pageNum });
+    renderMembersTable(filteredMembersData || allMembersData);
+}
+
+// P1.7: 成员表条数变化处理
+function handleMembersPageSizeChange(moduleName, newSize) {
+    const size = parseInt(newSize);
+    setModulePaginationState('members', { pageSize: size, page: 1 });
+    renderMembersTable(filteredMembersData || allMembersData);
+}
+
+// 全局过滤后的成员数据
+let filteredMembersData = null;
 
 // 加载设备列表
 async function loadDevices() {
@@ -396,6 +445,9 @@ function renderDevicesTable(data) {
                 if (ok > 0) loadDevices();
             }
         });
+        
+        // P1.7: 更新设备表分页增强控件
+        updateDevicesPagination(data.length);
     } else {
         tbody.innerHTML = `
             <tr>
@@ -409,8 +461,53 @@ function renderDevicesTable(data) {
                 </td>
             </tr>
         `;
+        // 清空分页控件
+        const pgDiv = document.getElementById('devices-pagination');
+        if (pgDiv) pgDiv.style.display = 'none';
     }
 }
+
+// P1.7: 更新设备表分页增强控件
+function updateDevicesPagination(totalItems) {
+    const pgDiv = document.getElementById('devices-pagination');
+    const pageNumsDiv = document.getElementById('devices-page-numbers');
+    if (!pgDiv || !pageNumsDiv) return;
+    
+    const state = getModulePaginationState('devices');
+    const pageSize = state.pageSize || 20;
+    const totalPages = pageSize === -1 ? 1 : Math.ceil(totalItems / pageSize);
+    const currentPage = Math.min(state.page || 1, totalPages || 1);
+    
+    _modulePaginationState['devices'] = _modulePaginationState['devices'] || {};
+    _modulePaginationState['devices'].totalItems = totalItems;
+    
+    if (totalItems > pageSize) {
+        pgDiv.style.display = 'flex';
+        appendPaginationExtras('devices-page-numbers', currentPage, totalPages, pageSize, {
+            moduleName: 'devices',
+            onPageChange: 'handleDevicesPageChange',
+            onPageSizeChange: 'handleDevicesPageSizeChange'
+        });
+    } else {
+        pgDiv.style.display = 'none';
+    }
+}
+
+// P1.7: 设备表页码变化处理
+function handleDevicesPageChange(moduleName, pageNum) {
+    setModulePaginationState('devices', { page: pageNum });
+    renderDevicesTable(filteredDevicesData || allDevicesData);
+}
+
+// P1.7: 设备表条数变化处理
+function handleDevicesPageSizeChange(moduleName, newSize) {
+    const size = parseInt(newSize);
+    setModulePaginationState('devices', { pageSize: size, page: 1 });
+    renderDevicesTable(filteredDevicesData || allDevicesData);
+}
+
+// 全局过滤后的设备数据
+let filteredDevicesData = null;
 
 // ==================== 面包屑导航功能 ====================
 

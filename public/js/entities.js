@@ -1132,7 +1132,7 @@ function renderBugsTable(data) {
     }
 }
 
-// ========== P0: 通用模块筛选 ==========
+// ========== P0/P1.7: 通用模块筛选 ==========
 function filterModule(moduleName) {
     const searchEl = document.getElementById(`${moduleName}-search`);
     const statusEl = document.getElementById(`${moduleName}-status-filter`);
@@ -1148,25 +1148,29 @@ function filterModule(moduleName) {
             source: () => allMembersData,
             searchFields: ['name', 'role', 'duty', 'wechat_id'],
             statusField: 'status',
-            render: renderMembersTable
+            render: renderMembersTable,
+            filteredVar: 'filteredMembersData'
         },
         devices: {
             source: () => allDevicesData,
             searchFields: ['name', 'manufacturer', 'device_type', 'keeper'],
             statusField: 'status',
-            render: renderDevicesTable
+            render: renderDevicesTable,
+            filteredVar: 'filteredDevicesData'
         },
         tests: {
             source: () => allTestsData,
             searchFields: ['name', 'game_name', 'device_name', 'tester_name'],
             statusField: 'status',
-            render: renderTestsTable
+            render: renderTestsTable,
+            filteredVar: 'filteredTestsData'
         },
         bugs: {
             source: () => allBugsData,
             searchFields: ['description', 'device_name', 'owner', 'problem_type', 'versions'],
             statusField: 'bug_status',
-            render: renderBugsTable
+            render: renderBugsTable,
+            filteredVar: 'filteredBugsData'
         }
     };
 
@@ -1188,6 +1192,11 @@ function filterModule(moduleName) {
     // 状态筛选
     if (statusVal) {
         data = data.filter(item => item[cfg.statusField] === statusVal);
+    }
+
+    // P1.7: 保存筛选后的数据到全局变量，供分页回调使用
+    if (cfg.filteredVar) {
+        window[cfg.filteredVar] = data;
     }
 
     cfg.render(data);

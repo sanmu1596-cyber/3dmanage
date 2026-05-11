@@ -5836,6 +5836,41 @@ th[data-field]:hover {
     cursor: pointer;
 }
 
+/* P1.7: 通用分页增强样式 */
+.pagination-extra {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 16px;
+}
+
+.pagination-extra .page-numbers {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pagination-extra .page-jump-wrapper {
+    margin-left: 0;
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] .pagination-extra {
+    background: rgba(15, 23, 42, 0.8);
+    border-top-color: var(--border);
+}
+
+[data-theme="dark"] .page-jump-wrapper {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .page-size-selector {
+    color: var(--text-secondary);
+}
+
 /* ========== 右键上下文菜单样式 ========== */
 .ctx-menu {
     position: fixed;
