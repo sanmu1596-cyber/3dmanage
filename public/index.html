@@ -1439,7 +1439,7 @@
 
                 <!-- 版本新增/编辑弹窗 -->
                 <div class="modal" id="version-modal">
-                    <div class="modal-overlay" onclick="closeModal('version-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('version-modal')"></div>
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3 id="version-modal-title">新增版本</h3>
@@ -1503,7 +1503,7 @@
 
                 <!-- ========== 游戏问题弹窗 ========== -->
                 <div class="modal" id="game-issue-modal">
-                    <div class="modal-overlay" onclick="closeModal('game-issue-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('game-issue-modal')"></div>
                     <div class="modal-container" style="max-width:600px">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -1576,7 +1576,7 @@
 
                 <!-- ========== 游戏版本弹窗 ========== -->
                 <div class="modal" id="game-version-modal">
-                    <div class="modal-overlay" onclick="closeModal('game-version-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('game-version-modal')"></div>
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3 id="game-version-modal-title">新增游戏版本</h3>
@@ -1621,7 +1621,7 @@
 
                 <!-- ========== 交织问题弹窗 ========== -->
                 <div class="modal" id="interlace-issue-modal">
-                    <div class="modal-overlay" onclick="closeModal('interlace-issue-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('interlace-issue-modal')"></div>
                     <div class="modal-container" style="max-width:600px">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -1694,7 +1694,7 @@
 
                 <!-- ========== 交织版本弹窗 ========== -->
                 <div class="modal" id="interlace-version-modal">
-                    <div class="modal-overlay" onclick="closeModal('interlace-version-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('interlace-version-modal')"></div>
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3 id="interlace-version-modal-title">新增交织版本</h3>
@@ -1733,7 +1733,7 @@
 
                 <!-- ========== 客户端问题弹窗 ========== -->
                 <div class="modal" id="client-issue-modal">
-                    <div class="modal-overlay" onclick="closeModal('client-issue-modal')"></div>
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('client-issue-modal')"></div>
                     <div class="modal-container" style="max-width:600px">
                         <div class="modal-content">
                             <div class="modal-header">
