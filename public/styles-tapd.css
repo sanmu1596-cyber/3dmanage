@@ -5497,9 +5497,15 @@ th[data-field]:hover {
     background: var(--bg-hover, rgba(255,255,255,0.06));
 }
 
-/* ========== Skeleton 骨架屏样式 ========== */
-.skeleton-shimmer {
+/* ========== Skeleton 骨架屏样式（覆盖层模式） ========== */
+.tab-content {
     position: relative;
+}
+
+.skeleton-shimmer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10;
     overflow: hidden;
     min-height: 200px;
     background: var(--bg-surface);

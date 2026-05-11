@@ -88,13 +88,17 @@ function switchTab(tabId, fromHash) {
 
     const content = document.getElementById(tabId);
     if (content) {
-        // 显示骨架屏（在数据加载期间消除白闪）
-        content.style.visibility = 'visible';
         content.classList.add('active');
-        // 插入骨架屏（如果有表格类内容）
-        if (SKELETON_CONFIGS[tabId] && content.querySelector('.table-container, .data-table, tbody')) {
-            content._savedInner = content.innerHTML;
-            content.innerHTML = generateSkeleton(tabId);
+        // 显示骨架屏覆盖层（保留原始DOM不被破坏，避免渲染函数找不到tbody等元素）
+        if (SKELETON_CONFIGS[tabId]) {
+            // 移除旧骨架屏（如有）
+            const oldSk = content.querySelector(`#${tabId}-skeleton`);
+            if (oldSk) oldSk.remove();
+            // 插入骨架屏覆盖层（绝对定位覆盖内容区）
+            const skEl = document.createElement('div');
+            skEl.innerHTML = generateSkeleton(tabId);
+            const skNode = skEl.firstElementChild;
+            if (skNode) content.appendChild(skNode);
         } else {
             content.style.visibility = 'hidden';
         }
@@ -118,7 +122,9 @@ function switchTab(tabId, fromHash) {
     const noObserverTabs = ['dashboard', 'field-settings'];
     loadTabData(tabId, mySwitch).then(() => {
         if (!content || mySwitch !== _tabSwitchCounter) return;
-        // 恢复实际内容（数据加载完毕后骨架屏自动被render替换）
+        // 数据加载完毕，移除骨架屏覆盖层（保留原始DOM完整性）
+        const skeleton = content.querySelector(`#${tabId}-skeleton`);
+        if (skeleton) skeleton.remove();
         if (noObserverTabs.includes(tabId)) {
             requestAnimationFrame(() => {
                 if (mySwitch === _tabSwitchCounter && content) {
@@ -130,11 +136,9 @@ function switchTab(tabId, fromHash) {
                 if (mySwitch !== _tabSwitchCounter) return;
                 requestAnimationFrame(() => {
                     if (mySwitch === _tabSwitchCounter && content) {
-                        // 如果内容还是骨架屏说明数据还没渲染完，隐藏它
-                        const skeleton = content.querySelector(`#${tabId}-skeleton`);
-                        if (skeleton) {
-                            content.style.visibility = 'hidden';
-                        }
+                        // 兜底：确保骨架屏被移除
+                        const sk = content.querySelector(`#${tabId}-skeleton`);
+                        if (sk) sk.remove();
                     }
                 });
             }, 150);
