@@ -5908,3 +5908,128 @@ th[data-field]:hover {
         color: #999;
     }
 }
+
+/* ========== 表单实时校验样式（P0） ========== */
+.field-error-msg {
+    color: #d44040;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 2px;
+    display: block;
+    animation: fieldErrorSlide 0.2s ease;
+}
+
+@keyframes fieldErrorSlide {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.field-invalid {
+    border-color: #d44040 !important;
+    box-shadow: 0 0 0 2px rgba(212, 64, 64, 0.15) !important;
+}
+
+.field-invalid:focus {
+    outline: none;
+    border-color: #d44040 !important;
+    box-shadow: 0 0 0 3px rgba(212, 64, 64, 0.2) !important;
+}
+
+/* 深色模式下的校验样式 */
+[data-theme="dark"] .field-error-msg {
+    color: #f57373;
+}
+
+[data-theme="dark"] .field-invalid {
+    border-color: #f57373 !important;
+    box-shadow: 0 0 0 2px rgba(245, 115, 115, 0.2) !important;
+}
+
+/* ========== 批量选择/操作样式（P0） ========== */
+.batch-select-col {
+    width: 40px !important;
+    text-align: center;
+    vertical-align: middle !important;
+}
+
+.batch-select-col input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #1677ff;
+}
+
+.row-selected {
+    background-color: rgba(22, 119, 255, 0.06) !important;
+}
+
+.row-selected td {
+    border-top: 1px solid rgba(22, 119, 255, 0.15);
+    border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+}
+
+[data-theme="dark"] .row-selected {
+    background-color: rgba(22, 119, 255, 0.12) !important;
+}
+
+.batch-action-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #e6f4ff, #f0f7ff);
+    border: 1px solid #91caff;
+    border-radius: 6px;
+    animation: batchBarSlide 0.2s ease;
+}
+
+@keyframes batchBarSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.batch-info {
+    font-size: 13px;
+    color: var(--text-primary, #333);
+}
+
+.batch-info strong {
+    color: #1677ff;
+    font-weight: 600;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-delete-batch {
+    background: #d44040 !important;
+    color: #fff !important;
+    border-color: #d44040 !important;
+}
+
+.btn-delete-batch:hover {
+    background: #cf1322 !important;
+    border-color: #cf1322 !important;
+}
+
+[data-theme="dark"] .batch-action-bar {
+    background: linear-gradient(135deg, #111b26, #0a1628);
+    border-color: #1677ff;
+}
+
+/* ========== 搜索结果高亮样式（P0） ========== */
+mark.search-highlight {
+    background: linear-gradient(120deg, #fff4c5 0%, #ffe58f 100%);
+    color: inherit;
+    padding: 1px 2px;
+    border-radius: 2px;
+    font-weight: 500;
+}
+
+[data-theme="dark"] mark.search-highlight {
+    background: linear-gradient(120deg, #4a3800 0%, #6b5200 100%);
+    color: #ffd666;
+}

@@ -299,11 +299,11 @@ function renderMembersTable(data) {
     const tbody = document.getElementById('members-table');
     if (data && data.length > 0) {
         tbody.innerHTML = data.map((member, index) => `
-            <tr>
+            <tr data-id="${member.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${escapeHtml(member.name)}</td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${escapeHtml(member.wechat_id || '-')}</td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${escapeHtml(member.role || '-')}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${highlightSearch(member.name, 'members-table')}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${highlightSearch(member.wechat_id || '-', 'members-table')}</td>
+                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${highlightSearch(member.role || '-', 'members-table')}</td>
                 <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>
                 <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${sanitizeCssClass(member.status)}">${getStatusText(member.status)}</span></td>
                 <td class="text-center action-icons">
@@ -312,10 +312,24 @@ function renderMembersTable(data) {
                 </td>
             </tr>
         `).join('');
+        initBatchSelect('members-table', {
+            entityName: '成员',
+            onDelete: async (ids) => {
+                let ok = 0, fail = 0;
+                for (const id of ids) {
+                    try {
+                        const r = await authFetch(`${API_BASE}/members/${id}`, { method: 'DELETE' });
+                        if (r.ok) ok++; else fail++;
+                    } catch { fail++; }
+                }
+                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
+                if (ok > 0) loadMembers();
+            }
+        });
     } else {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-state">
+                <td colspan="8" class="empty-state">
                     <div class="empty-icon">👥</div>
                     <div class="empty-text">还没有项目成员</div>
                     <div class="empty-sub">添加团队成员以便分配任务和跟踪工作进度</div>
@@ -351,9 +365,9 @@ function renderDevicesTable(data) {
         tbody.innerHTML = data.map((device, index) => `
             <tr class="clickable" data-id="${device.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${escapeHtml(device.manufacturer || '-')}</td>
-                <td>${escapeHtml(device.device_type || '-')}</td>
-                <td>${escapeHtml(device.name)}</td>
+                <td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>
+                <td>${highlightSearch(device.device_type || '-', 'devices-table')}</td>
+                <td>${highlightSearch(device.name, 'devices-table')}</td>
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>
@@ -368,10 +382,24 @@ function renderDevicesTable(data) {
                 </td>
             </tr>
         `).join('');
+        initBatchSelect('devices-table', {
+            entityName: '设备',
+            onDelete: async (ids) => {
+                let ok = 0, fail = 0;
+                for (const id of ids) {
+                    try {
+                        const r = await authFetch(`${API_BASE}/devices/${id}`, { method: 'DELETE' });
+                        if (r.ok) ok++; else fail++;
+                    } catch { fail++; }
+                }
+                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
+                if (ok > 0) loadDevices();
+            }
+        });
     } else {
         tbody.innerHTML = `
             <tr>
-                <td colspan="13" class="empty-state">
+                <td colspan="14" class="empty-state">
                     <div class="empty-icon">📱</div>
                     <div class="empty-text">还没有测试设备</div>
                     <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>

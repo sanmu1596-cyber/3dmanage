@@ -256,28 +256,28 @@ function renderGamesPage() {
 
             // 根据可见列配置生成单元格
             if (visibleColumns.name) {
-                rowHtml += `<td class="cell-game-name">${escapeHtml(game.name)}</td>`;
+                rowHtml += `<td class="cell-game-name">${highlightSearch(game.name, 'games-table')}</td>`;
             }
             if (visibleColumns.english_name) {
-                rowHtml += `<td class="cell-game-name">${escapeHtml(game.english_name || '-')}</td>`;
+                rowHtml += `<td class="cell-game-name">${highlightSearch(game.english_name || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.platform) {
                 rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
             }
             if (visibleColumns.game_id) {
-                rowHtml += `<td>${escapeHtml(game.game_id || '-')}</td>`;
+                rowHtml += `<td>${highlightSearch(game.game_id || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.game_type) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${escapeHtml(game.game_type || '-')}</td>`;
+                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${highlightSearch(game.game_type || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.description) {
-                rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
+                rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${highlightSearch(game.description || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.developer) {
-                rowHtml += `<td>${escapeHtml(game.developer || '-')}</td>`;
+                rowHtml += `<td>${highlightSearch(game.developer || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.operator) {
-                rowHtml += `<td>${escapeHtml(game.operator || '-')}</td>`;
+                rowHtml += `<td>${highlightSearch(game.operator || '-', 'games-table')}</td>`;
             }
             if (visibleColumns.release_date) {
                 rowHtml += `<td>${escapeHtml(game.release_date || '-')}</td>`;
@@ -319,8 +319,8 @@ function renderGamesPage() {
             return `<tr class="clickable" data-id="${game.id}">${rowHtml}</tr>`;
         }).join('');
     } else {
-        // 计算显示的列数（包括序号和操作列）
-        const visibleCount = Object.values(visibleColumns).filter(v => v).length + 2;
+        // 计算显示的列数（包括序号、checkbox选择列和操作列）
+        const visibleCount = Object.values(visibleColumns).filter(v => v).length + 3;
         tbody.innerHTML = `
             <tr>
                 <td colspan="${visibleCount}" class="empty-state">
@@ -342,6 +342,21 @@ function renderGamesPage() {
     applyCellTooltips('games-table');
     // P0: 初始化表头排序
     initTableSort('games-table');
+    // P0: 初始化批量选择
+    initBatchSelect('games-table', {
+        entityName: '游戏',
+        onDelete: async (ids) => {
+            let ok = 0, fail = 0;
+            for (const id of ids) {
+                try {
+                    const r = await authFetch(`${API_BASE}/games/${id}`, { method: 'DELETE' });
+                    if (r.ok) ok++; else fail++;
+                } catch { fail++; }
+            }
+            showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
+            if (ok > 0) await loadGames();
+        }
+    });
 }
 
 // ========== 游戏列表行内编辑 ==========
@@ -657,6 +672,9 @@ function filterGames() {
     const platformFilter = document.getElementById('platform-filter')?.value || '';
     const typeFilter = document.getElementById('type-filter')?.value || '';
     const statusFilter = document.getElementById('status-filter')?.value || '';
+
+    // P0: 注册搜索关键词用于高亮渲染
+    setSearchKeyword('games-table', searchTerm);
 
     filteredGamesData = allGamesData.filter(game => {
         // 搜索匹配（游戏名称或ID）
@@ -1002,12 +1020,12 @@ function renderTestsTable(data) {
     const tbody = document.getElementById('tests-table');
     if (data && data.length > 0) {
         tbody.innerHTML = data.map((test, index) => `
-            <tr>
+            <tr data-id="${test.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${escapeHtml(test.name)}</td>
-                <td>${escapeHtml(test.game_name || '-')}</td>
-                <td>${escapeHtml(test.device_name || '-')}</td>
-                <td>${escapeHtml(test.tester_name || '-')}</td>
+                <td>${highlightSearch(test.name, 'tests-table')}</td>
+                <td>${highlightSearch(test.game_name || '-', 'tests-table')}</td>
+                <td>${highlightSearch(test.device_name || '-', 'tests-table')}</td>
+                <td>${highlightSearch(test.tester_name || '-', 'tests-table')}</td>
                 <td>${escapeHtml(test.test_date || '-')}</td>
                 <td class="text-center"><span class="status-badge status-${sanitizeCssClass(test.status)}">${getTestStatusText(test.status)}</span></td>
                 <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(test.priority)}">${getPriorityText(test.priority)}</span></td>
@@ -1017,12 +1035,26 @@ function renderTestsTable(data) {
                     <button class="btn btn-small btn-delete" onclick="deleteTest(${test.id})">删除</button>
                 </td>
             </tr>
-        `).join('');
+        `        ).join('');
         applyCellTooltips('tests-table');
+        initBatchSelect('tests-table', {
+            entityName: '测试记录',
+            onDelete: async (ids) => {
+                let ok = 0, fail = 0;
+                for (const id of ids) {
+                    try {
+                        const r = await authFetch(`${API_BASE}/tests/${id}`, { method: 'DELETE' });
+                        if (r.ok) ok++; else fail++;
+                    } catch { fail++; }
+                }
+                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
+                if (ok > 0) loadTests();
+            }
+        });
     } else {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="empty-state">
+                <td colspan="11" class="empty-state">
                     <div class="empty-icon">🧪</div>
                     <div class="empty-text">还没有测试记录</div>
                     <div class="empty-sub">创建测试记录以追踪游戏在各设备上的表现</div>
@@ -1053,27 +1085,41 @@ function renderBugsTable(data) {
     const tbody = document.getElementById('bugs-table');
     if (data && data.length > 0) {
         tbody.innerHTML = data.map((bug, index) => `
-            <tr>
+            <tr data-id="${bug.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${escapeHtml(bug.versions || '-')}</td>
-                <td>${escapeHtml(bug.device_name || '-')}</td>
+                <td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>
+                <td>${highlightSearch(bug.device_name || '-', 'bugs-table')}</td>
                 <td>${escapeHtml(bug.discovery_time || '-')}</td>
-                <td>${escapeHtml(bug.owner || '-')}</td>
+                <td>${highlightSearch(bug.owner || '-', 'bugs-table')}</td>
                 <td class="text-center"><span class="status-badge status-${sanitizeCssClass(bug.bug_status)}">${getBugStatusText(bug.bug_status)}</span></td>
                 <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(bug.priority)}">${getPriorityText(bug.priority)}</span></td>
-                <td>${escapeHtml(bug.problem_type || '-')}</td>
-                <td>${escapeHtml(bug.description || '-')}</td>
+                <td>${highlightSearch(bug.problem_type || '-', 'bugs-table')}</td>
+                <td>${highlightSearch(bug.description || '-', 'bugs-table')}</td>
                 <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editBug(${bug.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteBug(${bug.id})">删除</button>
                 </td>
             </tr>
-        `).join('');
+        `        ).join('');
         applyCellTooltips('bugs-table');
+        initBatchSelect('bugs-table', {
+            entityName: '缺陷',
+            onDelete: async (ids) => {
+                let ok = 0, fail = 0;
+                for (const id of ids) {
+                    try {
+                        const r = await authFetch(`${API_BASE}/bugs/${id}`, { method: 'DELETE' });
+                        if (r.ok) ok++; else fail++;
+                    } catch { fail++; }
+                }
+                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
+                if (ok > 0) loadBugs();
+            }
+        });
     } else {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="empty-state">
+                <td colspan="11" class="empty-state">
                     <div class="empty-icon">🐛</div>
                     <div class="empty-text">暂无缺陷记录</div>
                     <div class="empty-sub">测试过程中发现的问题会记录在这里</div>
@@ -1092,6 +1138,9 @@ function filterModule(moduleName) {
     const statusEl = document.getElementById(`${moduleName}-status-filter`);
     const keyword = (searchEl ? searchEl.value : '').toLowerCase().trim();
     const statusVal = statusEl ? statusEl.value : '';
+
+    // P0: 注册搜索关键词用于高亮渲染
+    setSearchKeyword(`${moduleName}-table`, keyword);
 
     // 筛选配置：定义每个模块的搜索字段和状态字段
     const config = {
@@ -1360,6 +1409,8 @@ function initForms() {
     // 成员表单
     document.getElementById('member-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!acquireSubmitLock('member-form')) return;
+        if (!validateForm('member-form')) { releaseSubmitLock('member-form'); return; }
         const id = document.getElementById('member-id').value;
         const data = {
             name: document.getElementById('member-name').value,
@@ -1388,12 +1439,16 @@ function initForms() {
         } catch (error) {
             console.error('保存成员失败:', error);
             showToast('保存失败', 'danger');
+        } finally {
+            releaseSubmitLock('member-form');
         }
     });
 
     // 设备表单
     document.getElementById('device-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!acquireSubmitLock('device-form')) return;
+        if (!validateForm('device-form')) { releaseSubmitLock('device-form'); return; }
         const id = document.getElementById('device-id').value;
         const data = {
             manufacturer: document.getElementById('device-manufacturer').value,
@@ -1430,12 +1485,16 @@ function initForms() {
         } catch (error) {
             console.error('保存设备失败:', error);
             showToast('保存失败', 'danger');
+        } finally {
+            releaseSubmitLock('device-form');
         }
     });
 
     // 游戏表单
     document.getElementById('game-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!acquireSubmitLock('game-form')) return;
+        if (!validateForm('game-form')) { releaseSubmitLock('game-form'); return; }
         const id = document.getElementById('game-id').value;
         const data = {
             name: document.getElementById('game-name').value,
@@ -1480,12 +1539,16 @@ function initForms() {
         } catch (error) {
             console.error('保存游戏失败:', error);
             showToast('保存失败', 'danger');
+        } finally {
+            releaseSubmitLock('game-form');
         }
     });
 
     // 测试表单
     document.getElementById('test-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!acquireSubmitLock('test-form')) return;
+        if (!validateForm('test-form')) { releaseSubmitLock('test-form'); return; }
         const id = document.getElementById('test-id').value;
         const data = {
             name: document.getElementById('test-name').value,
@@ -1519,12 +1582,16 @@ function initForms() {
         } catch (error) {
             console.error('保存测试失败:', error);
             showToast('保存失败', 'danger');
+        } finally {
+            releaseSubmitLock('test-form');
         }
     });
 
     // 缺陷表单
     document.getElementById('bug-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!acquireSubmitLock('bug-form')) return;
+        if (!validateForm('bug-form')) { releaseSubmitLock('bug-form'); return; }
         const id = document.getElementById('bug-id').value;
         const data = {
             versions: document.getElementById('bug-versions').value,
@@ -1559,8 +1626,13 @@ function initForms() {
         } catch (error) {
             console.error('保存缺陷失败:', error);
             showToast('保存失败', 'danger');
+        } finally {
+            releaseSubmitLock('bug-form');
         }
     });
+
+    // P0: 初始化表单实时校验
+    initFormValidations();
 }
 
 // 模态框操作
@@ -2256,5 +2328,46 @@ function applyGamesSort() {
 
     // 排序后重置到第一页
     currentPage = 1;
+}
+
+// ========== 表单校验配置注册（P0） ==========
+
+/**
+ * 初始化所有表单的校验规则
+ * 在 DOMContentLoaded 或 initForms() 末尾调用
+ */
+function initFormValidations() {
+    // 成员表单：姓名必填
+    registerFormValidation('member-form', {
+        'member-name': [{ rule: 'required', message: '请输入成员姓名' }]
+    });
+
+    // 设备表单：名称必填，数量必须是数字
+    registerFormValidation('device-form', {
+        'device-name': [{ rule: 'required', message: '请输入设备名称' }],
+        'device-quantity': [{ rule: 'isNumber', message: '数量必须是有效数字' }]
+    });
+
+    // 游戏表单：名称必填（最强校验）
+    registerFormValidation('game-form', {
+        'game-name': [
+            { rule: 'required', message: '请输入游戏名称' },
+            { rule: 'minLength', param: 2, message: '游戏名称至少2个字符' }
+        ],
+        'game-release-date': [{ rule: 'isDate', message: '日期格式不正确（如 2024-01-15）' }],
+        'game-adapter-progress': [{ rule: 'isNumber', message: '适配进度必须是数字' }]
+    });
+
+    // 测试表单：测试名称必填
+    registerFormValidation('test-form', {
+        'test-name': [{ rule: 'required', message: '请输入测试名称' }],
+        'test-date': [{ rule: 'isDate', message: '请输入有效的测试日期' }]
+    });
+
+    // 缺陷表单：描述必填
+    registerFormValidation('bug-form', {
+        'bug-description': [{ rule: 'required', message: '请输入缺陷描述' }],
+        'bug-discovery-time': [{ rule: 'isDate', message: '请输入有效的发现时间' }]
+    });
 }
 
