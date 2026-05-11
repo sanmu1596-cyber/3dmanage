@@ -3,6 +3,19 @@
    UI风格：纯白底 + 蓝色主色调 + 扁平设计
    ========================================== */
 
+/* ---- P1.9: 屏幕阅读器专用样式 ---- */
+.srOnly, .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ---- @font-face: TencentSans ---- */
 @font-face {
     font-family: 'TencentSans';

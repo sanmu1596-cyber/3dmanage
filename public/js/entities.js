@@ -7,6 +7,9 @@ var App = window.App;
 
 // ==================== 设备行内编辑 ====================
 
+// P1.1: 行内编辑焦点管理 - 记录当前编辑的td
+let _inlineEditCurrentTd = null;
+
 /**
  * 双击单元格进入编辑模式
  * @param {HTMLElement} td - 被双击的<td>元素
@@ -22,6 +25,8 @@ function startInlineEdit(td, deviceId, field, inputType) {
     const displayValue = currentValue === '-' ? '' : currentValue;
 
     td.classList.add('editing');
+    // P1.1: 记录当前编辑的td，用于外部点击判断
+    _inlineEditCurrentTd = td;
 
     // 锁定单元格宽高，防止编辑态撑开引起抖动
     const rect = td.getBoundingClientRect();
@@ -1651,15 +1656,41 @@ function initForms() {
 }
 
 // 模态框操作
+let _previousFocus = null; // P1.8: 记录弹窗打开前的焦点元素
+
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.style.display = 'block';
+    if (modal) {
+        // P1.8: 保存当前焦点元素
+        _previousFocus = document.activeElement;
+        
+        modal.style.display = 'block';
+        
+        // P1.8: 弹窗打开后将焦点移动到弹窗内的第一个可交互元素
+        setTimeout(() => {
+            const focusable = modal.querySelector('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+            if (focusable) {
+                focusable.focus();
+            } else {
+                // 如果没有可交互元素，聚焦到弹窗本身
+                modal.focus();
+            }
+        }, 50);
+    }
 }
 
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.style.display = 'none';
     resetForm(modalId.replace('-modal', '-form'));
+    
+    // P1.8: 弹窗关闭后恢复焦点到之前保存的元素
+    if (_previousFocus && _previousFocus.focus) {
+        setTimeout(() => {
+            _previousFocus.focus();
+            _previousFocus = null;
+        }, 50);
+    }
 }
 
 // 点击模态框外部关闭 - 已禁用自动关闭功能
@@ -2385,4 +2416,41 @@ function initFormValidations() {
         'bug-discovery-time': [{ rule: 'isDate', message: '请输入有效的发现时间' }]
     });
 }
+
+// P1.1: 全局点击事件处理 - 外部点击自动保存行内编辑
+document.addEventListener('click', function(e) {
+    // 如果没有正在编辑的单元格，不处理
+    if (!_inlineEditCurrentTd) return;
+    
+    // 检查点击目标是否在编辑单元格内
+    if (_inlineEditCurrentTd.contains(e.target)) return;
+    
+    // 点击在编辑单元格外，检查是否是input/select
+    const input = _inlineEditCurrentTd.querySelector('input, textarea, select');
+    if (input && document.contains(e.target) && !_inlineEditCurrentTd.contains(e.target)) {
+        // 外部点击，触发blur保存
+        input.blur();
+    }
+});
+
+// P1.1: 编辑完成后清除记录
+function clearInlineEditState() {
+    _inlineEditCurrentTd = null;
+}
+
+// 在saveInlineEdit完成后调用clearInlineEditState
+// 修改saveInlineEdit函数
+const originalSaveInlineEdit = saveInlineEdit;
+saveInlineEdit = async function(td, deviceId, field, newValue) {
+    const result = await originalSaveInlineEdit(td, deviceId, field, newValue);
+    clearInlineEditState();
+    return result;
+};
+
+// cancelInlineEdit也需要清除状态
+const originalCancelInlineEdit = cancelInlineEdit;
+cancelInlineEdit = function(td, currentValue) {
+    originalCancelInlineEdit(td, currentValue);
+    clearInlineEditState();
+};
 

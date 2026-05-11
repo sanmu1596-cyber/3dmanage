@@ -841,3 +841,91 @@ function changePageSizeEx(moduleName, newSize) {
     document.dispatchEvent(event);
 }
 
+// ========== P1.9: 屏幕阅读器ARIA属性支持 ==========
+
+/**
+ * 为数据表格添加ARIA属性，提升屏幕阅读器可访问性
+ * @param {string} tableId - 表格tbody的ID
+ * @param {Object} options - 配置选项
+ *   - caption: 表格标题（用于屏幕阅读器）
+ *   - summary: 表格摘要描述
+ *   - label: 表格的aria-label标签
+ */
+function enhanceTableAccessibility(tableId, options = {}) {
+    const table = document.querySelector(`#${tableId}`)?.closest('.data-table');
+    if (!table) return;
+
+    // 添加表格标题
+    if (options.caption && !table.querySelector('caption')) {
+        const caption = document.createElement('caption');
+        caption.textContent = options.caption;
+        caption.style.srOnly = true; // 仅屏幕阅读器可见
+        table.insertBefore(caption, table.firstChild);
+    }
+
+    // 添加aria-label
+    if (options.label) {
+        table.setAttribute('aria-label', options.label);
+    }
+
+    // 添加role="grid"
+    table.setAttribute('role', 'grid');
+
+    // 为thead添加role="rowgroup"
+    const thead = table.querySelector('thead');
+    if (thead) {
+        thead.setAttribute('role', 'rowgroup');
+        // 为每个th添加role="columnheader"
+        thead.querySelectorAll('th').forEach(th => {
+            th.setAttribute('role', 'columnheader');
+        });
+    }
+
+    // 为tbody设置role="rowgroup"
+    const tbody = table.querySelector('tbody');
+    if (tbody) {
+        tbody.setAttribute('role', 'rowgroup');
+    }
+
+    // 为每行添加role="row"
+    tbody?.querySelectorAll('tr').forEach(tr => {
+        tr.setAttribute('role', 'row');
+        // 为每个td添加role="gridcell"
+        tr.querySelectorAll('td').forEach(td => {
+            td.setAttribute('role', 'gridcell');
+        });
+    });
+}
+
+/**
+ * 为分页控件添加ARIA属性
+ * @param {string} containerId - 分页容器的ID
+ * @param {Object} options - 配置选项
+ *   - currentPage: 当前页
+ *   - totalPages: 总页数
+ *   - totalItems: 总条目数
+ *   - label: 分页的aria-label
+ */
+function enhancePaginationAccessibility(containerId, options = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.setAttribute('role', 'navigation');
+    container.setAttribute('aria-label', options.label || '分页导航');
+    container.setAttribute('aria-label', `${options.label || '分页'}: 第${options.currentPage || 1}页，共${options.totalPages || 1}页，共${options.totalItems || 0}条`);
+}
+
+// 为按钮添加aria-label（如果没有文本内容）
+document.addEventListener('DOMContentLoaded', () => {
+    // 为只有emoji图标的按钮添加aria-label
+    document.querySelectorAll('.action-icon-btn').forEach(btn => {
+        if (btn.textContent.trim() && !btn.getAttribute('aria-label')) {
+            // 提取emoji作为描述
+            const emoji = btn.textContent.trim().match(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]/gu);
+            if (emoji) {
+                btn.setAttribute('aria-label', btn.title || '操作按钮');
+            }
+        }
+    });
+});
+
