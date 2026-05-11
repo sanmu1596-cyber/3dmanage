@@ -654,3 +654,190 @@ function highlightSearch(text, tableId) {
     }
 }
 
+// ========== P1.5: 通用筛选Chips渲染函数 ==========
+// 为各模块提供统一的筛选标签渲染能力
+// 使用方法：在各模块的filter函数末尾调用 renderModuleFilterChips('members-table', {searchTerm, statusFilter})
+
+/**
+ * 渲染模块的筛选Chips标签
+ * @param {string} moduleId - 模块标识（members/devices/tests等）
+ * @param {Object} filters - 筛选条件对象 {searchTerm, statusFilter, ...}
+ * @param {Object} options - 配置选项 {containerId, onRemoveHandlers}
+ */
+function renderModuleFilterChips(moduleId, filters, options = {}) {
+    const containerId = options.containerId || `${moduleId}-filter-chips`;
+    let container = document.getElementById(containerId);
+    
+    // 如果容器不存在，创建它（在table-container之前）
+    if (!container) {
+        const tableContainer = document.querySelector(`#${moduleId === 'members' ? 'members-table' : moduleId === 'devices' ? 'devices-table' : moduleId}-table`)?.closest('.table-container');
+        if (tableContainer) {
+            container = document.createElement('div');
+            container.id = containerId;
+            container.className = 'filter-chips-area';
+            tableContainer.parentNode.insertBefore(container, tableContainer);
+        }
+    }
+    
+    if (!container) return;
+
+    const chips = [];
+    const onRemove = options.onRemoveHandlers || {};
+
+    // 搜索条件chip
+    if (filters.searchTerm) {
+        chips.push({
+            label: `搜索: "${filters.searchTerm}"`,
+            onRemove: onRemove.searchTerm || (() => {
+                const el = document.getElementById(`${moduleId}-search`);
+                if (el) { el.value = ''; }
+                // 触发对应模块的筛选函数
+                if (typeof window[`filterModule`] === 'function') {
+                    filterModule(moduleId);
+                }
+            })
+        });
+    }
+
+    // 状态筛选chip
+    if (filters.statusFilter) {
+        const statusText = {
+            'active': '活跃',
+            'inactive': '非活跃',
+            'available': '可用',
+            'assigned': '已分配',
+            'maintenance': '维护中',
+            'broken': '损坏'
+        }[filters.statusFilter] || filters.statusFilter;
+        
+        chips.push({
+            label: `状态: ${statusText}`,
+            onRemove: onRemove.statusFilter || (() => {
+                const el = document.getElementById(`${moduleId}-status-filter`);
+                if (el) { el.value = ''; }
+                if (typeof window[`filterModule`] === 'function') {
+                    filterModule(moduleId);
+                }
+            })
+        });
+    }
+
+    // 其他自定义chips
+    if (options.extraChips) {
+        chips.push(...options.extraChips);
+    }
+
+    // 渲染chips
+    if (chips.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = '';
+    container.innerHTML = chips.map((chip, i) =>
+        `<span class="filter-chip"><span class="chip-label">${escapeHtml(chip.label)}</span>` +
+        `<span class="chip-remove" data-chip-idx="${i}">✕</span></span>`
+    ).join('');
+
+    // 事件委托
+    container.onclick = (e) => {
+        if (e.target.classList.contains('chip-remove')) {
+            const idx = parseInt(e.target.dataset.chipIdx);
+            if (chips[idx] && chips[idx].onRemove) {
+                chips[idx].onRemove();
+            }
+        }
+    };
+}
+
+// ========== P1.7: 通用分页增强函数 ==========
+// 将游戏表已实现的分页增强功能（跳转页/条数选择）推广到所有模块
+
+/**
+ * 为模块的页码区域添加分页增强控件
+ * @param {string} pageNumbersDivId - 页码div的ID
+ * @param {number} currentPage - 当前页
+ * @param {number} totalPages - 总页数
+ * @param {number} currentPageSize - 当前每页条数
+ * @param {Object} options - 配置选项
+ *   - onPageChange: 页码变化回调 (moduleName, pageNum)
+ *   - onPageSizeChange: 条数变化回调 (moduleName, newSize)
+ *   - pageSizes: 可选的条数选项，默认[20, 50, 100, -1]
+ */
+function appendPaginationExtras(pageNumbersDivId, currentPage, totalPages, currentPageSize, options = {}) {
+    const container = document.getElementById(pageNumbersDivId);
+    if (!container) return;
+
+    const pageSizes = options.pageSizes || [20, 50, 100];
+    const moduleName = options.moduleName || '';
+
+    // 如果totalPages<=1仍然显示增强控件
+    let html = '<span class="page-jump-wrapper">跳至';
+    html += `<input type="number" min="1" max="${totalPages || 1}" value="${currentPage}" `;
+    html += `onkeydown="if(event.key==='Enter'){const v=parseInt(this.value);if(v>=1&&v<=${totalPages||1}){goToPageEx('${moduleName}',v);}this.value='${currentPage}';}" `;
+    html += `title="输入页码后按回车跳转">`;
+    html += `/${totalPages || 1} 页</span>`;
+
+    html += '<span class="page-size-selector">每页';
+    html += `<select onchange="changePageSizeEx('${moduleName}',this.value)">`;
+    pageSizes.forEach(s => {
+        const label = s === -1 ? '全部' : `${s}条`;
+        html += `<option value="${s}" ${currentPageSize === s ? 'selected' : ''}>${label}</option>`;
+    });
+    html += `</select></span>`;
+
+    // 追加到页码区域
+    container.innerHTML = html;
+}
+
+// 全局分页状态管理
+const _modulePaginationState = {};
+
+/**
+ * 设置模块的分页状态
+ */
+function setModulePaginationState(moduleName, state) {
+    _modulePaginationState[moduleName] = { ...(_modulePaginationState[moduleName] || {}), ...state };
+    // 持久化到localStorage
+    try {
+        localStorage.setItem(`pagination_${moduleName}`, JSON.stringify(_modulePaginationState[moduleName]));
+    } catch(e) {}
+}
+
+/**
+ * 获取模块的分页状态（从localStorage恢复）
+ */
+function getModulePaginationState(moduleName) {
+    if (_modulePaginationState[moduleName]) return _modulePaginationState[moduleName];
+    try {
+        const saved = localStorage.getItem(`pagination_${moduleName}`);
+        if (saved) {
+            _modulePaginationState[moduleName] = JSON.parse(saved);
+            return _modulePaginationState[moduleName];
+        }
+    } catch(e) {}
+    return { page: 1, pageSize: 20 };
+}
+
+/**
+ * 分页增强控件的页码跳转回调
+ */
+function goToPageEx(moduleName, pageNum) {
+    setModulePaginationState(moduleName, { page: pageNum });
+    // 触发对应模块的重新渲染（由各模块自行实现）
+    const event = new CustomEvent('modulePageChange', { detail: { module: moduleName, page: pageNum } });
+    document.dispatchEvent(event);
+}
+
+/**
+ * 分页增强控件的条数变化回调
+ */
+function changePageSizeEx(moduleName, newSize) {
+    const size = parseInt(newSize);
+    setModulePaginationState(moduleName, { pageSize: size, page: 1 });
+    // 触发对应模块的重新渲染
+    const event = new CustomEvent('modulePageSizeChange', { detail: { module: moduleName, pageSize: size } });
+    document.dispatchEvent(event);
+}
+

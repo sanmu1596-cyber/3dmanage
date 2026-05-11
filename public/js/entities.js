@@ -1191,6 +1191,12 @@ function filterModule(moduleName) {
     }
 
     cfg.render(data);
+
+    // P1.5: 渲染筛选条件Chips标签
+    renderModuleFilterChips(moduleName, {
+        searchTerm: keyword,
+        statusFilter: statusVal
+    });
 }
 
 // 更新统计数据（直接查后端API，确保实时准确）

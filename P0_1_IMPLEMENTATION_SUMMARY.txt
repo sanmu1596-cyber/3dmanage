@@ -1,0 +1,146 @@
+======================================================================================
+P0.1 - 批量选择Checkbox实现指南 (工作量: 4小时)
+======================================================================================
+
+现状分析:
+- entities.js: 缺少批量选择checkbox (对比testcases.js行147已正确实现)
+- 无法进行批量操作(批量删除、批量导出等)
+- 操作工具栏不存在
+
+核心实现步骤:
+
+1. 全局状态管理 (entities.js顶部添加)
+   - const selectedGameIds = new Set()
+   - const selectedMemberIds = new Set()
+   - const selectedDeviceIds = new Set()
+
+2. 核心函数实现
+   - toggleGameSelect(gameId): 切换单个选择
+   - toggleAllGamesSelect(isChecked): 切换全选
+   - clearGameSelection(): 清空所有选择
+   - batchDeleteGames(): 批量删除
+   - batchExportGames(): 批量导出
+   - updateGameRowSelection(gameId): 更新行样式
+   - updateGameBatchToolbar(): 更新工具栏
+
+3. 修改renderGamesPage() (约第253行)
+   原文:
+     let rowHtml = `<td class="text-center"><strong>${globalIndex}</strong></td>`;
+   
+   新文:
+     const isChecked = selectedGameIds.has(game.id) ? 'checked' : '';
+     let rowHtml = `
+       <td class="text-center checkbox-cell">
+         <input type="checkbox" class="game-checkbox" 
+                data-game-id="${game.id}" ${isChecked}
+                onchange="toggleGameSelect(${game.id})">
+       </td>
+       <td class="text-center"><strong>${globalIndex}</strong></td>
+     `;
+
+4. 表头全选checkbox (在renderGamesPage()开始处添加)
+   - 找到表头第一个<th>
+   - 添加 <input type="checkbox" class="games-select-all" ...>
+   - 绑定toggleAllGamesSelect()
+
+5. HTML工具栏 (public/index.html游戏表格前添加)
+   <div id="games-batch-toolbar" class="batch-toolbar" style="display:none;">
+     <!-- 动态生成 -->
+   </div>
+
+6. CSS样式 (styles-tapd.css添加)
+   .batch-toolbar: 工具栏基础样式
+   .batch-info: 左侧信息部分
+   .batch-actions: 右侧操作按钮
+   .checkbox-cell: 复选框单元格
+   .game-checkbox: 复选框元素
+   .game-row-selected: 选中行样式 (背景色+左边框)
+   @keyframes slideDown: 工具栏滑入动画
+
+7. 为设备表和成员表重复相同步骤
+   - renderDevicesTable(): 添加设备checkbox
+   - renderMembersTable(): 添加成员checkbox
+   - 对应的函数和样式
+
+关键代码片段:
+
+函数1: toggleGameSelect
+  if (selectedGameIds.has(gameId)) {
+    selectedGameIds.delete(gameId);
+  } else {
+    selectedGameIds.add(gameId);
+  }
+  updateGameRowSelection(gameId);
+  updateGameBatchToolbar();
+
+函数2: batchDeleteGames
+  showConfirm(`确定删除选中的 ${selectedGameIds.size} 个游戏吗？`, async () => {
+    const resp = await authFetch(`${API_BASE}/games/batch-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: Array.from(selectedGameIds) })
+    });
+    // 处理响应...
+  });
+
+函数3: updateGameBatchToolbar
+  if (selectedGameIds.size > 0) {
+    toolbar.style.display = 'flex';
+    toolbar.innerHTML = `已选择 ${selectedGameIds.size} 个...` + 操作按钮;
+  } else {
+    toolbar.style.display = 'none';
+  }
+
+文件修改清单:
+1. entities.js: 
+   - 添加~80行全局函数 (顶部)
+   - 修改~5行renderGamesPage() (第253行附近)
+   - 修改~50行表头生成逻辑
+   - 为devices/members表重复上述修改
+
+2. public/index.html:
+   - 添加1行工具栏HTML (游戏表格前)
+   - 为devices/members表添加对应工具栏HTML
+
+3. styles-tapd.css:
+   - 添加~100行CSS样式
+
+后端API要求:
+  POST /api/games/batch-delete
+  {
+    "ids": [1, 2, 3],
+    ...
+  }
+  
+  Response:
+  {
+    "success": true,
+    "deleted": 3
+  }
+
+验收测试清单:
+- 单个checkbox选择/取消
+- 全选checkbox自动选中所有行
+- 取消全选checkbox自动取消所有行
+- 工具栏在有选择时显示，无选择时隐藏
+- 工具栏显示正确的计数
+- 批量删除弹出确认对话框
+- 批量删除成功后重新加载表格
+- 批量导出生成正确的Excel文件
+- 分页时各页的选择状态独立
+- 样式在light/dark模式下正确显示
+
+关键设计决策:
+1. 使用Set管理selectedIds，性能O(1) vs Array的O(n)
+2. 全选仅在当前页，不跨页 (更直观)
+3. 使用classList修改行样式 (高效)
+4. 工具栏display切换而不移除DOM (性能)
+5. 选择状态存储在内存，页面刷新后清空 (简化逻辑)
+
+预期工作量分解:
+- 全局函数编写: 1.5小时
+- 修改renderGamesPage(): 0.5小时
+- HTML/CSS添加: 0.5小时
+- 为其他表格重复: 1.5小时
+
+总计: 4小时
+

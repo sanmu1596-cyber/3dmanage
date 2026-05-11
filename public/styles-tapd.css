@@ -1008,6 +1008,53 @@ body {
     table-layout: auto;
 }
 
+/* P1.3 增强：列宽自适应优化 */
+.data-table td {
+    max-width: 400px; /* 默认最大宽度，防止长文本撑开表格 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.data-table td a,
+.data-table td .text-link {
+    color: var(--primary);
+    text-decoration: none;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.data-table td a:hover,
+.data-table td .text-link:hover {
+    text-decoration: underline;
+    color: var(--primary-hover);
+}
+
+/* 长文本单元格允许换行（需要时添加此类） */
+.data-table td.allow-wrap {
+    white-space: normal !important;
+    word-break: break-word;
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] .data-table td {
+    max-width: 400px;
+}
+
+[data-theme="dark"] .data-table td a,
+[data-theme="dark"] .data-table td .text-link {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .data-table td a:hover,
+[data-theme="dark"] .data-table td .text-link:hover {
+    color: var(--primary-hover);
+}
+
 .data-table thead {
     position: sticky;
     top: 0;
@@ -1267,28 +1314,58 @@ body.col-resizing * {
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.2s;
-    opacity: 0.5;
+    opacity: 0.4; /* 默认更淡，强调操作区域 */
 }
 
-.action-icon-btn:hover {
-    opacity: 1;
-    background: var(--bg-elevated);
-}
-
-.action-icon-btn.delete:hover {
-    background: #ffebee;
-}
-
-/* 行悬停时显示操作按钮 */
+/* P1.2优化：行悬停时操作按钮更加明显 */
 tr:hover .action-icon-btn {
-    opacity: 0.8;
+    opacity: 0.9; /* 悬停时几乎可见 */
+    background: var(--bg-elevated);
+    transform: scale(1.05); /* 轻微放大 */
 }
 
 tr:hover .action-icon-btn:hover {
     opacity: 1;
+    background: var(--primary-light);
+    transform: scale(1.1); /* hover时更明显放大 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); /* 添加阴影 */
 }
 
-.btn-edit {
+/* P1.2优化：行选中态视觉反馈 */
+.data-table tbody tr.selected {
+    background: rgba(22, 119, 255, 0.08) !important;
+    box-shadow: inset 3px 0 0 var(--primary); /* 左侧主色边框强调选中行 */
+}
+
+.data-table tbody tr.selected td {
+    border-top: 1px solid rgba(22, 119, 255, 0.12);
+    border-bottom: 1px solid rgba(22, 119, 255, 0.12);
+}
+
+.data-table tbody tr.selected .action-icon-btn {
+    opacity: 0.85; /* 选中行按钮默认更明显 */
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] tr:hover .action-icon-btn {
+    background: var(--bg-elevated);
+}
+
+[data-theme="dark"] tr:hover .action-icon-btn:hover {
+    background: var(--primary-light);
+}
+
+[data-theme="dark"] .data-table tbody tr.selected {
+    background: rgba(22, 119, 255, 0.15) !important;
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+[data-theme="dark"] .data-table tbody tr.selected td {
+    border-color: rgba(22, 119, 255, 0.25);
+}
+
+/* 编辑中行的操作按钮 */
+tr:hover .action-icon-btn:hover {
     color: var(--primary);
     border: 1px solid var(--primary);
     background: transparent;
@@ -1375,12 +1452,46 @@ tr:hover .action-icon-btn:hover {
 
 /* ========== 状态标签 - TAPD 扁平风格 ========== */
 .status-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
+}
+
+/* P1.4: 状态徽章emoji图标 */
+.status-badge::before {
+    content: '';
+    display: none;
+}
+.status-badge.has-icon {
+    padding-left: 24px;
+}
+.status-badge.has-icon::before {
+    display: inline-block;
+    content: '';
+    position: absolute;
+    left: 8px;
+    width: 12px;
+    height: 12px;
+}
+.status-badge.has-icon {
+    position: relative;
+    padding-left: 28px !important;
+}
+.status-badge.has-icon::before {
+    display: inline-block;
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
 }
 
 .status-active, .status-available, .status-completed, .status-online {
