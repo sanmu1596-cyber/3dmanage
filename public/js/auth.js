@@ -174,13 +174,56 @@ async function checkLoginStatus() {
 // 获取当前用户信息
 function getCurrentUser() {
     if (IS_DEV_MODE) {
-        return { username: 'admin', realName: '管理员', role: '超级管理员', role_id: 1 };
+        return { username: 'admin', realName: '管理员', role: '超级管理员', role_id: 1, role_key: 'super_admin' };
     }
     try {
         const userInfo = localStorage.getItem('userInfo');
-        return userInfo ? JSON.parse(userInfo) : { username: '未知', realName: '未知', role: '未知' };
+        return userInfo ? JSON.parse(userInfo) : { username: '未知', realName: '未知', role: '未知', role_key: 'unknown' };
     } catch (e) {
-        return { username: '未知', realName: '未知', role: '未知' };
+        return { username: '未知', realName: '未知', role: '未知', role_key: 'unknown' };
+    }
+}
+
+// 检查用户是否具有特定权限
+// 用法: if (hasPermission('games', 'edit')) { showEditBtn(); }
+function hasPermission(module, action) {
+    if (IS_DEV_MODE) return true; // 开发模式拥有所有权限
+    const user = getCurrentUser();
+    if (user.role_key === 'super_admin') return true; // 超级管理员拥有所有权限
+    // 从用户信息中获取权限矩阵
+    try {
+        const permissions = JSON.parse(localStorage.getItem('userPermissions') || '{}');
+        return permissions[module]?.[action] === true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 根据权限显示/隐藏元素
+// 用法: <div data-permission="games.edit">编辑按钮</div>
+function applyPermissionControl() {
+    if (IS_DEV_MODE) return; // 开发模式不隐藏任何元素
+    document.querySelectorAll('[data-permission]').forEach(el => {
+        const [module, action] = el.dataset.permission.split('.');
+        if (!hasPermission(module, action)) {
+            el.style.display = 'none';
+        }
+    });
+}
+
+// 加载用户权限矩阵
+async function loadUserPermissions() {
+    if (IS_DEV_MODE) return;
+    try {
+        const resp = await authFetch(`${API_BASE}/auth/permissions`);
+        if (resp.ok) {
+            const result = await resp.json();
+            if (result.success && result.permissions) {
+                localStorage.setItem('userPermissions', JSON.stringify(result.permissions));
+            }
+        }
+    } catch (e) {
+        console.warn('加载用户权限失败:', e);
     }
 }
 
@@ -253,6 +296,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadMembers(); // 成员数据是全局依赖（适配进展、游戏列表都用到）
     initForms();
     updateUserInfo();
+    // P3-19: 加载用户权限矩阵并应用权限控制
+    await loadUserPermissions();
+    applyPermissionControl();
     updateStats();
     initHashRouter(); // P0: URL hash 路由（会调 switchTab → loadTabData 按需加载）
 

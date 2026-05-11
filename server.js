@@ -150,6 +150,7 @@ const authRouter = express.Router();
 authRouter.post('/login', usersController.login);
 authRouter.post('/logout', usersController.logout);
 authRouter.get('/me', auth.verifyToken, usersController.getCurrentUser);
+authRouter.get('/permissions', auth.verifyToken, usersController.getCurrentUserPermissions);
 
 // ==================== 用户管理路由（需要认证） ====================
 const usersRouter = express.Router();
