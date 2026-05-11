@@ -677,3 +677,176 @@ function applyCellTooltips(tableId) {
     });
 }
 
+// ==================== 表格行右键上下文菜单 ====================
+
+let _activeCtxMenu = null; // 当前显示的右键菜单DOM引用
+
+/**
+ * 右键菜单配置：tableId → { getItems(row, id) }
+ * 返回菜单项数组: [{ icon, label, action, danger?, divider? }]
+ */
+const CTX_MENU_CONFIGS = {
+    'games-table': {
+        getItems: (tr, id) => [
+            { icon: '✏️', label: '编辑游戏', action: () => editGame(id) },
+            { icon: '👁️', label: '查看详情', action: () => { /* 可扩展：打开详情面板 */ } },
+            { divider: true },
+            { icon: '📋', label: '复制名称', action: () => copyToClipboard(tr.querySelector('td.cell-game-name')?.textContent || '') },
+            { icon: '🔗', label: '复制行数据(JSON)', action: () => copyRowAsJson(tr) },
+            { divider: true },
+            { icon: '🗑️', label: '删除游戏', action: () => deleteGame(id), danger: true }
+        ]
+    },
+    'members-table': {
+        getItems: (tr, id) => [
+            { icon: '✏️', label: '编辑成员', action: () => editMember(id) },
+            { icon: '📋', label: '复制姓名', action: () => copyToClipboard(tr.querySelectorAll('td')[1]?.textContent || '') },
+            { divider: true },
+            { icon: '🗑️', label: '删除成员', action: () => deleteMember(id), danger: true }
+        ]
+    },
+    'devices-table': {
+        getItems: (tr, id) => [
+            { icon: '✏️', label: '编辑设备', action: () => editDevice(id) },
+            { icon: '📋', label: '复制设备名', action: () => copyToClipboard(tr.querySelectorAll('td')[2]?.textContent || '') },
+            { divider: true },
+            { icon: '🗑️', label: '删除设备', action: () => deleteDevice(id), danger: true }
+        ]
+    },
+    'tests-table': {
+        getItems: (tr, id) => [
+            { icon: '✏️', label: '编辑测试', action: () => editTest(id) },
+            { icon: '🗑️', label: '删除测试', action: () => deleteTest(id), danger: true }
+        ]
+    },
+    'bugs-table': {
+        getItems: (tr, id) => [
+            { icon: '✏️', label: '编辑缺陷', action: () => editBug(id) },
+            { icon: '🗑️', label: '删除缺陷', action: () => deleteBug(id), danger: true }
+        ]
+    }
+};
+
+/**
+ * 初始化所有表格的右键菜单（在 DOMContentLoaded 时调用）
+ */
+function initContextMenu() {
+    Object.keys(CTX_MENU_CONFIGS).forEach(tableId => {
+        const tbody = document.getElementById(tableId);
+        if (!tbody) return;
+
+        // 使用事件委托监听右键
+        tbody.addEventListener('contextmenu', (e) => {
+            const tr = e.target.closest('tr');
+            if (!tr || tr.querySelector('.empty-state')) return;
+
+            e.preventDefault();
+
+            // 从行的 data-id 或按钮中提取ID
+            let rowId = tr.dataset.id;
+            if (!rowId) {
+                const btn = tr.querySelector('button[onclick*="edit"], button[onclick*="delete"], button[onclick*="Edit"], button[onclick*="Delete"]');
+                if (btn) {
+                    const match = btn.getAttribute('onclick')?.match(/\((\d+)/);
+                    rowId = match ? match[1] : null;
+                }
+            }
+
+            if (!rowId) return;
+
+            showContextMenu(e.clientX, e.clientY, CTX_MENU_CONFIGS[tableId].getItems(tr, rowId));
+        });
+    });
+
+    // 全局点击关闭右键菜单
+    document.addEventListener('click', closeContextMenu);
+    document.addEventListener('contextmenu', closeContextMenu); // 再次右键也关闭旧的
+}
+
+/**
+ * 显示右键菜单
+ */
+function showContextMenu(x, y, items) {
+    closeContextMenu(); // 先关闭已存在的
+
+    const menu = document.createElement('div');
+    menu.className = 'ctx-menu';
+
+    items.forEach(item => {
+        if (item.divider) {
+            menu.innerHTML += '<div class="ctx-menu-divider"></div>';
+        } else {
+            const cls = item.danger ? 'ctx-menu-item ctx-menu-danger' : 'ctx-menu-item';
+            menu.innerHTML += `<button class="${cls}"><span class="ctx-menu-icon">${item.icon}</span><span class="ctx-menu-text">${item.label}</span></button>`;
+        }
+    });
+
+    document.body.appendChild(menu);
+    _activeCtxMenu = menu;
+
+    // 调整位置防止超出视口
+    const rect = menu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
+    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    // 绑定菜单项点击
+    let idx = 0;
+    items.forEach(item => {
+        if (!item.divider) {
+            menu.children[idx].addEventListener('click', (e) => {
+                e.stopPropagation();
+                item.action();
+                closeContextMenu();
+            });
+            idx++;
+        }
+    });
+}
+
+/**
+ * 关闭右键菜单
+ */
+function closeContextMenu() {
+    if (_activeCtxMenu) {
+        _activeCtxMenu.remove();
+        _activeCtxMenu = null;
+    }
+}
+
+/**
+ * 复制文本到剪贴板
+ */
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast(`已复制: ${text}`, 'success', 1500);
+    } catch {
+        // fallback: 降级提示
+        showToast('复制失败，请手动选择复制', 'warning');
+    }
+}
+
+/**
+ * 将表格行数据复制为JSON
+ */
+function copyRowAsJson(tr) {
+    const cells = tr.querySelectorAll('td');
+    // 跳过checkbox列和操作列
+    const data = {};
+    cells.forEach(td => {
+        // 简单提取文本
+        const text = td.textContent.trim();
+        if (text && !td.classList.contains('action-icons') && !td.querySelector('.row-checkbox')) {
+            // 使用单元格位置作为key（简化处理）
+            const field = td.closest('thead')?.querySelector(`th:nth-child(${Array.from(td.parentNode.children).indexOf(td)+1})`)?.getAttribute('data-field');
+            if (field) data[field] = text;
+        }
+    });
+    copyToClipboard(JSON.stringify(data, null, 2));
+}
+
+// 在 DOMContentLoaded 时初始化右键菜单
+document.addEventListener('DOMContentLoaded', initContextMenu);
+

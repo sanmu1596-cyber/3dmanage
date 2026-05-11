@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260507e">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260511">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -42,7 +42,7 @@
                     <div class="sidebar-section-title">总览</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
-                            <span class="sidebar-icon">📊</span>项目概览
+                            <span class="sidebar-icon">📊</span>项目概览<span class="shortcut-badge">⌘1</span>
                         </a>
                     </div>
                 </div>
@@ -51,13 +51,13 @@
                     <div class="sidebar-section-title">基础数据模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="games" onclick="switchTab('games')">
-                            <span class="sidebar-icon">🎮</span>游戏列表
+                            <span class="sidebar-icon">🎮</span>游戏列表<span class="shortcut-badge">⌘2</span>
                         </a>
                         <a class="sidebar-item" data-tab="devices" onclick="switchTab('devices')">
-                            <span class="sidebar-icon">📱</span>设备列表
+                            <span class="sidebar-icon">📱</span>设备列表<span class="shortcut-badge">⌘3</span>
                         </a>
                         <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
-                            <span class="sidebar-icon">👥</span>项目成员列表
+                            <span class="sidebar-icon">👥</span>项目成员列表<span class="shortcut-badge">⌘4</span>
                         </a>
                     </div>
                 </div>
@@ -66,10 +66,10 @@
                     <div class="sidebar-section-title">游戏模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="progress" onclick="switchTab('progress')">
-                            <span class="sidebar-icon">📈</span>适配进展
+                            <span class="sidebar-icon">📈</span>适配进展<span class="shortcut-badge">⌘5</span>
                         </a>
                         <a class="sidebar-item" data-tab="tests" onclick="switchTab('tests')">
-                            <span class="sidebar-icon">🧪</span>测试列表
+                            <span class="sidebar-icon">🧪</span>测试列表<span class="shortcut-badge">⌘6</span>
                         </a>
                         <a class="sidebar-item" data-tab="game-issues" onclick="switchTab('game-issues')">
                             <span class="sidebar-icon">⚠️</span>游戏问题
@@ -78,7 +78,7 @@
                             <span class="sidebar-icon">📝</span>测试用例
                         </a>
                         <a class="sidebar-item" data-tab="config-plan" onclick="switchTab('config-plan')">
-                            <span class="sidebar-icon">📋</span>配置计划
+                            <span class="sidebar-icon">📋</span>配置计划<span class="shortcut-badge">⌘8</span>
                         </a>
                         <a class="sidebar-item" data-tab="game-versions" onclick="switchTab('game-versions')">
                             <span class="sidebar-icon">📦</span>版本管理
@@ -117,7 +117,7 @@
                             <span class="sidebar-icon">🔲</span>适配矩阵
                         </a>
                         <a class="sidebar-item" data-tab="bugs" onclick="switchTab('bugs')">
-                            <span class="sidebar-icon">🐛</span>缺陷列表
+                            <span class="sidebar-icon">🐛</span>缺陷列表<span class="shortcut-badge">⌘7</span>
                         </a>
                         <a class="sidebar-item" data-tab="requirements" onclick="switchTab('requirements')">
                             <span class="sidebar-icon">📄</span>需求管理
@@ -159,6 +159,9 @@
 
             <!-- 右侧内容区域 -->
             <main class="content-area">
+
+                <!-- 面包屑导航（由 router.js 动态更新） -->
+                <nav class="breadcrumb-nav" id="breadcrumb-nav"></nav>
 
                 <!-- ========== 项目概览 Dashboard ========== -->
                 <section id="dashboard" class="tab-content active">
@@ -299,6 +302,9 @@
                             <button class="tool-btn" onclick="resetFilters()">重置</button>
                         </div>
                     </div>
+
+                    <!-- 筛选条件标签（动态生成） -->
+                    <div id="filter-chips" class="filter-chips-area"></div>
 
                     <!-- 字段显示设置面板 -->
                     <div id="column-settings" class="column-settings-panel" style="display: none;">

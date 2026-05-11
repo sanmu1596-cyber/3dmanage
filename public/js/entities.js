@@ -340,6 +340,8 @@ function renderGamesPage() {
     updatePaginationControls();
     // P0: 为长文本单元格添加 tooltip
     applyCellTooltips('games-table');
+    // P0: 初始化表头排序
+    initTableSort('games-table');
 }
 
 // ========== 游戏列表行内编辑 ==========
@@ -562,6 +564,8 @@ function updatePaginationControls() {
     if (!pageNumbersDiv) return;
     if (totalPages <= 1) {
         pageNumbersDiv.innerHTML = '';
+        // 即使只有一页也显示分页增强控件
+        pageNumbersDiv.innerHTML = buildPaginationExtras(totalPages);
         return;
     }
 
@@ -571,7 +575,47 @@ function updatePaginationControls() {
         const isActive = i === currentPage ? 'active' : '';
         pageNumbersHTML += `<button class="btn btn-small page-number ${isActive}" onclick="goToPage(${i})">${i}</button>`;
     }
-    pageNumbersDiv.innerHTML = pageNumbersHTML;
+    pageNumbersDiv.innerHTML = pageNumbersHTML + buildPaginationExtras(totalPages);
+}
+
+/**
+ * 构建分页增强控件（跳转输入框 + 每页条数选择器）
+ */
+function buildPaginationExtras(totalPages) {
+    let html = '';
+
+    // 跳转到指定页
+    html += `<span class="page-jump-wrapper">跳至`;
+    html += `<input type="number" min="1" max="${totalPages}" value="${currentPage}" `;
+    html += `onkeydown="if(event.key==='Enter'){const v=parseInt(this.value);if(v>=1&&v<=${totalPages})goToPage(v);this.value=${currentPage};}" `;
+    html += `title="输入页码后按回车跳转">`;
+    html += `/${totalPages} 页</span>`;
+
+    // 每页条数选择器
+    const sizes = [20, 50, 100];
+    html += `<span class="page-size-selector">每页`;
+    html += `<select onchange="changePageSizeCustom(this.value)">`;
+    sizes.forEach(s => {
+        html += `<option value="${s}" ${pageSize === s ? 'selected' : ''}>${s}条</option>`;
+    });
+    html += `<option value="-1" ${pageSize === -1 ? 'selected' : ''}>全部</option>`;
+    html += `</select></span>`;
+
+    return html;
+}
+
+/**
+ * 自定义每页条数（由增强分页选择器调用）
+ */
+function changePageSizeCustom(val) {
+    pageSize = parseInt(val);
+    currentPage = 1;
+
+    // 同步到原有的 select（如果存在）
+    const oldSelect = document.getElementById('page-size');
+    if (oldSelect) oldSelect.value = val;
+
+    renderGamesPage();
 }
 
 // 切换到上一页
@@ -635,6 +679,83 @@ function filterGames() {
     // 重置到第一页
     currentPage = 1;
     renderGamesPage();
+
+    // 渲染筛选条件标签
+    renderFilterChips({ searchTerm, platformFilter, typeFilter, statusFilter });
+}
+
+// 渲染筛选条件为可移除的Chip标签
+function renderFilterChips(filters) {
+    const container = document.getElementById('filter-chips');
+    if (!container) return;
+
+    const chips = [];
+
+    if (filters.searchTerm) {
+        chips.push({
+            label: `搜索: "${filters.searchTerm}"`,
+            onRemove: () => {
+                const el = document.getElementById('search-input');
+                if (el) { el.value = ''; filterGames(); }
+            }
+        });
+    }
+
+    if (filters.platformFilter) {
+        const selectEl = document.getElementById('platform-filter');
+        const text = selectEl?.options[selectEl.selectedIndex]?.text || filters.platformFilter;
+        chips.push({
+            label: `平台: ${text}`,
+            onRemove: () => {
+                const el = document.getElementById('platform-filter');
+                if (el) { el.value = ''; filterGames(); }
+            }
+        });
+    }
+
+    if (filters.typeFilter) {
+        const selectEl = document.getElementById('type-filter');
+        const text = selectEl?.options[selectEl.selectedIndex]?.text || filters.typeFilter;
+        chips.push({
+            label: `类型: ${text}`,
+            onRemove: () => {
+                const el = document.getElementById('type-filter');
+                if (el) { el.value = ''; filterGames(); }
+            }
+        });
+    }
+
+    if (filters.statusFilter) {
+        const selectEl = document.getElementById('status-filter');
+        const text = selectEl?.options[selectEl.selectedIndex]?.text || filters.statusFilter;
+        chips.push({
+            label: `状态: ${text}`,
+            onRemove: () => {
+                const el = document.getElementById('status-filter');
+                if (el) { el.value = ''; filterGames(); }
+            }
+        });
+    }
+
+    if (chips.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = '';
+    container.innerHTML = chips.map((chip, i) =>
+        `<span class="filter-chip"><span class="chip-label">${escapeHtml(chip.label)}</span>` +
+        `<span class="chip-remove" data-chip-idx="${i}">✕</span></span>`
+    ).join('');
+
+    // 绑定移除事件（使用事件委托更高效）
+    container.addEventListener('click', (e) => {
+        if (e.target.classList.contains('chip-remove')) {
+            const idx = parseInt(e.target.dataset.chipIdx);
+            if (chips[idx]) chips[idx].onRemove();
+        }
+    }, { once: false });
 }
 
 // 重置筛选条件
@@ -1982,7 +2103,7 @@ function loadColumnSettings() {
     if (savedSettings) {
         try {
             const saved = JSON.parse(savedSettings);
-            
+
             // 合并保存的设置到默认设置中，新增字段默认显示
             // 这样旧的localStorage中没有的新字段会保持默认值true
             for (const key in saved) {
@@ -2001,5 +2122,139 @@ function loadColumnSettings() {
             console.error('加载列显示设置失败:', error);
         }
     }
+}
+
+// ==================== 表格列排序功能 ====================
+
+/**
+ * 排序状态：{ field: string, direction: 'asc'|'desc'|null }
+ * null = 默认顺序（按数据库原始顺序）
+ */
+let tableSortState = { field: null, direction: null };
+
+/**
+ * 初始化表头排序点击事件（在 DOMContentLoaded 或表格渲染后调用）
+ * 为带有 data-field 属性的 <th> 添加点击排序
+ */
+function initTableSort(tableId) {
+    const thead = document.querySelector(`#${tableId}`).closest('table')?.querySelector('thead');
+    if (!thead) return;
+
+    thead.querySelectorAll('th[data-field]').forEach(th => {
+        // 跳过已初始化的（避免重复绑定）
+        if (th.dataset.sortInit) return;
+        th.dataset.sortInit = '1';
+
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        th.style.position = 'relative';
+
+        // 添加排序箭头占位
+        if (!th.querySelector('.sort-arrow')) {
+            const arrow = document.createElement('span');
+            arrow.className = 'sort-arrow';
+            arrow.innerHTML = ' <span class="sort-indicator"></span>';
+            th.appendChild(arrow);
+        }
+
+        // 更新当前排序状态显示
+        updateSortIndicator(th);
+
+        th.addEventListener('click', () => {
+            const field = th.getAttribute('data-field');
+            handleSortClick(tableId, field);
+        });
+    });
+}
+
+/**
+ * 处理表头点击排序
+ * 三态循环: default → asc → desc → default
+ */
+function handleSortClick(tableId, field) {
+    if (tableSortState.field === field) {
+        // 同一字段：切换方向或重置
+        if (tableSortState.direction === 'asc') {
+            tableSortState.direction = 'desc';
+        } else if (tableSortState.direction === 'desc') {
+            tableSortState.field = null;
+            tableSortState.direction = null;
+        } else {
+            tableSortState.direction = 'asc';
+        }
+    } else {
+        // 新字段：默认升序
+        tableSortState.field = field;
+        tableSortState.direction = 'asc';
+    }
+
+    // 更新所有表头箭头显示
+    const thead = document.querySelector(`#${tableId}`).closest('table')?.querySelector('thead');
+    if (thead) {
+        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th));
+    }
+
+    // 对游戏列表应用排序并重新渲染
+    if (tableId === 'games-table') {
+        applyGamesSort();
+        renderGamesPage();
+    }
+}
+
+/**
+ * 更新单个表头的排序箭头显示
+ */
+function updateSortIndicator(th) {
+    const field = th.getAttribute('data-field');
+    const indicator = th.querySelector('.sort-indicator');
+    if (!indicator) return;
+
+    th.classList.remove('sort-asc', 'sort-desc');
+
+    if (tableSortState.field === field && tableSortState.direction) {
+        th.classList.add(tableSortState.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+        indicator.innerHTML = tableSortState.direction === 'asc' ? '▲' : '▼';
+        indicator.style.opacity = '1';
+    } else {
+        indicator.innerHTML = '▽'; // 未排序时显示浅色双向箭头
+        indicator.style.opacity = '0.3';
+    }
+}
+
+/**
+ * 对 filteredGamesData 进行原地排序
+ */
+function applyGamesSort() {
+    if (!tableSortState.field || !tableSortState.direction) return;
+
+    const field = tableSortState.field;
+    const dir = tableSortState.direction;
+
+    filteredGamesData.sort((a, b) => {
+        let valA = a[field];
+        let valB = b[field];
+
+        // 数字类型字段的特殊处理
+        if (field === 'adapter_progress') {
+            valA = parseInt(valA) || 0;
+            valB = parseInt(valB) || 0;
+        } else {
+            // 字符串比较：转小写，null/undefined 排最后
+            valA = (valA != null ? String(valA) : '');
+            valB = (valB != null ? String(valB) : '');
+        }
+
+        let cmp = 0;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            cmp = valA - valB;
+        } else {
+            cmp = valA.localeCompare(valB, 'zh-CN', { numeric: true });
+        }
+
+        return dir === 'asc' ? cmp : -cmp;
+    });
+
+    // 排序后重置到第一页
+    currentPage = 1;
 }
 

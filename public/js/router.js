@@ -31,9 +31,38 @@ function initTabs() {
     });
 }
 
-// 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数, 防抖动)
+// 切换Tab (P0: 增加 hash 路由, 性能优化: 防抖+请求计数, 防抖动, Skeleton骨架屏)
 let _tabSwitchCounter = 0; // 递增计数器，用于检测过时的tab切换
 let _revealTimer = null; // 恢复可见的定时器
+
+// 各模块的Skeleton模板配置
+const SKELETON_CONFIGS = {
+    games: { rows: 5, cols: 6 },
+    members: { rows: 4, cols: 4 },
+    devices: { rows: 4, cols: 8 },
+    tests: { rows: 4, cols: 7 },
+    bugs: { rows: 4, cols: 7 },
+    progress: { rows: 3, cols: 5 }
+};
+
+/**
+ * 生成骨架屏HTML
+ */
+function generateSkeleton(tabId) {
+    const cfg = SKELETON_CONFIGS[tabId];
+    if (!cfg) return '';
+    let rowsHtml = '';
+    for (let r = 0; r < cfg.rows; r++) {
+        const cells = [];
+        for (let c = 0; c < cfg.cols; c++) {
+            const widths = ['short', 'medium', '', 'wide', ''];
+            cells.push(`<div class="skeleton-cell ${widths[c % widths.length]}"></div>`);
+        }
+        rowsHtml += `<div class="skeleton-row">${cells.join('')}</div>`;
+    }
+    return `<div class="skeleton-shimmer" id="${tabId}-skeleton">${rowsHtml}</div>`;
+}
+
 function switchTab(tabId, fromHash) {
     const mySwitch = ++_tabSwitchCounter; // 记录本次切换的序号
     clearTimeout(_revealTimer);
@@ -53,15 +82,22 @@ function switchTab(tabId, fromHash) {
     // 激活当前标签
     const sidebarItem = document.querySelector(`.sidebar-item[data-tab="${tabId}"]`);
     if (sidebarItem) sidebarItem.classList.add('active');
-    
+
     const tabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
     if (tabBtn) tabBtn.classList.add('active');
-    
+
     const content = document.getElementById(tabId);
     if (content) {
-        // 防抖动：先让内容区不可见（保留布局占位），等所有DOM操作完成再显示
-        content.style.visibility = 'hidden';
+        // 显示骨架屏（在数据加载期间消除白闪）
+        content.style.visibility = 'visible';
         content.classList.add('active');
+        // 插入骨架屏（如果有表格类内容）
+        if (SKELETON_CONFIGS[tabId] && content.querySelector('.table-container, .data-table, tbody')) {
+            content._savedInner = content.innerHTML;
+            content.innerHTML = generateSkeleton(tabId);
+        } else {
+            content.style.visibility = 'hidden';
+        }
     } else {
         // fallback: 如果找不到对应 tab，跳到 dashboard
         const dash = document.getElementById('dashboard');
@@ -75,24 +111,30 @@ function switchTab(tabId, fromHash) {
         history.pushState(null, '', '#' + tabId);
     }
 
+    // 更新面包屑导航
+    updateBreadcrumb(tabId);
+
     // 按需加载当前 tab 数据
     const noObserverTabs = ['dashboard', 'field-settings'];
     loadTabData(tabId, mySwitch).then(() => {
         if (!content || mySwitch !== _tabSwitchCounter) return;
+        // 恢复实际内容（数据加载完毕后骨架屏自动被render替换）
         if (noObserverTabs.includes(tabId)) {
-            // 没有 MutationObserver 注入的 tab，直接用 rAF 显示
             requestAnimationFrame(() => {
                 if (mySwitch === _tabSwitchCounter && content) {
                     content.style.visibility = '';
                 }
             });
         } else {
-            // 有表格 Observer 注入的 tab，等 Observer 防抖(80ms)完成后再显示
             _revealTimer = setTimeout(() => {
                 if (mySwitch !== _tabSwitchCounter) return;
                 requestAnimationFrame(() => {
                     if (mySwitch === _tabSwitchCounter && content) {
-                        content.style.visibility = '';
+                        // 如果内容还是骨架屏说明数据还没渲染完，隐藏它
+                        const skeleton = content.querySelector(`#${tabId}-skeleton`);
+                        if (skeleton) {
+                            content.style.visibility = 'hidden';
+                        }
                     }
                 });
             }, 150);
@@ -102,6 +144,10 @@ function switchTab(tabId, fromHash) {
 
 // 按需加载当前Tab数据
 async function loadTabData(tabId, switchId) {
+    // 显示刷新指示器
+    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'设备列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
+    if (tabLabels[tabId]) showRefreshIndicator(`正在加载${tabLabels[tabId]}...`);
+
     // 确保字段选项已加载（全局依赖）
     if (!window._fieldOptionsLoaded) {
         await loadFieldOptions();
@@ -109,6 +155,20 @@ async function loadTabData(tabId, switchId) {
     }
     // 如果切换已过时（用户快速切到别的tab了），跳过
     if (switchId !== undefined && switchId !== _tabSwitchCounter) return;
+    try {
+        await _doLoadTabData(tabId, switchId);
+        // 隐藏刷新指示器（带成功提示）
+        hideRefreshIndicator('同步完成 ✅');
+    } catch(e) {
+        console.error('[loadTabData]', e);
+        hideRefreshIndicator();
+    }
+}
+
+/**
+ * 实际的数据加载逻辑（与原 loadTabData 一致）
+ */
+async function _doLoadTabData(tabId, switchId) {
     switch (tabId) {
         case 'dashboard':
             await loadDashboard();
@@ -335,5 +395,65 @@ function renderDevicesTable(data) {
             </tr>
         `;
     }
+}
+
+// ==================== 面包屑导航功能 ====================
+
+/**
+ * Tab → 显示名称 的映射
+ */
+const BREADCRUMB_MAP = {
+    'dashboard': { label: '项目概览', icon: '📊', parent: null },
+    'games':     { label: '游戏列表', icon: '🎮', parent: 'dashboard' },
+    'devices':   { label: '设备列表', icon: '📱', parent: 'dashboard' },
+    'members':   { label: '项目成员', icon: '👥', parent: 'dashboard' },
+    'progress':  { label: '适配进展', icon: '📈', parent: 'games' },
+    'matrix':    { label: '适配矩阵', icon: '🔲', parent: 'progress' },
+    'tests':     { label: '测试列表', icon: '🧪', parent: 'games' },
+    'bugs':      { label: '缺陷列表', icon: '🐛', parent: 'tests' },
+    'game-issues':{label: '游戏问题', icon: '⚠️',  parent: 'games' },
+    'config-plan':{label: '配置计划', icon: '📋', parent: 'progress' },
+    'my-tasks':   { label: '我的任务', icon: '✅', parent: null },
+    'requirements':{label: '需求管理', icon: '📝', parent: null },
+    'field-settings':{label:'字段设置', icon: '⚙️', parent: null },
+    'test-cases':{label: '测试用例', icon: '📑', parent: 'tests' },
+    'user-management':{label:'用户管理', icon: '🔐', parent: null },
+    'versions':  { label: '版本管理', icon: '🏷️', parent: 'devices' },
+    'game-versions':{label:'游戏版本', icon: '🎯', parent: 'games' },
+    'interlace-issues':{label:'交错问题', icon: '🔀', parent: 'games' },
+    'interlace-versions':{label:'交错版本', icon: '🔀', parent: 'devices' },
+    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' }
+};
+
+function updateBreadcrumb(tabId) {
+    const nav = document.getElementById('breadcrumb-nav');
+    if (!nav) return;
+
+    const path = [];
+    let current = tabId;
+    while (current && BREADCRUMB_MAP[current]) {
+        path.unshift(BREADCRUMB_MAP[current]);
+        current = BREADCRUMB_MAP[current].parent;
+    }
+
+    if (path.length === 0) return;
+
+    let html = '';
+    path.forEach((item, idx) => {
+        if (idx > 0) html += `<span class="breadcrumb-sep">›</span>`;
+        const isLast = idx === path.length - 1;
+        if (isLast) {
+            html += `<span class="breadcrumb-current">${item.icon} ${item.label}</span>`;
+        } else {
+            for (const [tid, val] of Object.entries(BREADCRUMB_MAP)) {
+                if (val.label === item.label && val.icon === item.icon) {
+                    html += `<a onclick="switchTab('${tid}')">${item.icon} ${item.label}</a>`;
+                    break;
+                }
+            }
+        }
+    });
+
+    nav.innerHTML = html;
 }
 

@@ -153,3 +153,68 @@ let allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
 let currentDeviceId = null;
 let progressData = []; // 存储各设备的游戏适配数据
 
+// ==================== 数据刷新指示器 ====================
+
+let _refreshCounter = 0; // 正在进行的请求数
+let _refreshBar = null;
+let _refreshToast = null;
+let _refreshTimer = null;
+
+/**
+ * 显示刷新指示器（进度条 + 提示文字）
+ */
+function showRefreshIndicator(msg) {
+    _refreshCounter++;
+    if (_refreshCounter === 1) {
+        _createRefreshElements();
+        if (_refreshBar) _refreshBar.style.display = 'block';
+        if (_refreshToast) { _refreshToast.style.display = 'flex'; _refreshToast.querySelector('.refresh-msg').textContent = msg || '正在同步...'; }
+    }
+}
+
+/**
+ * 隐藏刷新指示器（所有请求完成时才隐藏）
+ * @param {string} finalMsg - 完成后短暂显示的消息（可选）
+ */
+function hideRefreshIndicator(finalMsg) {
+    _refreshCounter = Math.max(0, _refreshCounter - 1);
+    if (_refreshCounter <= 0) {
+        if (finalMsg && _refreshToast) {
+            // 短暂显示完成消息后消失
+            _refreshToast.querySelector('.refresh-msg').textContent = finalMsg;
+            clearTimeout(_refreshTimer);
+            _refreshTimer = setTimeout(() => {
+                _removeRefreshElements();
+                _refreshCounter = 0;
+            }, 1200);
+        } else {
+            _removeRefreshElements();
+        }
+        _refreshCounter = 0;
+    }
+}
+
+function _createRefreshElements() {
+    if (!_refreshBar) {
+        _refreshBar = document.createElement('div');
+        _refreshBar.className = 'data-refresh-bar';
+        _refreshBar.innerHTML = '<div class="refresh-progress"></div>';
+        _refreshBar.style.display = 'none';
+        document.body.appendChild(_refreshBar);
+    }
+
+    if (!_refreshToast) {
+        _refreshToast = document.createElement('div');
+        _refreshToast.className = 'refresh-toast';
+        _refreshToast.innerHTML = '<span class="refresh-spinner"></span><span class="refresh-msg">正在同步...</span>';
+        _refreshToast.style.display = 'none';
+        document.body.appendChild(_refreshToast);
+    }
+}
+
+function _removeRefreshElements() {
+    if (_refreshBar) { _refreshBar.remove(); _refreshBar = null; }
+    if (_refreshToast) { _refreshToast.remove(); _refreshToast = null; }
+    clearTimeout(_refreshTimer);
+}
+
