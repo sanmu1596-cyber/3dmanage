@@ -122,27 +122,10 @@ function switchTab(tabId, fromHash) {
     const noObserverTabs = ['dashboard', 'field-settings'];
     loadTabData(tabId, mySwitch).then(() => {
         if (!content || mySwitch !== _tabSwitchCounter) return;
-        // 数据加载完毕，移除骨架屏覆盖层（保留原始DOM完整性）
+        // 数据加载完毕，移除骨架屏覆盖层 + 恢复可见性
         const skeleton = content.querySelector(`#${tabId}-skeleton`);
         if (skeleton) skeleton.remove();
-        if (noObserverTabs.includes(tabId)) {
-            requestAnimationFrame(() => {
-                if (mySwitch === _tabSwitchCounter && content) {
-                    content.style.visibility = '';
-                }
-            });
-        } else {
-            _revealTimer = setTimeout(() => {
-                if (mySwitch !== _tabSwitchCounter) return;
-                requestAnimationFrame(() => {
-                    if (mySwitch === _tabSwitchCounter && content) {
-                        // 兜底：确保骨架屏被移除
-                        const sk = content.querySelector(`#${tabId}-skeleton`);
-                        if (sk) sk.remove();
-                    }
-                });
-            }, 150);
-        }
+        content.style.visibility = '';
     });
 }
 
