@@ -1132,6 +1132,80 @@ body.col-resizing * {
     cursor: col-resize !important;
 }
 
+/* ========== 表头拖拽排序 - TAPD风格 ========== */
+/* 可拖拽表头样式 */
+.data-table th[data-field] {
+    cursor: grab;
+    user-select: none;
+}
+
+.data-table th[data-field]:active {
+    cursor: grabbing;
+}
+
+/* 拖拽中的表头 */
+.data-table th.dragging-source {
+    opacity: 0.3;
+    background: var(--primary-light);
+}
+
+/* 幽灵拖拽元素 */
+.column-drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    background: rgba(25, 118, 210, 0.95);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    white-space: nowrap;
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
+}
+
+/* 插入提示线 */
+.column-drop-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--primary);
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(25, 118, 210, 0.5);
+}
+
+/* 目标列高亮 */
+.data-table th.drag-over {
+    background: var(--primary-light) !important;
+}
+
+/* 拖拽时表格行的列也半透明 */
+.data-table tbody td.dragging-col {
+    opacity: 0.3;
+    background: var(--primary-light);
+}
+
+/* 长按提示 */
+.data-table th[data-field]::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: var(--primary);
+    transition: width 0.3s ease;
+}
+
+.data-table th[data-field].press-hint::after {
+    width: 60%;
+}
+
 .data-table td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border-light);

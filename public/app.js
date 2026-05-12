@@ -962,6 +962,10 @@ async function loadGames() {
         // 填充筛选下拉框
         populateFilterOptions();
 
+        // 加载列顺序并初始化拖拽
+        loadColumnOrder();
+        initHeaderDrag();
+
         renderGamesPage();
 
         // 更新测试游戏下拉框（使用全部数据）
@@ -1025,60 +1029,66 @@ function renderGamesPage() {
             const globalIndex = pageSize === -1 ? index + 1 : (currentPage - 1) * pageSize + index + 1;
             let rowHtml = `<td class="text-center"><strong>${globalIndex}</strong></td>`;
 
-            // 根据可见列配置生成单元格
-            if (visibleColumns.name) {
-                rowHtml += `<td class="cell-game-name">${escapeHtml(game.name)}</td>`;
-            }
-            if (visibleColumns.english_name) {
-                rowHtml += `<td class="cell-game-name">${escapeHtml(game.english_name || '-')}</td>`;
-            }
-            if (visibleColumns.platform) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
-            }
-            if (visibleColumns.game_id) {
-                rowHtml += `<td>${escapeHtml(game.game_id || '-')}</td>`;
-            }
-            if (visibleColumns.game_type) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${escapeHtml(game.game_type || '-')}</td>`;
-            }
-            if (visibleColumns.description) {
-                rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
-            }
-            if (visibleColumns.developer) {
-                rowHtml += `<td>${escapeHtml(game.developer || '-')}</td>`;
-            }
-            if (visibleColumns.operator) {
-                rowHtml += `<td>${escapeHtml(game.operator || '-')}</td>`;
-            }
-            if (visibleColumns.release_date) {
-                rowHtml += `<td>${escapeHtml(game.release_date || '-')}</td>`;
-            }
-            if (visibleColumns.config_path) {
-                rowHtml += `<td>${escapeHtml(game.config_path || '-')}</td>`;
-            }
-            if (visibleColumns.adapter_progress) {
-                rowHtml += `<td>${escapeHtml(game.adapter_progress || '0%')}</td>`;
-            }
-            if (visibleColumns.owner) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
-            }
-            if (visibleColumns.online_status) {
-                rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
-            }
-            if (visibleColumns.quality) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
-            }
-            if (visibleColumns.game_account) {
-                const acctText = game.game_account || '-';
-                const acctHtml = acctText.split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
-                rowHtml += `<td class="editable-cell" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
-            }
-            if (visibleColumns.storage_location) {
-                rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'storage_location', 'storage_location')" title="点击选择">${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
-            }
-            if (visibleColumns.game_engine) {
-                rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'game_engine')" title="双击编辑">${escapeHtml(game.game_engine || '-')}</td>`;
-            }
+            // 根据列顺序配置生成单元格
+            columnOrder.forEach(field => {
+                if (!visibleColumns[field]) return;
+
+                switch(field) {
+                    case 'name':
+                        rowHtml += `<td class="cell-game-name">${escapeHtml(game.name)}</td>`;
+                        break;
+                    case 'english_name':
+                        rowHtml += `<td class="cell-game-name">${escapeHtml(game.english_name || '-')}</td>`;
+                        break;
+                    case 'platform':
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
+                        break;
+                    case 'game_id':
+                        rowHtml += `<td>${escapeHtml(game.game_id || '-')}</td>`;
+                        break;
+                    case 'game_type':
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${escapeHtml(game.game_type || '-')}</td>`;
+                        break;
+                    case 'description':
+                        rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${escapeHtml(game.description || '-')}</td>`;
+                        break;
+                    case 'developer':
+                        rowHtml += `<td>${escapeHtml(game.developer || '-')}</td>`;
+                        break;
+                    case 'operator':
+                        rowHtml += `<td>${escapeHtml(game.operator || '-')}</td>`;
+                        break;
+                    case 'release_date':
+                        rowHtml += `<td>${escapeHtml(game.release_date || '-')}</td>`;
+                        break;
+                    case 'config_path':
+                        rowHtml += `<td>${escapeHtml(game.config_path || '-')}</td>`;
+                        break;
+                    case 'adapter_progress':
+                        rowHtml += `<td>${escapeHtml(game.adapter_progress || '0%')}</td>`;
+                        break;
+                    case 'owner':
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
+                        break;
+                    case 'online_status':
+                        rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
+                        break;
+                    case 'quality':
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
+                        break;
+                    case 'game_account':
+                        const acctText = game.game_account || '-';
+                        const acctHtml = acctText.split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
+                        rowHtml += `<td class="editable-cell" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
+                        break;
+                    case 'storage_location':
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'storage_location', 'storage_location')" title="点击选择">${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
+                        break;
+                    case 'game_engine':
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'game_engine')" title="双击编辑">${escapeHtml(game.game_engine || '-')}</td>`;
+                        break;
+                }
+            });
 
             rowHtml += `
                 <td class="text-center action-icons">
@@ -1088,6 +1098,7 @@ function renderGamesPage() {
             `;
 
             return `<tr class="clickable" data-id="${game.id}">${rowHtml}</tr>`;
+        }).join('');
         }).join('');
     } else {
         // 计算显示的列数（包括序号和操作列）
@@ -1109,6 +1120,296 @@ function renderGamesPage() {
 
     // 更新分页信息和控件
     updatePaginationControls();
+}
+
+// ========== 表头拖拽排序 - TAPD风格 ==========
+
+// 列顺序配置（持久化到localStorage）
+let columnOrder = ['name', 'english_name', 'platform', 'game_id', 'game_type', 'description',
+    'developer', 'operator', 'release_date', 'config_path', 'adapter_progress',
+    'owner', 'online_status', 'quality', 'game_account', 'storage_location', 'game_engine'];
+
+// 从localStorage加载列顺序
+function loadColumnOrder() {
+    const saved = localStorage.getItem('gamesColumnOrder');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                columnOrder = parsed;
+            }
+        } catch (e) {
+            console.warn('加载列顺序失败:', e);
+        }
+    }
+}
+
+// 保存列顺序到localStorage
+function saveColumnOrder() {
+    try {
+        localStorage.setItem('gamesColumnOrder', JSON.stringify(columnOrder));
+    } catch (e) {
+        console.warn('保存列顺序失败:', e);
+    }
+}
+
+// 初始化表头拖拽
+function initHeaderDrag() {
+    const table = document.querySelector('#games-table');
+    if (!table) return;
+    
+    const thead = table.previousElementSibling;
+    if (!thead) return;
+    
+    const headerRow = thead.querySelector('tr');
+    if (!headerRow) return;
+    
+    let dragState = {
+        isDragging: false,
+        sourceTh: null,
+        sourceField: null,
+        sourceIndex: -1,
+        ghost: null,
+        indicator: null,
+        longPressTimer: null,
+        startX: 0,
+        startY: 0
+    };
+    
+    const LONG_PRESS_DELAY = 400; // 长按触发时间(ms)
+    
+    // 获取所有可拖拽的表头
+    function getDraggableHeaders() {
+        return Array.from(headerRow.querySelectorAll('th[data-field]'));
+    }
+    
+    // 创建幽灵元素
+    function createGhost(th, x, y) {
+        const ghost = document.createElement('div');
+        ghost.className = 'column-drag-ghost';
+        ghost.textContent = th.textContent.trim();
+        ghost.style.left = x + 'px';
+        ghost.style.top = y + 'px';
+        document.body.appendChild(ghost);
+        return ghost;
+    }
+    
+    // 创建插入指示器
+    function createIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'column-drop-indicator';
+        indicator.style.display = 'none';
+        headerRow.appendChild(indicator);
+        return indicator;
+    }
+    
+    // 显示插入指示器
+    function showIndicator(targetTh, position) {
+        if (!dragState.indicator) {
+            dragState.indicator = createIndicator();
+        }
+        
+        const rect = targetTh.getBoundingClientRect();
+        const rowRect = headerRow.getBoundingClientRect();
+        
+        dragState.indicator.style.display = 'block';
+        dragState.indicator.style.height = rowRect.height + 'px';
+        
+        if (position === 'before') {
+            dragState.indicator.style.left = (rect.left - rowRect.left) + 'px';
+        } else {
+            dragState.indicator.style.left = (rect.right - rowRect.left - 3) + 'px';
+        }
+    }
+    
+    // 隐藏插入指示器
+    function hideIndicator() {
+        if (dragState.indicator) {
+            dragState.indicator.style.display = 'none';
+        }
+    }
+    
+    // 获取目标位置
+    function getDropPosition(x, headers) {
+        for (let i = 0; i < headers.length; i++) {
+            const rect = headers[i].getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+            
+            if (x < midX) {
+                return { index: i, position: 'before', th: headers[i] };
+            }
+        }
+        return { index: headers.length, position: 'after', th: headers[headers.length - 1] };
+    }
+    
+    // 执行列移动
+    function moveColumn(fromField, toIndex) {
+        const fromIndex = columnOrder.indexOf(fromField);
+        if (fromIndex === -1) return;
+        
+        // 从原位置移除
+        columnOrder.splice(fromIndex, 1);
+        
+        // 插入到新位置（考虑移除后的索引变化）
+        let adjustedIndex = toIndex;
+        if (fromIndex < toIndex) {
+            adjustedIndex = toIndex - 1;
+        }
+        columnOrder.splice(adjustedIndex, 0, fromField);
+        
+        // 保存并重新渲染
+        saveColumnOrder();
+        renderGamesPage();
+    }
+    
+    // 高亮对应列的数据单元格
+    function highlightColumn(field, highlight) {
+        const table = document.querySelector('#games-table');
+        if (!table) return;
+        
+        const headers = getDraggableHeaders();
+        const colIndex = headers.findIndex(h => h.dataset.field === field);
+        if (colIndex === -1) return;
+        
+        // 表头高亮
+        headers[colIndex].classList.toggle('dragging-source', highlight);
+        
+        // 数据行高亮（+1因为有序号列）
+        const dataColIndex = colIndex + 1;
+        table.querySelectorAll('tr').forEach(row => {
+            const cell = row.children[dataColIndex];
+            if (cell) {
+                cell.classList.toggle('dragging-col', highlight);
+            }
+        });
+    }
+    
+    // mousedown事件
+    headerRow.addEventListener('mousedown', (e) => {
+        const th = e.target.closest('th[data-field]');
+        if (!th) return;
+        
+        // 忽略右键
+        if (e.button !== 0) return;
+        
+        // 忽略点击在resize手柄上
+        if (e.target.classList.contains('col-resize-handle')) return;
+        
+        dragState.sourceTh = th;
+        dragState.sourceField = th.dataset.field;
+        dragState.startX = e.clientX;
+        dragState.startY = e.clientY;
+        
+        // 添加长按提示
+        th.classList.add('press-hint');
+        
+        // 启动长按计时器
+        dragState.longPressTimer = setTimeout(() => {
+            dragState.isDragging = true;
+            th.classList.remove('press-hint');
+            
+            // 高亮源列
+            highlightColumn(dragState.sourceField, true);
+            
+            // 创建幽灵元素
+            dragState.ghost = createGhost(th, e.clientX, e.clientY);
+            
+            // 阻止文本选择
+            document.body.style.userSelect = 'none';
+        }, LONG_PRESS_DELAY);
+    });
+    
+    // mousemove事件
+    document.addEventListener('mousemove', (e) => {
+        if (!dragState.sourceTh) return;
+        
+        // 如果还没开始拖拽，检查移动距离是否超过阈值（取消长按）
+        if (!dragState.isDragging) {
+            const dx = Math.abs(e.clientX - dragState.startX);
+            const dy = Math.abs(e.clientY - dragState.startY);
+            
+            if (dx > 5 || dy > 5) {
+                // 移动了，取消长按
+                clearTimeout(dragState.longPressTimer);
+                dragState.sourceTh.classList.remove('press-hint');
+                dragState.sourceTh = null;
+            }
+            return;
+        }
+        
+        // 更新幽灵位置
+        if (dragState.ghost) {
+            dragState.ghost.style.left = e.clientX + 'px';
+            dragState.ghost.style.top = e.clientY + 'px';
+        }
+        
+        // 显示插入指示器
+        const headers = getDraggableHeaders();
+        const dropPos = getDropPosition(e.clientX, headers);
+        
+        if (dropPos.th && dropPos.th !== dragState.sourceTh) {
+            showIndicator(dropPos.th, dropPos.position);
+        } else {
+            hideIndicator();
+        }
+    });
+    
+    // mouseup事件
+    document.addEventListener('mouseup', (e) => {
+        if (!dragState.sourceTh) return;
+        
+        // 清除长按计时器
+        clearTimeout(dragState.longPressTimer);
+        dragState.sourceTh.classList.remove('press-hint');
+        
+        if (dragState.isDragging) {
+            // 执行列移动
+            const headers = getDraggableHeaders();
+            const dropPos = getDropPosition(e.clientX, headers);
+            
+            if (dropPos.th && dropPos.th !== dragState.sourceTh) {
+                const targetIndex = columnOrder.indexOf(dropPos.th.dataset.field);
+                if (targetIndex !== -1) {
+                    let insertIndex = targetIndex;
+                    if (dropPos.position === 'after') {
+                        insertIndex = targetIndex + 1;
+                    }
+                    moveColumn(dragState.sourceField, insertIndex);
+                }
+            }
+            
+            // 清理
+            highlightColumn(dragState.sourceField, false);
+            
+            if (dragState.ghost) {
+                dragState.ghost.remove();
+                dragState.ghost = null;
+            }
+            
+            hideIndicator();
+            document.body.style.userSelect = '';
+        }
+        
+        // 重置状态
+        dragState = {
+            isDragging: false,
+            sourceTh: null,
+            sourceField: null,
+            sourceIndex: -1,
+            ghost: null,
+            indicator: null,
+            longPressTimer: null,
+            startX: 0,
+            startY: 0
+        };
+    });
+    
+    // 防止拖拽时选中文字
+    headerRow.addEventListener('selectstart', (e) => {
+        if (dragState.isDragging) {
+            e.preventDefault();
+        }
+    });
 }
 
 // ========== 游戏列表行内编辑 ==========
@@ -2731,19 +3032,50 @@ async function deleteBug(id) {
     });
 }
 
-// 更新表头显示/隐藏
+// 更新表头显示/隐藏和顺序
 function updateColumnHeaders() {
     const thead = document.querySelector('#games-table').previousElementSibling;
-    const headers = thead.querySelectorAll('th[data-field]');
-
-    headers.forEach(header => {
-        const field = header.getAttribute('data-field');
-        if (visibleColumns[field]) {
-            header.classList.remove('hidden-column');
+    const headerRow = thead.querySelector('tr');
+    const allHeaders = Array.from(headerRow.querySelectorAll('th'));
+    
+    // 分离固定列和可排序列
+    const fixedBefore = []; // 序号列
+    const sortableHeaders = []; // 数据列
+    const fixedAfter = []; // 操作列
+    
+    allHeaders.forEach(h => {
+        const field = h.dataset.field;
+        if (field) {
+            // 更新显示状态
+            if (visibleColumns[field]) {
+                h.classList.remove('hidden-column');
+            } else {
+                h.classList.add('hidden-column');
+            }
+            sortableHeaders.push(h);
         } else {
-            header.classList.add('hidden-column');
+            // 固定列：根据位置判断
+            const index = allHeaders.indexOf(h);
+            if (index < 2) {
+                fixedBefore.push(h);
+            } else {
+                fixedAfter.push(h);
+            }
         }
     });
+    
+    // 按columnOrder排序
+    sortableHeaders.sort((a, b) => {
+        const orderA = columnOrder.indexOf(a.dataset.field);
+        const orderB = columnOrder.indexOf(b.dataset.field);
+        return orderA - orderB;
+    });
+    
+    // 清空并重新添加：固定前 → 排序后 → 固定后
+    headerRow.innerHTML = '';
+    fixedBefore.forEach(h => headerRow.appendChild(h));
+    sortableHeaders.forEach(h => headerRow.appendChild(h));
+    fixedAfter.forEach(h => headerRow.appendChild(h));
 }
 
 // 切换字段显示设置面板
