@@ -2336,9 +2336,13 @@ function initTableSort(tableId) {
         if (th.dataset.sortInit) return;
         th.dataset.sortInit = '1';
 
-        th.style.cursor = 'pointer';
         th.style.userSelect = 'none';
         th.style.position = 'relative';
+
+        // 保留表头拖拽的grab光标（不覆盖games-table的cursor:grab）
+        if (tableId !== 'games-table' || !th.dataset.field) {
+            th.style.cursor = 'pointer';
+        }
 
         // 添加排序箭头占位
         if (!th.querySelector('.sort-arrow')) {
@@ -2352,6 +2356,11 @@ function initTableSort(tableId) {
         updateSortIndicator(th);
 
         th.addEventListener('click', () => {
+            // 如果刚完成长按拖拽，跳过排序（防止竞争）
+            if (_isHeaderLongPress) {
+                _isHeaderLongPress = false;
+                return;
+            }
             const field = th.getAttribute('data-field');
             handleSortClick(tableId, field);
         });
@@ -2529,16 +2538,23 @@ cancelInlineEdit = function(td, currentValue) {
 
 // ========== 表头拖拽排序 - TAPD风格 ==========
 
+// 全局标志：是否刚完成长按拖拽（用于阻止click排序）
+let _isHeaderLongPress = false;
+
 // 初始化表头拖拽
 function initHeaderDrag() {
     const table = document.querySelector('#games-table');
     if (!table) return;
-    
+
     const thead = table.previousElementSibling;
     if (!thead) return;
-    
+
     const headerRow = thead.querySelector('tr');
     if (!headerRow) return;
+
+    // 防重复绑定
+    if (headerRow.dataset.headerDragInit) return;
+    headerRow.dataset.headerDragInit = '1';
     
     let dragState = {
         isDragging: false,
@@ -2682,6 +2698,7 @@ function initHeaderDrag() {
         // 启动长按计时器
         dragState.longPressTimer = setTimeout(() => {
             dragState.isDragging = true;
+            _isHeaderLongPress = true;  // 标记已进入拖拽模式
             th.classList.remove('press-hint');
             
             // 高亮源列
@@ -2733,11 +2750,11 @@ function initHeaderDrag() {
     // mouseup事件
     document.addEventListener('mouseup', (e) => {
         if (!dragState.sourceTh) return;
-        
+
         // 清除长按计时器
         clearTimeout(dragState.longPressTimer);
         dragState.sourceTh.classList.remove('press-hint');
-        
+
         if (dragState.isDragging) {
             // 执行列移动
             const headers = getDraggableHeaders();
