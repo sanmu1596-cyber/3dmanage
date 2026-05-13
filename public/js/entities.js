@@ -1107,27 +1107,62 @@ async function loadTests() {
     }
 }
 
-// P0: 渲染测试表格（支持筛选后的子集）
+// P0: 渲染测试表格（支持筛选后的子集 + 列拖拽排序）
 function renderTestsTable(data) {
     const tbody = document.getElementById('tests-table');
+
+    // 更新表头列顺序
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('tests-table');
+    // 初始化拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('tests-table');
+    // 初始化点击排序
+    if (typeof initTableSort === 'function') initTableSort('tests-table');
+
     if (data && data.length > 0) {
-        tbody.innerHTML = data.map((test, index) => `
-            <tr data-id="${test.id}">
-                <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${highlightSearch(test.name, 'tests-table')}</td>
-                <td>${highlightSearch(test.game_name || '-', 'tests-table')}</td>
-                <td>${highlightSearch(test.device_name || '-', 'tests-table')}</td>
-                <td>${highlightSearch(test.tester_name || '-', 'tests-table')}</td>
-                <td>${escapeHtml(test.test_date || '-')}</td>
-                <td class="text-center"><span class="status-badge status-${sanitizeCssClass(test.status)}">${getTestStatusText(test.status)}</span></td>
-                <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(test.priority)}">${getPriorityText(test.priority)}</span></td>
-                <td>${test.bugs_count || 0}</td>
+        const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('tests-table') :
+            ['name', 'game_name', 'device_name', 'tester_name', 'test_date', 'status', 'priority', 'bugs_count'];
+
+        tbody.innerHTML = data.map((test, index) => {
+            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+
+            colOrder.forEach(field => {
+                switch (field) {
+                    case 'name':
+                        rowHtml += `<td>${highlightSearch(test.name, 'tests-table')}</td>`;
+                        break;
+                    case 'game_name':
+                        rowHtml += `<td>${highlightSearch(test.game_name || '-', 'tests-table')}</td>`;
+                        break;
+                    case 'device_name':
+                        rowHtml += `<td>${highlightSearch(test.device_name || '-', 'tests-table')}</td>`;
+                        break;
+                    case 'tester_name':
+                        rowHtml += `<td>${highlightSearch(test.tester_name || '-', 'tests-table')}</td>`;
+                        break;
+                    case 'test_date':
+                        rowHtml += `<td>${escapeHtml(test.test_date || '-')}</td>`;
+                        break;
+                    case 'status':
+                        rowHtml += `<td class="text-center"><span class="status-badge status-${sanitizeCssClass(test.status)}">${getTestStatusText(test.status)}</span></td>`;
+                        break;
+                    case 'priority':
+                        rowHtml += `<td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(test.priority)}">${getPriorityText(test.priority)}</span></td>`;
+                        break;
+                    case 'bugs_count':
+                        rowHtml += `<td>${test.bugs_count || 0}</td>`;
+                        break;
+                }
+            });
+
+            rowHtml += `
                 <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editTest(${test.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteTest(${test.id})">删除</button>
                 </td>
-            </tr>
-        `        ).join('');
+            `;
+            return `<tr data-id="${test.id}">${rowHtml}</tr>`;
+        }).join('');
+
         applyCellTooltips('tests-table');
         // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
     } else {
@@ -1159,27 +1194,62 @@ async function loadBugs() {
     }
 }
 
-// P0: 渲染缺陷表格（支持筛选后的子集）
+// P0: 渲染缺陷表格（支持筛选后的子集 + 列拖拽排序）
 function renderBugsTable(data) {
     const tbody = document.getElementById('bugs-table');
+
+    // 更新表头列顺序
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('bugs-table');
+    // 初始化拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('bugs-table');
+    // 初始化点击排序
+    if (typeof initTableSort === 'function') initTableSort('bugs-table');
+
     if (data && data.length > 0) {
-        tbody.innerHTML = data.map((bug, index) => `
-            <tr data-id="${bug.id}">
-                <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>
-                <td>${highlightSearch(bug.device_name || '-', 'bugs-table')}</td>
-                <td>${escapeHtml(bug.discovery_time || '-')}</td>
-                <td>${highlightSearch(bug.owner || '-', 'bugs-table')}</td>
-                <td class="text-center"><span class="status-badge status-${sanitizeCssClass(bug.bug_status)}">${getBugStatusText(bug.bug_status)}</span></td>
-                <td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(bug.priority)}">${getPriorityText(bug.priority)}</span></td>
-                <td>${highlightSearch(bug.problem_type || '-', 'bugs-table')}</td>
-                <td>${highlightSearch(bug.description || '-', 'bugs-table')}</td>
+        const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('bugs-table') :
+            ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
+
+        tbody.innerHTML = data.map((bug, index) => {
+            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+
+            colOrder.forEach(field => {
+                switch (field) {
+                    case 'versions':
+                        rowHtml += `<td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>`;
+                        break;
+                    case 'device_name':
+                        rowHtml += `<td>${highlightSearch(bug.device_name || '-', 'bugs-table')}</td>`;
+                        break;
+                    case 'discovery_time':
+                        rowHtml += `<td>${escapeHtml(bug.discovery_time || '-')}</td>`;
+                        break;
+                    case 'owner':
+                        rowHtml += `<td>${highlightSearch(bug.owner || '-', 'bugs-table')}</td>`;
+                        break;
+                    case 'bug_status':
+                        rowHtml += `<td class="text-center"><span class="status-badge status-${sanitizeCssClass(bug.bug_status)}">${getBugStatusText(bug.bug_status)}</span></td>`;
+                        break;
+                    case 'priority':
+                        rowHtml += `<td class="text-center"><span class="priority-badge priority-${sanitizeCssClass(bug.priority)}">${getPriorityText(bug.priority)}</span></td>`;
+                        break;
+                    case 'problem_type':
+                        rowHtml += `<td>${highlightSearch(bug.problem_type || '-', 'bugs-table')}</td>`;
+                        break;
+                    case 'description':
+                        rowHtml += `<td>${highlightSearch(bug.description || '-', 'bugs-table')}</td>`;
+                        break;
+                }
+            });
+
+            rowHtml += `
                 <td class="text-center">
                     <button class="btn btn-small btn-edit" onclick="editBug(${bug.id})">编辑</button>
                     <button class="btn btn-small btn-delete" onclick="deleteBug(${bug.id})">删除</button>
                 </td>
-            </tr>
-        `        ).join('');
+            `;
+            return `<tr data-id="${bug.id}">${rowHtml}</tr>`;
+        }).join('');
+
         applyCellTooltips('bugs-table');
     } else {
         tbody.innerHTML = `
