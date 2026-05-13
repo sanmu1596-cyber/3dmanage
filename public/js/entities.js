@@ -388,21 +388,8 @@ function renderGamesPage() {
     applyCellTooltips('games-table');
     // P0: 初始化表头排序
     initTableSort('games-table');
-    // P0: 初始化批量选择
-    initBatchSelect('games-table', {
-        entityName: '游戏',
-        onDelete: async (ids) => {
-            let ok = 0, fail = 0;
-            for (const id of ids) {
-                try {
-                    const r = await authFetch(`${API_BASE}/games/${id}`, { method: 'DELETE' });
-                    if (r.ok) ok++; else fail++;
-                } catch { fail++; }
-            }
-            showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
-            if (ok > 0) await loadGames();
-        }
-    });
+    // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入（injectBatchCheckboxes）
+    // 不再在此调用 initBatchSelect，避免重复插入复选框列
 }
 
 // ========== 游戏列表行内编辑 ==========
@@ -2398,6 +2385,41 @@ function handleSortClick(tableId, field) {
     if (tableId === 'games-table') {
         applyGamesSort();
         renderGamesPage();
+    }
+
+    // 更新重置排序按钮的显示状态
+    updateResetSortBtn();
+}
+
+/**
+ * 重置游戏列表排序，恢复初始顺序
+ */
+function resetGamesSort() {
+    tableSortState.field = null;
+    tableSortState.direction = null;
+
+    // 恢复原始数据顺序（按ID排序作为默认顺序）
+    filteredGamesData.sort((a, b) => (a.id || 0) - (b.id || 0));
+    currentPage = 1;
+
+    // 更新表头箭头显示
+    const thead = document.querySelector('#games-table')?.closest('table')?.querySelector('thead');
+    if (thead) {
+        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th));
+    }
+
+    renderGamesPage();
+    updateResetSortBtn();
+    showToast('已恢复初始顺序', 'success');
+}
+
+/**
+ * 更新重置排序按钮的可见性
+ */
+function updateResetSortBtn() {
+    const btn = document.getElementById('reset-sort-btn');
+    if (btn) {
+        btn.style.display = tableSortState.field ? '' : 'none';
     }
 }
 
