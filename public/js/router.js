@@ -297,37 +297,52 @@ async function loadMembers() {
 // P0: 渲染成员表格（支持筛选后的子集）
 function renderMembersTable(data) {
     const tbody = document.getElementById('members-table');
+
+    // 更新表头列顺序
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('members-table');
+    // 初始化拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('members-table');
+    // 初始化点击排序
+    if (typeof initTableSort === 'function') initTableSort('members-table');
+
     if (data && data.length > 0) {
-        tbody.innerHTML = data.map((member, index) => `
-            <tr data-id="${member.id}">
-                <td class="text-center"><strong>${index + 1}</strong></td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${highlightSearch(member.name, 'members-table')}</td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${highlightSearch(member.wechat_id || '-', 'members-table')}</td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${highlightSearch(member.role || '-', 'members-table')}</td>
-                <td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>
-                <td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${sanitizeCssClass(member.status)}">${getStatusText(member.status)}</span></td>
+        const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('members-table') :
+            ['name', 'wechat_id', 'role', 'duty', 'status'];
+
+        tbody.innerHTML = data.map((member, index) => {
+            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+
+            colOrder.forEach(field => {
+                switch (field) {
+                    case 'name':
+                        rowHtml += `<td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${highlightSearch(member.name, 'members-table')}</td>`;
+                        break;
+                    case 'wechat_id':
+                        rowHtml += `<td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'wechat_id', 'text')" title="双击编辑">${highlightSearch(member.wechat_id || '-', 'members-table')}</td>`;
+                        break;
+                    case 'role':
+                        rowHtml += `<td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'role', 'select')" title="双击选择">${highlightSearch(member.role || '-', 'members-table')}</td>`;
+                        break;
+                    case 'duty':
+                        rowHtml += `<td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'duty', 'textarea')" title="双击编辑">${escapeHtml(member.duty || '-')}</td>`;
+                        break;
+                    case 'status':
+                        rowHtml += `<td class="editable-cell text-center" ondblclick="startMemberInlineEdit(this, ${member.id}, 'status', 'select')" title="双击切换"><span class="status-badge status-${sanitizeCssClass(member.status)}">${getStatusText(member.status)}</span></td>`;
+                        break;
+                }
+            });
+
+            rowHtml += `
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editMember(${member.id})" title="编辑">✏️</button>
                     <button class="action-icon-btn delete" onclick="deleteMember(${member.id})" title="删除">🗑️</button>
                 </td>
-            </tr>
-        `).join('');
-        initBatchSelect('members-table', {
-            entityName: '成员',
-            onDelete: async (ids) => {
-                let ok = 0, fail = 0;
-                for (const id of ids) {
-                    try {
-                        const r = await authFetch(`${API_BASE}/members/${id}`, { method: 'DELETE' });
-                        if (r.ok) ok++; else fail++;
-                    } catch { fail++; }
-                }
-                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
-                if (ok > 0) loadMembers();
-            }
-        });
-        
-        // P1.7: 更新成员表分页增强控件
+            `;
+            return `<tr data-id="${member.id}">${rowHtml}</tr>`;
+        }).join('');
+
+        // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
+
         updateMembersPagination(data.length);
     } else {
         tbody.innerHTML = `
@@ -410,43 +425,72 @@ async function loadDevices() {
 // P0: 渲染设备表格（支持筛选后的子集）
 function renderDevicesTable(data) {
     const tbody = document.getElementById('devices-table');
+
+    // 更新表头列顺序
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('devices-table');
+    // 初始化拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
+    // 初始化点击排序
+    if (typeof initTableSort === 'function') initTableSort('devices-table');
+
     if (data && data.length > 0) {
-        tbody.innerHTML = data.map((device, index) => `
-            <tr class="clickable" data-id="${device.id}">
-                <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>
-                <td>${highlightSearch(device.device_type || '-', 'devices-table')}</td>
-                <td>${highlightSearch(device.name, 'devices-table')}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>
-                <td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>
-                <td>${escapeHtml(device.total_bugs || 0)}</td>
-                <td>${escapeHtml(device.completed_adaptations || 0)}</td>
-                <td>${getDeviceOnlineGameCount(device.name)}</td>
+        const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('devices-table') :
+            ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
+             'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
+             'completed_adaptations', 'online_games'];
+
+        tbody.innerHTML = data.map((device, index) => {
+            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+
+            colOrder.forEach(field => {
+                switch (field) {
+                    case 'manufacturer':
+                        rowHtml += `<td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
+                        break;
+                    case 'device_type':
+                        rowHtml += `<td>${highlightSearch(device.device_type || '-', 'devices-table')}</td>`;
+                        break;
+                    case 'name':
+                        rowHtml += `<td>${highlightSearch(device.name, 'devices-table')}</td>`;
+                        break;
+                    case 'requirements':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>`;
+                        break;
+                    case 'quantity':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>`;
+                        break;
+                    case 'keeper':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>`;
+                        break;
+                    case 'notes':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>`;
+                        break;
+                    case 'adapter_completion_rate':
+                        rowHtml += `<td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>`;
+                        break;
+                    case 'total_bugs':
+                        rowHtml += `<td>${escapeHtml(device.total_bugs || 0)}</td>`;
+                        break;
+                    case 'completed_adaptations':
+                        rowHtml += `<td>${escapeHtml(device.completed_adaptations || 0)}</td>`;
+                        break;
+                    case 'online_games':
+                        rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
+                        break;
+                }
+            });
+
+            rowHtml += `
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
                     <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
                 </td>
-            </tr>
-        `).join('');
-        initBatchSelect('devices-table', {
-            entityName: '设备',
-            onDelete: async (ids) => {
-                let ok = 0, fail = 0;
-                for (const id of ids) {
-                    try {
-                        const r = await authFetch(`${API_BASE}/devices/${id}`, { method: 'DELETE' });
-                        if (r.ok) ok++; else fail++;
-                    } catch { fail++; }
-                }
-                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
-                if (ok > 0) loadDevices();
-            }
-        });
-        
-        // P1.7: 更新设备表分页增强控件
+            `;
+            return `<tr class="clickable" data-id="${device.id}">${rowHtml}</tr>`;
+        }).join('');
+
+        // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
+
         updateDevicesPagination(data.length);
     } else {
         tbody.innerHTML = `

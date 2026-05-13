@@ -388,6 +388,7 @@
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
+                            <button id="reset-sort-members-btn" class="tool-btn" onclick="resetTableSort('members-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="members-search" class="filter-input" placeholder="搜索姓名/角色..." style="width:180px" oninput="filterModule('members')">
                             <select id="members-status-filter" class="compact-select" onchange="filterModule('members')">
@@ -402,11 +403,11 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th>姓名</th>
-                                    <th>企业微信ID</th>
-                                    <th>角色</th>
-                                    <th>职责</th>
-                                    <th>状态</th>
+                                    <th data-field="name">姓名</th>
+                                    <th data-field="wechat_id">企业微信ID</th>
+                                    <th data-field="role">角色</th>
+                                    <th data-field="duty">职责</th>
+                                    <th data-field="status">状态</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -549,6 +550,7 @@
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
+                            <button id="reset-sort-devices-btn" class="tool-btn" onclick="resetTableSort('devices-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
@@ -565,17 +567,17 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th>厂商</th>
-                                    <th>设备类型</th>
-                                    <th>设备名称</th>
-                                    <th>设备需求</th>
-                                    <th>数量</th>
-                                    <th>保管者</th>
-                                    <th>备注</th>
-                                    <th>适配完成率</th>
-                                    <th>总BUG数</th>
-                                    <th>适配完成数</th>
-                                    <th>适配游戏数</th>
+                                    <th data-field="manufacturer">厂商</th>
+                                    <th data-field="device_type">设备类型</th>
+                                    <th data-field="name">设备名称</th>
+                                    <th data-field="requirements">设备需求</th>
+                                    <th data-field="quantity">数量</th>
+                                    <th data-field="keeper">保管者</th>
+                                    <th data-field="notes">备注</th>
+                                    <th data-field="adapter_completion_rate">适配完成率</th>
+                                    <th data-field="total_bugs">总BUG数</th>
+                                    <th data-field="completed_adaptations">适配完成数</th>
+                                    <th data-field="online_games">适配游戏数</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -664,6 +666,7 @@
                             <button class="tool-btn" onclick="exportToExcel('tests')"><span class="tool-icon">📤</span>导出</button>
                             <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
                             <button class="tool-btn" onclick="exportToPDF('测试列表')"><span class="tool-icon">📄</span>PDF</button>
+                            <button id="reset-sort-tests-btn" class="tool-btn" onclick="resetTableSort('tests-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="tests-search" class="filter-input" placeholder="搜索测试名称/游戏..." style="width:180px" oninput="filterModule('tests')">
                             <select id="tests-status-filter" class="compact-select" onchange="filterModule('tests')">
@@ -680,14 +683,14 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th>测试名称</th>
-                                    <th>游戏</th>
-                                    <th>设备</th>
-                                    <th>测试人</th>
-                                    <th>测试日期</th>
-                                    <th>状态</th>
-                                    <th>优先级</th>
-                                    <th>缺陷数</th>
+                                    <th data-field="name">测试名称</th>
+                                    <th data-field="game_name">游戏</th>
+                                    <th data-field="device_name">设备</th>
+                                    <th data-field="tester_name">测试人</th>
+                                    <th data-field="test_date">测试日期</th>
+                                    <th data-field="status">状态</th>
+                                    <th data-field="priority">优先级</th>
+                                    <th data-field="bugs_count">缺陷数</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -708,6 +711,7 @@
                             <button class="tool-btn" onclick="exportToExcel('bugs')"><span class="tool-icon">📤</span>导出</button>
                             <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
                             <button class="tool-btn" onclick="exportToPDF('缺陷列表')"><span class="tool-icon">📄</span>PDF</button>
+                            <button id="reset-sort-bugs-btn" class="tool-btn" onclick="resetTableSort('bugs-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="bugs-search" class="filter-input" placeholder="搜索描述/设备/负责人..." style="width:180px" oninput="filterModule('bugs')">
                             <select id="bugs-status-filter" class="compact-select" onchange="filterModule('bugs')">
@@ -724,14 +728,14 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th>涉及版本</th>
-                                    <th>设备名称</th>
-                                    <th>发现时间</th>
-                                    <th>负责人</th>
-                                    <th>缺陷状态</th>
-                                    <th>优先级</th>
-                                    <th>问题类型</th>
-                                    <th>描述</th>
+                                    <th data-field="versions">涉及版本</th>
+                                    <th data-field="device_name">设备名称</th>
+                                    <th data-field="discovery_time">发现时间</th>
+                                    <th data-field="owner">负责人</th>
+                                    <th data-field="bug_status">缺陷状态</th>
+                                    <th data-field="priority">优先级</th>
+                                    <th data-field="problem_type">问题类型</th>
+                                    <th data-field="description">描述</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>

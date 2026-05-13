@@ -5,36 +5,96 @@
  */
 var App = window.App;
 
-// ========== 表头拖拽排序 - TAPD风格 ==========
+// ========== 通用表头拖拽排序系统（TAPD风格）==========
 
-// 列顺序配置（持久化到localStorage）
-let columnOrder = ['name', 'english_name', 'platform', 'game_id', 'game_type', 'description',
-    'developer', 'operator', 'release_date', 'config_path', 'adapter_progress',
-    'owner', 'online_status', 'quality', 'game_account', 'storage_location', 'game_engine'];
+// 全局标志：是否刚完成长按拖拽（用于阻止click排序）
+let _isHeaderLongPress = false;
 
-// 从localStorage加载列顺序
-function loadColumnOrder() {
-    const saved = localStorage.getItem('gamesColumnOrder');
+/**
+ * 各模块列顺序配置注册表
+ * key: tableId (如 'games-table', 'members-table')
+ * value: { order: [], storageKey: '', defaultOrder: [] }
+ */
+const _columnConfigs = {};
+
+/**
+ * 注册模块的列顺序配置（在页面加载时调用）
+ */
+function registerColumnConfig(tableId, defaultOrder, storageKey) {
+    _columnConfigs[tableId] = {
+        order: [...defaultOrder],
+        defaultOrder: [...defaultOrder],
+        storageKey: storageKey || tableId + 'ColumnOrder'
+    };
+    // 从localStorage加载已保存的顺序
+    const saved = localStorage.getItem(_columnConfigs[tableId].storageKey);
     if (saved) {
         try {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                columnOrder = parsed;
+                _columnConfigs[tableId].order = parsed;
             }
         } catch (e) {
-            console.warn('加载列顺序失败:', e);
+            console.warn(`加载${tableId}列顺序失败:`, e);
         }
     }
 }
 
-// 保存列顺序到localStorage
-function saveColumnOrder() {
+/**
+ * 获取指定表格的当前列顺序
+ */
+function getColumnOrder(tableId) {
+    return _columnConfigs[tableId] ? _columnConfigs[tableId].order : [];
+}
+
+/**
+ * 保存指定表格的列顺序到localStorage
+ */
+function saveColumnOrderForTable(tableId) {
+    const config = _columnConfigs[tableId];
+    if (!config) return;
     try {
-        localStorage.setItem('gamesColumnOrder', JSON.stringify(columnOrder));
+        localStorage.setItem(config.storageKey, JSON.stringify(config.order));
     } catch (e) {
-        console.warn('保存列顺序失败:', e);
+        console.warn(`保存${tableId}列顺序失败:`, e);
     }
 }
+
+// 游戏模块列顺序（保持向后兼容）
+registerColumnConfig('games-table',
+    ['name', 'english_name', 'platform', 'game_id', 'game_type', 'description',
+     'developer', 'operator', 'release_date', 'config_path', 'adapter_progress',
+     'owner', 'online_status', 'quality', 'game_account', 'storage_location', 'game_engine'],
+    'gamesColumnOrder'
+);
+
+// 成员模块列顺序
+registerColumnConfig('members-table',
+    ['name', 'wechat_id', 'role', 'duty', 'status'],
+    'membersColumnOrder'
+);
+
+// 设备模块列顺序
+registerColumnConfig('devices-table',
+    ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
+     'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
+     'completed_adaptations', 'online_games'],
+    'devicesColumnOrder'
+);
+
+// 测试模块列顺序
+registerColumnConfig('tests-table',
+    ['name', 'game_name', 'device_name', 'tester_name', 'test_date',
+     'status', 'priority', 'bugs_count'],
+    'testsColumnOrder'
+);
+
+// 缺陷模块列顺序
+registerColumnConfig('bugs-table',
+    ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
+     'priority', 'problem_type', 'description'],
+    'bugsColumnOrder'
+);
 
 // ==================== 设备行内编辑 ====================
 
@@ -227,9 +287,8 @@ async function loadGames() {
         // 填充筛选下拉框
         populateFilterOptions();
 
-        // 加载列顺序并初始化拖拽
-        loadColumnOrder();
-        initHeaderDrag();
+        // 初始化拖拽排序
+        initHeaderDrag('games-table');
 
         renderGamesPage();
 
@@ -287,7 +346,7 @@ function renderGamesPage() {
     }
 
     // 更新表头的显示/隐藏
-    updateColumnHeaders();
+    updateColumnHeaders('games-table');
 
     if (gamesToShow.length > 0) {
         tbody.innerHTML = gamesToShow.map((game, index) => {
@@ -295,7 +354,7 @@ function renderGamesPage() {
             let rowHtml = `<td class="text-center"><strong>${globalIndex}</strong></td>`;
 
             // 根据columnOrder顺序生成单元格
-            columnOrder.forEach(field => {
+            getColumnOrder('games-table').forEach(field => {
                 if (!visibleColumns[field]) return;
                 
                 switch (field) {
@@ -1070,20 +1129,7 @@ function renderTestsTable(data) {
             </tr>
         `        ).join('');
         applyCellTooltips('tests-table');
-        initBatchSelect('tests-table', {
-            entityName: '测试记录',
-            onDelete: async (ids) => {
-                let ok = 0, fail = 0;
-                for (const id of ids) {
-                    try {
-                        const r = await authFetch(`${API_BASE}/tests/${id}`, { method: 'DELETE' });
-                        if (r.ok) ok++; else fail++;
-                    } catch { fail++; }
-                }
-                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
-                if (ok > 0) loadTests();
-            }
-        });
+        // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
     } else {
         tbody.innerHTML = `
             <tr>
@@ -1135,20 +1181,6 @@ function renderBugsTable(data) {
             </tr>
         `        ).join('');
         applyCellTooltips('bugs-table');
-        initBatchSelect('bugs-table', {
-            entityName: '缺陷',
-            onDelete: async (ids) => {
-                let ok = 0, fail = 0;
-                for (const id of ids) {
-                    try {
-                        const r = await authFetch(`${API_BASE}/bugs/${id}`, { method: 'DELETE' });
-                        if (r.ok) ok++; else fail++;
-                    } catch { fail++; }
-                }
-                showToast(`批量删除完成：成功 ${ok}，失败 ${fail}`, ok > 0 ? 'success' : 'danger');
-                if (ok > 0) loadBugs();
-            }
-        });
     } else {
         tbody.innerHTML = `
             <tr>
@@ -2180,45 +2212,44 @@ async function deleteBug(id) {
 }
 
 // 更新表头显示/隐藏
-function updateColumnHeaders() {
-    const thead = document.querySelector('#games-table').previousElementSibling;
+function updateColumnHeaders(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    const thead = table.previousElementSibling;
     if (!thead) return;
     const headerRow = thead.querySelector('tr');
     if (!headerRow) return;
-    
-    // 获取所有表头（排除序号列和操作列）
+
+    const config = _columnConfigs[tableId];
+    if (!config) return;
+
+    // 获取所有表头（排除固定列：序号、checkbox、操作）
     const allHeaders = Array.from(headerRow.querySelectorAll('th'));
-    const fixedHeaders = allHeaders.filter(th => !th.dataset.field); // 序号列、checkbox、操作列
-    const draggableHeaders = allHeaders.filter(th => th.dataset.field); // 可拖拽列
-    
+    const fixedHeaders = allHeaders.filter(th => !th.dataset.field);
+    const draggableHeaders = allHeaders.filter(th => th.dataset.field);
+
     // 按columnOrder排序可拖拽列
     const sortedHeaders = [];
-    columnOrder.forEach(field => {
+    config.order.forEach(field => {
         const header = draggableHeaders.find(th => th.dataset.field === field);
         if (header) sortedHeaders.push(header);
     });
-    
+
     // 清空表头行
     headerRow.innerHTML = '';
-    
+
     // 重新按顺序添加：固定列前 -> 排序后的可拖拽列 -> 固定列后
     fixedHeaders.forEach((header, index) => {
         if (index < fixedHeaders.length / 2) {
             headerRow.appendChild(header);
         }
     });
-    
+
     sortedHeaders.forEach(header => {
-        // 更新显示/隐藏
-        const field = header.dataset.field;
-        if (visibleColumns[field]) {
-            header.classList.remove('hidden-column');
-        } else {
-            header.classList.add('hidden-column');
-        }
         headerRow.appendChild(header);
     });
-    
+
     fixedHeaders.forEach((header, index) => {
         if (index >= fixedHeaders.length / 2) {
             headerRow.appendChild(header);
@@ -2302,13 +2333,18 @@ function loadColumnSettings() {
     }
 }
 
-// ==================== 表格列排序功能 ====================
+// ==================== 通用表格列排序功能 ====================
 
 /**
- * 排序状态：{ field: string, direction: 'asc'|'desc'|null }
- * null = 默认顺序（按数据库原始顺序）
+ * 排序状态（按tableId分别管理）
+ * key: tableId, value: { field: string, direction: 'asc'|'desc'|null }
  */
-let tableSortState = { field: null, direction: null };
+const _tableSortStates = {};
+
+function getSortState(tableId) {
+    if (!_tableSortStates[tableId]) _tableSortStates[tableId] = { field: null, direction: null };
+    return _tableSortStates[tableId];
+}
 
 /**
  * 初始化表头排序点击事件（在 DOMContentLoaded 或表格渲染后调用）
@@ -2340,7 +2376,7 @@ function initTableSort(tableId) {
         }
 
         // 更新当前排序状态显示
-        updateSortIndicator(th);
+        updateSortIndicator(th, tableId);
 
         th.addEventListener('click', () => {
             // 如果刚完成长按拖拽，跳过排序（防止竞争）
@@ -2355,113 +2391,71 @@ function initTableSort(tableId) {
 }
 
 /**
- * 处理表头点击排序
+ * 处理表头点击排序（通用）
  * 三态循环: default → asc → desc → default
  */
 function handleSortClick(tableId, field) {
-    if (tableSortState.field === field) {
-        // 同一字段：切换方向或重置
-        if (tableSortState.direction === 'asc') {
-            tableSortState.direction = 'desc';
-        } else if (tableSortState.direction === 'desc') {
-            tableSortState.field = null;
-            tableSortState.direction = null;
+    const sortState = getSortState(tableId);
+    if (sortState.field === field) {
+        if (sortState.direction === 'asc') {
+            sortState.direction = 'desc';
+        } else if (sortState.direction === 'desc') {
+            sortState.field = null;
+            sortState.direction = null;
         } else {
-            tableSortState.direction = 'asc';
+            sortState.direction = 'asc';
         }
     } else {
-        // 新字段：默认升序
-        tableSortState.field = field;
-        tableSortState.direction = 'asc';
+        sortState.field = field;
+        sortState.direction = 'asc';
     }
 
     // 更新所有表头箭头显示
-    const thead = document.querySelector(`#${tableId}`).closest('table')?.querySelector('thead');
+    const thead = document.querySelector(`#${tableId}`)?.closest('table')?.querySelector('thead');
     if (thead) {
-        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th));
+        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th, tableId));
     }
 
-    // 对游戏列表应用排序并重新渲染
-    if (tableId === 'games-table') {
-        applyGamesSort();
-        renderGamesPage();
-    }
+    // 应用排序并重新渲染
+    applyTableSort(tableId);
 
     // 更新重置排序按钮的显示状态
-    updateResetSortBtn();
+    updateResetSortBtn(tableId);
 }
 
 /**
- * 重置游戏列表排序，恢复初始顺序
+ * 通用表格排序应用（根据tableId对对应数据排序并重新渲染）
  */
-function resetGamesSort() {
-    tableSortState.field = null;
-    tableSortState.direction = null;
+function applyTableSort(tableId) {
+    const sortState = getSortState(tableId);
+    if (!sortState.field || !sortState.direction) return;
 
-    // 恢复原始数据顺序（按ID排序作为默认顺序）
-    filteredGamesData.sort((a, b) => (a.id || 0) - (b.id || 0));
-    currentPage = 1;
+    const { field, direction } = sortState;
+    const dir = direction;
 
-    // 更新表头箭头显示
-    const thead = document.querySelector('#games-table')?.closest('table')?.querySelector('thead');
-    if (thead) {
-        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th));
-    }
+    // 根据tableId找到对应的数据数组和渲染函数
+    const tableConfigs = {
+        'games-table': { data: () => filteredGamesData, render: () => renderGamesPage(), page: () => { currentPage = 1; } },
+        'members-table': { data: () => window.filteredMembersData || window.allMembersData || [], render: () => { if(typeof renderMembersTable === 'function' && window.allMembersData) renderMembersTable(window.allMembersData); }, page: () => {} },
+        'devices-table': { data: () => window.filteredDevicesData || window.allDevicesData || [], render: () => { if(typeof renderDevicesTable === 'function' && window.allDevicesData) renderDevicesTable(window.allDevicesData); }, page: () => {} },
+        'tests-table': { data: () => window.filteredTestsData || window.allTestsData || [], render: () => { if(typeof renderTestsTable === 'function') renderTestsTable(filteredTestsData || allTestsData || []); }, page: () => {} },
+        'bugs-table': { data: () => window.filteredBugsData || window.allBugsData || [], render: () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }, page: () => {} }
+    };
 
-    renderGamesPage();
-    updateResetSortBtn();
-    showToast('已恢复初始顺序', 'success');
-}
+    const cfg = tableConfigs[tableId];
+    if (!cfg) return;
 
-/**
- * 更新重置排序按钮的可见性
- */
-function updateResetSortBtn() {
-    const btn = document.getElementById('reset-sort-btn');
-    if (btn) {
-        btn.style.display = tableSortState.field ? '' : 'none';
-    }
-}
-
-/**
- * 更新单个表头的排序箭头显示
- */
-function updateSortIndicator(th) {
-    const field = th.getAttribute('data-field');
-    const indicator = th.querySelector('.sort-indicator');
-    if (!indicator) return;
-
-    th.classList.remove('sort-asc', 'sort-desc');
-
-    if (tableSortState.field === field && tableSortState.direction) {
-        th.classList.add(tableSortState.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-        indicator.innerHTML = tableSortState.direction === 'asc' ? '▲' : '▼';
-        indicator.style.opacity = '1';
-    } else {
-        indicator.innerHTML = '▽'; // 未排序时显示浅色双向箭头
-        indicator.style.opacity = '0.3';
-    }
-}
-
-/**
- * 对 filteredGamesData 进行原地排序
- */
-function applyGamesSort() {
-    if (!tableSortState.field || !tableSortState.direction) return;
-
-    const field = tableSortState.field;
-    const dir = tableSortState.direction;
-
-    filteredGamesData.sort((a, b) => {
+    const dataArr = cfg.data();
+    dataArr.sort((a, b) => {
         let valA = a[field];
         let valB = b[field];
 
         // 数字类型字段的特殊处理
-        if (field === 'adapter_progress') {
+        const numFields = ['adapter_progress', 'quantity', 'total_bugs', 'completed_adaptations', 'online_games', 'bugs_count'];
+        if (numFields.includes(field)) {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;
         } else {
-            // 字符串比较：转小写，null/undefined 排最后
             valA = (valA != null ? String(valA) : '');
             valB = (valB != null ? String(valB) : '');
         }
@@ -2472,12 +2466,100 @@ function applyGamesSort() {
         } else {
             cmp = valA.localeCompare(valB, 'zh-CN', { numeric: true });
         }
-
         return dir === 'asc' ? cmp : -cmp;
     });
 
-    // 排序后重置到第一页
-    currentPage = 1;
+    cfg.page();
+    cfg.render();
+}
+
+/**
+ * 重置指定表格的排序，恢复初始顺序（通用）
+ */
+function resetTableSort(tableId) {
+    const sortState = getSortState(tableId);
+    sortState.field = null;
+    sortState.direction = null;
+
+    // 恢复原始数据顺序（按ID排序作为默认顺序）
+    const dataMap = {
+        'games-table': () => filteredGamesData,
+        'members-table': () => window.allMembersData,
+        'devices-table': () => window.allDevicesData,
+        'tests-table': () => window.allTestsData,
+        'bugs-table': () => window.allBugsData
+    };
+    const getData = dataMap[tableId];
+    if (getData) {
+        const arr = getData();
+        if (arr) arr.sort((a, b) => (a.id || 0) - (b.id || 0));
+    }
+
+    // 更新表头箭头显示
+    const thead = document.querySelector(`#${tableId}`)?.closest('table')?.querySelector('thead');
+    if (thead) {
+        thead.querySelectorAll('th[data-field]').forEach(th => updateSortIndicator(th, tableId));
+    }
+
+    // 重新渲染
+    applyTableSort(tableId); // 会触发render（虽然field为null会直接return，所以需要单独调render）
+    const renderMap = {
+        'games-table': () => renderGamesPage(),
+        'members-table': () => { if(window.allMembersData && typeof renderMembersTable === 'function') renderMembersTable(window.allMembersData); },
+        'devices-table': () => { if(window.allDevicesData && typeof renderDevicesTable === 'function') renderDevicesTable(window.allDevicesData); },
+        'tests-table': () => { if(typeof renderTestsTable === 'function') renderTestsTable(filteredTestsData || allTestsData || []); },
+        'bugs-table': () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }
+    };
+    (renderMap[tableId] || function(){})();
+
+    updateResetSortBtn(tableId);
+    showToast('已恢复初始顺序', 'success');
+}
+
+/**
+ * 更新重置排序按钮的可见性（通用）
+ */
+function updateResetSortBtn(tableId) {
+    const btnIdMap = {
+        'games-table': 'reset-sort-btn',
+        'members-table': 'reset-sort-members-btn',
+        'devices-table': 'reset-sort-devices-btn',
+        'tests-table': 'reset-sort-tests-btn',
+        'bugs-table': 'reset-sort-bugs-btn'
+    };
+    const btnId = btnIdMap[tableId];
+    if (!btnId) return;
+    const btn = document.getElementById(btnId);
+    if (btn) {
+        const sortState = getSortState(tableId);
+        btn.style.display = sortState.field ? '' : 'none';
+    }
+}
+
+/**
+ * 更新单个表头的排序箭头显示（通用）
+ * @param {HTMLElement} th - 表头元素
+ * @param {string} tableId - 表格ID（用于获取对应排序状态）
+ */
+function updateSortIndicator(th, tableId) {
+    const field = th.getAttribute('data-field');
+    const indicator = th.querySelector('.sort-indicator');
+    if (!indicator) return;
+
+    // 从th所属的table推断tableId（如果未传入）
+    const tid = tableId || th.closest('tbody')?.id || th.closest('table')?.querySelector('tbody')?.id;
+    const sortState = tid ? getSortState(tid) : null;
+
+    th.classList.remove('sort-asc', 'sort-desc');
+
+    if (sortState && sortState.field === field && sortState.direction) {
+        th.classList.add(sortState.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+        indicator.innerHTML = sortState.direction === 'asc' ? '▲' : '▼';
+        indicator.style.opacity = '1';
+    } else {
+        indicator.innerHTML = '▽';
+        indicator.style.opacity = '0.3';
+    }
 }
 
 // ========== 表单校验配置注册（P0） ==========
@@ -2558,15 +2640,15 @@ cancelInlineEdit = function(td, currentValue) {
     clearInlineEditState();
 };
 
-// ========== 表头拖拽排序 - TAPD风格 ==========
+// ========== 通用表头拖拽排序 - TAPD风格 ==========
 
-// 全局标志：是否刚完成长按拖拽（用于阻止click排序）
-let _isHeaderLongPress = false;
-
-// 初始化表头拖拽
-function initHeaderDrag() {
-    const table = document.querySelector('#games-table');
+// 初始化表头拖拽（通用版，支持任意表格）
+function initHeaderDrag(tableId) {
+    const table = document.getElementById(tableId);
     if (!table) return;
+
+    const config = _columnConfigs[tableId];
+    if (!config) return;
 
     const thead = table.previousElementSibling;
     if (!thead) return;
@@ -2577,7 +2659,7 @@ function initHeaderDrag() {
     // 防重复绑定
     if (headerRow.dataset.headerDragInit) return;
     headerRow.dataset.headerDragInit = '1';
-    
+
     let dragState = {
         isDragging: false,
         sourceTh: null,
@@ -2589,14 +2671,14 @@ function initHeaderDrag() {
         startX: 0,
         startY: 0
     };
-    
+
     const LONG_PRESS_DELAY = 400; // 长按触发时间(ms)
-    
+
     // 获取所有可拖拽的表头
     function getDraggableHeaders() {
         return Array.from(headerRow.querySelectorAll('th[data-field]'));
     }
-    
+
     // 创建幽灵元素
     function createGhost(th, x, y) {
         const ghost = document.createElement('div');
@@ -2607,7 +2689,7 @@ function initHeaderDrag() {
         document.body.appendChild(ghost);
         return ghost;
     }
-    
+
     // 创建插入指示器
     function createIndicator() {
         const indicator = document.createElement('div');
@@ -2616,174 +2698,170 @@ function initHeaderDrag() {
         headerRow.appendChild(indicator);
         return indicator;
     }
-    
+
     // 显示插入指示器
     function showIndicator(targetTh, position) {
         if (!dragState.indicator) {
             dragState.indicator = createIndicator();
         }
-        
+
         const rect = targetTh.getBoundingClientRect();
         const rowRect = headerRow.getBoundingClientRect();
-        
+
         dragState.indicator.style.display = 'block';
         dragState.indicator.style.height = rowRect.height + 'px';
-        
+
         if (position === 'before') {
             dragState.indicator.style.left = (rect.left - rowRect.left) + 'px';
         } else {
             dragState.indicator.style.left = (rect.right - rowRect.left - 3) + 'px';
         }
     }
-    
+
     // 隐藏插入指示器
     function hideIndicator() {
         if (dragState.indicator) {
             dragState.indicator.style.display = 'none';
         }
     }
-    
+
     // 获取目标位置
     function getDropPosition(x, headers) {
         for (let i = 0; i < headers.length; i++) {
             const rect = headers[i].getBoundingClientRect();
             const midX = rect.left + rect.width / 2;
-            
+
             if (x < midX) {
                 return { index: i, position: 'before', th: headers[i] };
             }
         }
         return { index: headers.length, position: 'after', th: headers[headers.length - 1] };
     }
-    
+
     // 执行列移动
     function moveColumn(fromField, toIndex) {
-        const fromIndex = columnOrder.indexOf(fromField);
+        const order = config.order;
+        const fromIndex = order.indexOf(fromField);
         if (fromIndex === -1) return;
-        
-        // 从原位置移除
-        columnOrder.splice(fromIndex, 1);
-        
-        // 插入到新位置（考虑移除后的索引变化）
+
+        order.splice(fromIndex, 1);
+
         let adjustedIndex = toIndex;
         if (fromIndex < toIndex) {
             adjustedIndex = toIndex - 1;
         }
-        columnOrder.splice(adjustedIndex, 0, fromField);
-        
-        // 保存并重新渲染
-        saveColumnOrder();
-        renderGamesPage();
+        order.splice(adjustedIndex, 0, fromField);
+
+        saveColumnOrderForTable(tableId);
+
+        // 根据tableId调用对应的重渲染函数
+        const renderFns = {
+            'games-table': () => renderGamesPage(),
+            'members-table': typeof renderMembersTable === 'function' ? () => { if(window.allMembersData) renderMembersTable(allMembersData); } : null,
+            'devices-table': typeof renderDevicesTable === 'function' ? () => { if(window.allDevicesData) renderDevicesTable(allDevicesData); } : null,
+            'tests-table': typeof renderTestsTable === 'function' ? () => { if(window.filteredTestsData || window.allTestsData) renderTestsTable(filteredTestsData || allTestsData); } : null,
+            'bugs-table': typeof renderBugsTable === 'function' ? () => { if(window.filteredBugsData || window.allBugsData) renderBugsTable(filteredBugsData || allBugsData); } : null
+        };
+        const renderFn = renderFns[tableId];
+        if (renderFn) renderFn();
     }
-    
+
     // 高亮对应列的数据单元格
     function highlightColumn(field, highlight) {
-        const table = document.querySelector('#games-table');
-        if (!table) return;
-        
+        const tbl = document.getElementById(tableId);
+        if (!tbl) return;
+
         const headers = getDraggableHeaders();
         const colIndex = headers.findIndex(h => h.dataset.field === field);
         if (colIndex === -1) return;
-        
+
         // 表头高亮
         headers[colIndex].classList.toggle('dragging-source', highlight);
-        
-        // 数据行高亮（+1因为有序号列）
-        const dataColIndex = colIndex + 1;
-        table.querySelectorAll('tr').forEach(row => {
+
+        // 数据行高亮（+1因为有序号列，+1如果还有checkbox列）
+        let dataColIndex = colIndex + 1;
+        // 如果有batch-th（checkbox），再+1
+        if (tbl.closest('table')?.querySelector('thead .batch-th')) dataColIndex++;
+        tbl.querySelectorAll('tbody tr').forEach(row => {
             const cell = row.children[dataColIndex];
             if (cell) {
                 cell.classList.toggle('dragging-col', highlight);
             }
         });
     }
-    
+
     // mousedown事件
     headerRow.addEventListener('mousedown', (e) => {
         const th = e.target.closest('th[data-field]');
         if (!th) return;
-        
-        // 忽略右键
+
         if (e.button !== 0) return;
-        
-        // 忽略点击在resize手柄上
         if (e.target.classList.contains('col-resize-handle')) return;
-        
+
         dragState.sourceTh = th;
         dragState.sourceField = th.dataset.field;
         dragState.startX = e.clientX;
         dragState.startY = e.clientY;
-        
-        // 添加长按提示
+
         th.classList.add('press-hint');
-        
-        // 启动长按计时器
+
         dragState.longPressTimer = setTimeout(() => {
             dragState.isDragging = true;
-            _isHeaderLongPress = true;  // 标记已进入拖拽模式
+            _isHeaderLongPress = true;
             th.classList.remove('press-hint');
-            
-            // 高亮源列
+
             highlightColumn(dragState.sourceField, true);
-            
-            // 创建幽灵元素
+
             dragState.ghost = createGhost(th, e.clientX, e.clientY);
-            
-            // 阻止文本选择
+
             document.body.style.userSelect = 'none';
         }, LONG_PRESS_DELAY);
     });
-    
+
     // mousemove事件
     document.addEventListener('mousemove', (e) => {
         if (!dragState.sourceTh) return;
-        
-        // 如果还没开始拖拽，检查移动距离是否超过阈值（取消长按）
+
         if (!dragState.isDragging) {
             const dx = Math.abs(e.clientX - dragState.startX);
             const dy = Math.abs(e.clientY - dragState.startY);
-            
+
             if (dx > 5 || dy > 5) {
-                // 移动了，取消长按
                 clearTimeout(dragState.longPressTimer);
                 dragState.sourceTh.classList.remove('press-hint');
                 dragState.sourceTh = null;
             }
             return;
         }
-        
-        // 更新幽灵位置
+
         if (dragState.ghost) {
             dragState.ghost.style.left = e.clientX + 'px';
             dragState.ghost.style.top = e.clientY + 'px';
         }
-        
-        // 显示插入指示器
+
         const headers = getDraggableHeaders();
         const dropPos = getDropPosition(e.clientX, headers);
-        
+
         if (dropPos.th && dropPos.th !== dragState.sourceTh) {
             showIndicator(dropPos.th, dropPos.position);
         } else {
             hideIndicator();
         }
     });
-    
+
     // mouseup事件
     document.addEventListener('mouseup', (e) => {
         if (!dragState.sourceTh) return;
 
-        // 清除长按计时器
         clearTimeout(dragState.longPressTimer);
         dragState.sourceTh.classList.remove('press-hint');
 
         if (dragState.isDragging) {
-            // 执行列移动
             const headers = getDraggableHeaders();
             const dropPos = getDropPosition(e.clientX, headers);
-            
+
             if (dropPos.th && dropPos.th !== dragState.sourceTh) {
-                const targetIndex = columnOrder.indexOf(dropPos.th.dataset.field);
+                const targetIndex = config.order.indexOf(dropPos.th.dataset.field);
                 if (targetIndex !== -1) {
                     let insertIndex = targetIndex;
                     if (dropPos.position === 'after') {
@@ -2792,20 +2870,18 @@ function initHeaderDrag() {
                     moveColumn(dragState.sourceField, insertIndex);
                 }
             }
-            
-            // 清理
+
             highlightColumn(dragState.sourceField, false);
-            
+
             if (dragState.ghost) {
                 dragState.ghost.remove();
                 dragState.ghost = null;
             }
-            
+
             hideIndicator();
             document.body.style.userSelect = '';
         }
-        
-        // 重置状态
+
         dragState = {
             isDragging: false,
             sourceTh: null,
@@ -2818,7 +2894,7 @@ function initHeaderDrag() {
             startY: 0
         };
     });
-    
+
     // 防止拖拽时选中文字
     headerRow.addEventListener('selectstart', (e) => {
         if (dragState.isDragging) {
