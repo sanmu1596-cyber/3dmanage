@@ -171,22 +171,21 @@ exports.getCurrentUser = (req, res) => {
 // 获取当前用户的权限矩阵
 exports.getCurrentUserPermissions = (req, res) => {
   const { role_id } = req.user;
-  const sql = 'SELECT permissions FROM roles WHERE id = ?';
-  
-  db.get(sql, [role_id], (err, row) => {
+
+  db.all('SELECT module, action, allowed FROM role_permissions WHERE role_id = ?', [role_id], (err, perms) => {
     if (err) {
       console.error('获取权限失败:', err);
       return res.status(500).json({ success: false, error: '获取权限失败' });
     }
-    if (!row) {
-      return res.json({ success: true, permissions: {} });
-    }
-    try {
-      const permissions = row.permissions ? JSON.parse(row.permissions) : {};
-      res.json({ success: true, permissions });
-    } catch (e) {
-      res.json({ success: true, permissions: {} });
-    }
+
+    // 转成 { module: { action: boolean } } 格式
+    const permMap = {};
+    perms.forEach(p => {
+      if (!permMap[p.module]) permMap[p.module] = {};
+      permMap[p.module][p.action] = !!p.allowed;
+    });
+
+    res.json({ success: true, permissions: permMap });
   });
 };
 
