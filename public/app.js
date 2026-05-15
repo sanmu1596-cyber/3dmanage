@@ -774,6 +774,8 @@ function renderDevicesTable(data) {
             </tr>
         `;
     }
+    // 初始化表头拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
 }
 
 // ==================== 设备行内编辑 ====================

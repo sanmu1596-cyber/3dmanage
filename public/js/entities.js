@@ -96,6 +96,13 @@ registerColumnConfig('bugs-table',
     'bugsColumnOrder'
 );
 
+
+// 报表游戏状态表列顺序
+registerColumnConfig('report-games-table',
+    ['name', 'status', 'platform', 'notes'],
+    'reportGamesColumnOrder'
+);
+
 // ==================== 设备行内编辑 ====================
 
 // P1.1: 行内编辑焦点管理 - 记录当前编辑的td
@@ -945,6 +952,15 @@ const exportConfigs = {
             { key: 'steps', label: '复现步骤' }, { key: 'planned_fix_time', label: '计划修复' },
             { key: 'actual_fix_time', label: '实际修复' }
         ]
+    },
+    reports: {
+        sheetName: '游戏适配状态详情',
+        getData: () => typeof allReportGameData !== 'undefined' ? allReportGameData : [],
+        columns: [
+            { key: 'name', label: '游戏名称' }, { key: 'statusLabel', label: '适配状态' },
+            { key: 'platform', label: '平台' }, { key: 'notes', label: '备注' }
+        ],
+        customExport: typeof exportReport === 'function' ? exportReport : null
     }
 };
 
@@ -2509,7 +2525,8 @@ function applyTableSort(tableId) {
         'members-table': { data: () => window.filteredMembersData || window.allMembersData || [], render: () => { if(typeof renderMembersTable === 'function' && window.allMembersData) renderMembersTable(window.allMembersData); }, page: () => {} },
         'devices-table': { data: () => window.filteredDevicesData || window.allDevicesData || [], render: () => { if(typeof renderDevicesTable === 'function' && window.allDevicesData) renderDevicesTable(window.allDevicesData); }, page: () => {} },
         'tests-table': { data: () => window.filteredTestsData || window.allTestsData || [], render: () => { if(typeof renderTestsTable === 'function') renderTestsTable(filteredTestsData || allTestsData || []); }, page: () => {} },
-        'bugs-table': { data: () => window.filteredBugsData || window.allBugsData || [], render: () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }, page: () => {} }
+        'bugs-table': { data: () => window.filteredBugsData || window.allBugsData || [], render: () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }, page: () => {} },
+        'report-games-table': { data: () => filteredReportGameData, render: () => renderReportTable(), page: () => { reportCurrentPage = 1; } }
     };
 
     const cfg = tableConfigs[tableId];
@@ -2830,7 +2847,8 @@ function initHeaderDrag(tableId) {
             'members-table': typeof renderMembersTable === 'function' ? () => { if(window.allMembersData) renderMembersTable(allMembersData); } : null,
             'devices-table': typeof renderDevicesTable === 'function' ? () => { if(window.allDevicesData) renderDevicesTable(allDevicesData); } : null,
             'tests-table': typeof renderTestsTable === 'function' ? () => { if(window.filteredTestsData || window.allTestsData) renderTestsTable(filteredTestsData || allTestsData); } : null,
-            'bugs-table': typeof renderBugsTable === 'function' ? () => { if(window.filteredBugsData || window.allBugsData) renderBugsTable(filteredBugsData || allBugsData); } : null
+            'bugs-table': typeof renderBugsTable === 'function' ? () => { if(window.filteredBugsData || window.allBugsData) renderBugsTable(filteredBugsData || allBugsData); } : null,
+            'report-games-table': typeof renderReportTable === 'function' ? () => renderReportTable() : null
         };
         const renderFn = renderFns[tableId];
         if (renderFn) renderFn();

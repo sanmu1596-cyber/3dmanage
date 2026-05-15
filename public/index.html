@@ -131,6 +131,9 @@
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
+                        <a class="sidebar-item" data-tab="reports" onclick="switchTab('reports')">
+                            <span class="sidebar-icon">📊</span>汇报报表
+                        </a>
                     </div>
                 </div>
                 <!-- 设置 -->
@@ -2151,6 +2154,51 @@
                     </div>
                 </section>
 
+                <!-- 汇报报表 -->
+                <section id="reports" class="tab-content">
+                    <style>
+                        .report-status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
+                        .adapting-badge { background:#e8f4fd; color:#0369a1; border:1px solid #bae6fd; }
+                        .bug-badge { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+                        .completed-badge { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+                        .report-text-edit { width:100%; border:1px dashed transparent; background:transparent; border-radius:4px; padding:4px 6px; font-size:13px; color:var(--text,#333); cursor:pointer; transition:all 0.2s; box-sizing:border-box; }
+                        .report-text-edit:hover,.report-text-edit:focus { border-color:var(--primary,#2563eb); outline:none; background:var(--card-bg,#fff); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+                        .report-text-edit::placeholder { color:#bbb; font-style:italic; }
+                    </style>
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <div style="position:relative;">
+                                <input type="text" id="report-search-input" placeholder="🔍 搜索游戏名称/状态/平台..." onkeyup="filterReports()">
+                            </div>
+                            <button class="tool-btn" onclick="resetReportFilters()" title="重置筛选">重置</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <span id="report-page-info" class="text-muted" style="font-size:12px;margin-right:8px;"></span>
+                            <button class="tool-btn" id="report-prev-page" onclick="reportPrevPage()" title="上一页">◀</button>
+                            <button class="tool-btn" id="report-next-page" onclick="reportNextPage()" title="下一页">▶</button>
+                            <button class="tool-btn tool-btn-primary" onclick="refreshReports()" title="刷新数据"><i class="fas fa-sync-alt"></i> 刷新</button>
+                            <button class="tool-btn" onclick="exportReport()" title="导出Excel" style="background:#28a745;color:#fff;"><i class="fas fa-file-excel"></i> 导出Excel</button>
+                            <span id="reports-updated" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="report-games-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th data-field="name">游戏名称</th>
+                                    <th data-field="status" width="100">适配状态</th>
+                                    <th data-field="platform" width="100">平台</th>
+                                    <th data-field="notes">备注</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-games-tbody">
+                                <tr><td colspan="5" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
             </main>
         </div>
     </div>
@@ -2903,6 +2951,7 @@
     <script src="js/testcases.js?v=20260508"></script>
     <script src="js/issues-versions.js?v=20260509"></script>
     <script src="js/social.js?v=20260508"></script>
+    <script src="js/reports.js?v=20260514"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
 </body>

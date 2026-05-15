@@ -245,6 +245,9 @@ async function _doLoadTabData(tabId, switchId) {
             await loadVersions();
             await loadClientIssues();
             break;
+        case 'reports':
+            loadReports();
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -578,7 +581,8 @@ const BREADCRUMB_MAP = {
     'game-versions':{label:'游戏版本', icon: '🎯', parent: 'games' },
     'interlace-issues':{label:'交错问题', icon: '🔀', parent: 'games' },
     'interlace-versions':{label:'交错版本', icon: '🔀', parent: 'devices' },
-    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' }
+    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' },
+    'reports':    { label: '汇报报表', icon: '📊', parent: null }
 };
 
 function updateBreadcrumb(tabId) {
