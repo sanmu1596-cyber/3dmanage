@@ -305,15 +305,9 @@ function renderReportTable() {
 }
 
 /**
- * 搜索关键词高亮（复用全局 highlightSearch 或降级为纯文本）
+ * 搜索关键词高亮（使用已加载的全局 highlightSearch）
+ * 注意：不在此重新定义，直接依赖 core.js 中的实现
  */
-function highlightSearch(text, tableId) {
-    if (!text) return '';
-    if (typeof window.highlightSearch === 'function') {
-        return window.highlightSearch(text, tableId);
-    }
-    return escapeHtml(text);
-}
 
 // ==================== 行内编辑：下拉选择（游戏名称/状态/平台） ====================
 /**
