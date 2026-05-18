@@ -1,11 +1,10 @@
 /**
- * 汇报报表模块 — reports.js（增强编辑版）
- * 只保留「游戏适配状态详情表」，全字段可编辑：
- * - 游戏名称 → 下拉选择（从游戏列表提取）
- * - 适配状态 → 下拉选择（待适配 / 适配中 / 已适配）
- * - 平台   → 下拉选择（Steam / WeGame / 官网）
- * - 备注   → 文本输入框
- * - 标准工具栏 + 搜索过滤 + 排序 + 拖拽 + 分页 + Excel导出
+ * 汇报报表模块 — reports.js（TAPD 风格 Click-to-Edit 版）
+ * 交互与游戏列表保持一致：默认展示文本，单击/双击进入编辑
+ * - 游戏名称 → 单击下拉选择（从游戏列表提取）
+ * - 适配状态 → 单击下拉选择（待适配 / 适配中 / 已适配）
+ * - 平台   → 单击下拉选择（Steam / WeGame / 官网）
+ * - 备注   → 双击文本输入
  */
 
 // ==================== 全局变量 ====================
@@ -79,7 +78,6 @@ function loadGameListForDropdown() {
         .then(result => {
             if (result && result.data && Array.isArray(result.data)) {
                 reportGameListCache = result.data.map(g => g.name || '').filter(Boolean).sort();
-                // 去重并保持顺序
                 reportGameListCache = [...new Set(reportGameListCache)];
             } else if (result && Array.isArray(result)) {
                 reportGameListCache = result.map(g => g.name || '').filter(Boolean).sort();
@@ -97,7 +95,6 @@ function loadGameListForDropdown() {
 function loadReportData() {
     showReportLoading();
 
-    // 并行：加载报表数据 + 加载游戏列表下拉选项
     let dataPromise = authFetch(API_BASE + '/reports/data')
         .then(r => {
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -115,20 +112,16 @@ function loadReportData() {
             hideReportBanner();
         });
 
-    // 游戏列表（下拉用，失败不影响主流程）
     loadGameListForDropdown().catch(() => {});
 
     dataPromise.then(() => renderReportTable()).catch(err => {
         console.error('[reports] 加载失败:', err);
-
-        // ★ 兜底：使用默认示例数据
         allReportGameData = getDefaultReportData();
         filteredReportGameData = [...allReportGameData];
         reportDataCache = null;
         showReportBanner('数据加载异常，当前显示的是示例数据。点击「刷新」重试。');
         renderReportTable();
 
-        // 后台静默重试一次（仅 localhost）
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             fetch(API_BASE + '/reports/data', { credentials: 'include' })
                 .then(r2 => r2.json())
@@ -171,36 +164,15 @@ function flattenGameStatus(gameStatus) {
     const rows = [];
 
     (gs.inProgress || []).forEach((g, i) => {
-        rows.push({
-            _id: 'ip_' + i,
-            name: g.name,
-            status: 'inProgress',
-            statusLabel: '适配中',
-            platform: g.platform || '',
-            notes: g.notes || ''
-        });
+        rows.push({ _id: 'ip_' + i, name: g.name, status: 'inProgress', statusLabel: '适配中', platform: g.platform || '', notes: g.notes || '' });
     });
 
     (gs.hasBugs || []).forEach((g, i) => {
-        rows.push({
-            _id: 'hb_' + i,
-            name: g.name,
-            status: 'inProgress',  // 有BUG归类为适配中
-            statusLabel: '适配中',
-            platform: g.platform || '',
-            notes: (g.bugNotes || '')
-        });
+        rows.push({ _id: 'hb_' + i, name: g.name, status: 'inProgress', statusLabel: '适配中', platform: g.platform || '', notes: (g.bugNotes || '') });
     });
 
     (gs.completed || []).forEach((g, i) => {
-        rows.push({
-            _id: 'cp_' + i,
-            name: g.name,
-            status: 'completed',
-            statusLabel: '已适配',
-            platform: g.platform || '',
-            notes: g.notes || ''
-        });
+        rows.push({ _id: 'cp_' + i, name: g.name, status: 'completed', statusLabel: '已适配', platform: g.platform || '', notes: g.notes || '' });
     });
 
     return rows;
@@ -208,8 +180,7 @@ function flattenGameStatus(gameStatus) {
 
 /** 根据 status 值查找对应的显示信息 */
 function getStatusInfo(statusValue) {
-    return REPORT_STATUS_OPTIONS.find(s => s.value === statusValue)
-        || REPORT_STATUS_OPTIONS[0]; // 默认待适配
+    return REPORT_STATUS_OPTIONS.find(s => s.value === statusValue) || REPORT_STATUS_OPTIONS[0];
 }
 
 // ==================== 搜索过滤 ====================
@@ -244,7 +215,7 @@ function resetReportFilters() {
     renderReportTable();
 }
 
-// ==================== 表格渲染（全字段可编辑） ====================
+// ==================== 表格渲染（TAPD 风格 Click-to-Edit） ====================
 function renderReportTable() {
     const tbody = document.getElementById('report-games-tbody');
     if (!tbody) return;
@@ -270,15 +241,12 @@ function renderReportTable() {
         return;
     }
 
-    // 构建行HTML —— 每个字段都是可编辑控件
-    const gameNames = reportGameListCache.length > 0 ? reportGameListCache : dataToShow.map(g => g.name).filter(Boolean);
-
+    // ★ TAPD风格：默认渲染文本值，通过 onclick/ondblclick 进入编辑
     tbody.innerHTML = dataToShow.map((g, idx) => {
         const globalIdx = REPORT_PAGE_SIZE === -1 ? idx + 1 : (reportCurrentPage - 1) * REPORT_PAGE_SIZE + idx + 1;
         const rowId = g._id || idx;
         const sInfo = getStatusInfo(g.status);
 
-        // 序号列
         let html = `<td class="text-center"><strong>${globalIdx}</strong></td>`;
 
         // 获取列顺序
@@ -290,62 +258,34 @@ function renderReportTable() {
         colOrder.forEach(field => {
             switch(field) {
                 case 'name':
-                    // 游戏名称 — 可搜索的下拉选择框
-                    html += `<td class="cell-game-name">
-                        <select class="report-select report-select-name"
-                                data-row-id="${rowId}" data-field="name"
-                                data-old-name="${escapeHtml(g.name)}"
-                                onchange="onReportFieldChange(this)">
-                            <option value="">-- 选择游戏 --</option>
-                            ${gameNames.map(n =>
-                                `<option value="${escapeHtml(n)}"${n === g.name ? ' selected' : ''}>${escapeHtml(n)}</option>`
-                            ).join('')}
-                        </select>
-                    </td>`;
+                    // 游戏名称 — 单击进入下拉选择
+                    html += `<td class="cell-game-name editable-cell" data-row-id="${rowId}" data-field="name"
+                                onclick="startReportDropdownEdit(this, '${rowId}', 'name')"
+                                title="点击选择游戏">${highlightSearch(g.name || '', 'report-games-table') || '<span class="text-muted">-- 选择 --</span>'}</td>`;
                     break;
 
-                case 'status':
-                    // 适配状态 — 下拉选择
-                    html += `<td>
-                        <select class="report-select report-select-status"
-                                data-row-id="${rowId}" data-field="status"
-                                data-old-status="${escapeHtml(g.status)}"
-                                style="background:${sInfo.color}15;border-color:${sInfo.color}45;color:${sInfo.color};font-weight:600;"
-                                onchange="onReportFieldChange(this)">
-                            ${REPORT_STATUS_OPTIONS.map(opt =>
-                                `<option value="${opt.value}"${opt.value === g.status ? ' selected' : ''}
-                                        style="color:${opt.color}">${opt.label}</option>`
-                            ).join('')}
-                        </select>
-                    </td>`;
+                case 'status': {
+                    // 适配状态 — 单击进入下拉选择，带颜色编码
+                    const displayName = highlightSearch(sInfo.label, 'report-games-table');
+                    html += `<td class="editable-cell text-center" data-row-id="${rowId}" data-field="status"
+                                onclick="startReportDropdownEdit(this, '${rowId}', 'status')"
+                                title="点击选择状态"
+                                style="color:${sInfo.color};font-weight:600;">${displayName}</td>`;
                     break;
+                }
 
                 case 'platform':
-                    // 平台 — 下拉选择
-                    html += `<td>
-                        <select class="report-select report-select-platform"
-                                data-row-id="${rowId}" data-field="platform"
-                                data-old-platform="${escapeHtml(g.platform)}"
-                                onchange="onReportFieldChange(this)">
-                            <option value="">-- 选择平台 --</option>
-                            ${REPORT_PLATFORM_OPTIONS.map(p => {
-                                const selected = (p.toLowerCase() === String(g.platform || '').toLowerCase());
-                                return `<option value="${p}"${selected ? ' selected' : ''}>${p}</option>`;
-                            }).join('')}
-                        </select>
-                    </td>`;
+                    // 平台 — 单击进入下拉选择
+                    html += `<td class="editable-cell text-center" data-row-id="${rowId}" data-field="platform"
+                                onclick="startReportDropdownEdit(this, '${rowId}', 'platform')"
+                                title="点击选择平台">${highlightSearch(g.platform || '', 'report-games-table') || '<span class="text-muted">--</span>'}</td>`;
                     break;
 
                 case 'notes':
-                    // 备注 — 文本输入框
-                    html += `<td class="cell-wrap">
-                        <input type="text" class="report-text-edit"
-                               data-row-id="${rowId}" data-field="notes"
-                               value="${escapeHtml(g.notes)}"
-                               placeholder="填写备注..."
-                               onblur="onReportFieldChange(this)"
-                               data-old-notes="${escapeHtml(g.notes)}">
-                    </td>`;
+                    // 备注 — 双击进入文本编辑
+                    html += `<td class="cell-wrap editable-cell" data-row-id="${rowId}"
+                                ondblclick="startReportNotesEdit(this, '${rowId}')"
+                                title="双击编辑备注">${highlightSearch(g.notes || '', 'report-games-table')}</td>`;
                     break;
             }
         });
@@ -364,131 +304,250 @@ function renderReportTable() {
     if (typeof initTableSort === 'function') try { initTableSort('report-games-table'); } catch(e) {}
 }
 
-// ==================== 统一字段变更处理 ====================
 /**
- * 所有编辑控件的统一 onChange/onBlur 处理器
- * 根据控件类型自动识别 field，更新本地缓存 + 保存到服务器
+ * 搜索关键词高亮（复用全局 highlightSearch 或降级为纯文本）
  */
-function onReportFieldChange(el) {
-    const rowId = el.getAttribute('data-row-id');
-    const field = el.getAttribute('data-field');
-
-    if (!field || !rowId) return;
-
-    let oldValue, newValue;
-
-    switch(field) {
-        case 'name':
-            oldValue = el.getAttribute('data-old-name') || '';
-            newValue = el.value.trim();
-            el.setAttribute('data-old-name', newValue);
-            break;
-        case 'status':
-            oldValue = el.getAttribute('data-old-status') || '';
-            newValue = el.value;
-            el.setAttribute('data-old-status', newValue);
-            break;
-        case 'platform':
-            oldValue = el.getAttribute('data-old-platform') || '';
-            newValue = el.value;
-            el.setAttribute('data-old-platform', newValue);
-            break;
-        case 'notes':
-            oldValue = el.getAttribute('data-old-notes') || '';
-            newValue = el.value.trim();
-            el.setAttribute('data-old-notes', newValue);
-            break;
-        default:
-            return;
+function highlightSearch(text, tableId) {
+    if (!text) return '';
+    if (typeof window.highlightSearch === 'function') {
+        return window.highlightSearch(text, tableId);
     }
-
-    // 值没变化跳过
-    if (newValue === oldValue) return;
-
-    // 找到对应的数据行
-    const rowData = allReportGameData.find(r => r._id == rowId);
-    if (!rowData) return;
-
-    // 更新本地缓存
-    if (field === 'name') {
-        rowData.name = newValue;
-    } else if (field === 'status') {
-        rowData.status = newValue;
-        const sInfo = getStatusInfo(newValue);
-        rowData.statusLabel = sInfo.label;
-        // 更新 select 样式颜色
-        el.style.background = sInfo.color + '15';
-        el.style.borderColor = sInfo.color + '45';
-        el.style.color = sInfo.color;
-    } else if (field === 'platform') {
-        rowData.platform = newValue;
-    } else if (field === 'notes') {
-        rowData.notes = newValue;
-    }
-
-    // 视觉反馈：成功绿色边框闪烁
-    el.style.borderColor = '#28a745';
-    setTimeout(() => {
-        el.style.borderColor = '';
-    }, 1200);
-
-    // 异步保存到服务器（不阻塞UI）
-    saveRowToServer(rowData);
+    return escapeHtml(text);
 }
 
-// ==================== 保存到服务器 ====================
-function saveRowToServer(rowData) {
-    if (!rowData || !rowData._id) return;
+// ==================== 行内编辑：下拉选择（游戏名称/状态/平台） ====================
+/**
+ * TAPD 风格单击下拉编辑 —— 与游戏列表的 startGameDropdownEdit 保持一致
+ * @param {HTMLElement} td - 被点击的单元格
+ * @param {string} rowId - 行标识
+ * @param {string} field - 字段名 (name / status / platform)
+ */
+function startReportDropdownEdit(td, rowId, field) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
 
-    const payload = {
-        _id: rowData._id,
-        name: rowData.name || '',
-        status: rowData.status || 'pending',
-        platform: rowData.platform || '',
-        notes: rowData.notes || ''
+    // 锁定宽高防抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const rowData = allReportGameData.find(r => r._id == rowId);
+    const originalHtml = td.innerHTML;
+    const currentValue = rowData ? (rowData[field] || '') : '';
+
+    const select = document.createElement('select');
+    select.className = 'inline-edit-select';
+
+    // 根据字段类型填充选项
+    if (field === 'name') {
+        // 游戏名称：从缓存的游戏列表提取
+        const gameNames = reportGameListCache.length > 0
+            ? reportGameListCache
+            : allReportGameData.map(g => g.name).filter(Boolean);
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '-- 选择游戏 --';
+        select.appendChild(emptyOpt);
+        gameNames.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n;
+            if (n === currentValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+    } else if (field === 'status') {
+        // 适配状态
+        REPORT_STATUS_OPTIONS.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            o.style.color = opt.color;
+            if (opt.value === currentValue) o.selected = true;
+            select.appendChild(o);
+        });
+    } else if (field === 'platform') {
+        // 平台
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '-- 选择平台 --';
+        select.appendChild(emptyOpt);
+        REPORT_PLATFORM_OPTIONS.forEach(p => {
+            const o = document.createElement('option');
+            o.value = p;
+            o.textContent = p;
+            if (p.toLowerCase() === String(currentValue).toLowerCase()) o.selected = true;
+            select.appendChild(o);
+        });
+    }
+
+    td.innerHTML = '';
+    td.appendChild(select);
+    select.focus();
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = select.value;
+
+        // 无变化直接还原
+        if (newValue === currentValue) {
+            finishEditing(td, originalHtml);
+            return;
+        }
+
+        // 更新本地缓存
+        if (rowData) {
+            if (field === 'name') {
+                rowData.name = newValue;
+            } else if (field === 'status') {
+                rowData.status = newValue;
+                const sInfo = getStatusInfo(newValue);
+                rowData.statusLabel = sInfo.label;
+            } else if (field === 'platform') {
+                rowData.platform = newValue;
+            }
+        }
+
+        // 保存到服务器
+        try {
+            const payload = Object.assign({}, rowData);
+            const response = await authFetch(API_BASE + '/reports/save-row', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.success) {
+                if (result.id && rowData) rowData._id = result.id;
+                // 更新单元格显示
+                refreshReportCell(td, rowId, field);
+                showToast('已保存', 'success');
+            } else {
+                td.innerHTML = originalHtml;
+                showToast(result.error || '保存失败', 'warning');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('网络异常，保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
     };
 
-    authFetch(API_BASE + '/reports/save-row', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            // 如果服务端返回了新的_id（首次创建），同步回来
-            if (result.id) rowData._id = result.id;
-            showToast('已保存', 'success');
-        } else {
-            showToast(result.error || '保存失败', 'warning');
-        }
-    })
-    .catch(err => {
-        console.error('[reports] 保存失败:', err);
-        showToast('本地已修改，但同步服务器失败', 'danger');
+    select.addEventListener('change', save);
+    select.addEventListener('blur', () => {
+        if (!saved) { saved = true; finishEditing(td, originalHtml); }
+    });
+    select.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { saved = true; finishEditing(td, originalHtml); }
     });
 }
 
-/** 旧版兼容接口（备注单独保存） */
-function saveReportOverride(inputEl) {
-    const rowId = inputEl.getAttribute('data-row-id') || inputEl.getAttribute('data-entity');
-    if (inputEl.hasAttribute('data-row-id')) {
-        onReportFieldChange(inputEl); // 新版统一处理
-    } else {
-        // 兜底：走旧的 entity_key 方式
-        const type = inputEl.getAttribute('data-report-type');
-        const entity = inputEl.getAttribute('data-entity');
-        const field = inputEl.getAttribute('data-field');
-        const newVal = inputEl.value.trim();
-        const oldVal = inputEl.getAttribute('data-old');
-        if (!type || !entity || !field || newVal === oldVal) return;
-        authFetch(API_BASE + '/reports/overrides', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ report_type: type, entity_key: entity, field, value: newVal })
-        }).then(r => r.json()).then(res => {
-            if (res.success) { inputEl.setAttribute('data-old', newVal); showToast('已保存','success'); }
-            else throw new Error(res.error);
-        }).catch(err => { inputEl.value = oldVal||''; showToast('保存失败','danger'); });
+// ==================== 行内编辑：文本输入（备注） ====================
+/**
+ * 双击文本编辑 —— 与游戏列表的 startGameTextEdit 保持一致
+ * @param {HTMLElement} td - 被双击的单元格
+ * @param {string} rowId - 行标识
+ */
+function startReportNotesEdit(td, rowId) {
+    if (td.classList.contains('editing')) return;
+    td.classList.add('editing');
+
+    // 锁定宽高防抖动
+    const rect = td.getBoundingClientRect();
+    td.style.width = rect.width + 'px';
+    td.style.minWidth = rect.width + 'px';
+    td.style.maxWidth = rect.width + 'px';
+    td.style.height = rect.height + 'px';
+    td.style.boxSizing = 'border-box';
+
+    const rowData = allReportGameData.find(r => r._id == rowId);
+    const originalValue = rowData ? (rowData.notes || '') : '';
+    const originalHtml = td.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-edit-input';
+    input.value = originalValue;
+    input.placeholder = '填写备注...';
+
+    td.innerHTML = '';
+    td.appendChild(input);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    let saved = false;
+    const save = async () => {
+        if (saved) return;
+        saved = true;
+        const newValue = input.value.trim();
+
+        if (newValue === originalValue) {
+            finishEditing(td, originalHtml);
+            return;
+        }
+
+        if (rowData) rowData.notes = newValue;
+
+        try {
+            const payload = Object.assign({}, rowData);
+            const response = await authFetch(API_BASE + '/reports/save-row', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.success) {
+                if (result.id && rowData) rowData._id = result.id;
+                td.textContent = newValue || '';
+                showToast('已保存', 'success');
+            } else {
+                td.innerHTML = originalHtml;
+                showToast(result.error || '保存失败', 'warning');
+            }
+        } catch (e) {
+            td.innerHTML = originalHtml;
+            showToast('网络异常，保存失败', 'danger');
+        }
+        td.classList.remove('editing');
+        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    };
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { saved = true; finishEditing(td, originalHtml); }
+    });
+}
+
+/** 编辑完成后还原单元格显示态 */
+function finishEditing(td, originalHtml) {
+    td.classList.remove('editing');
+    td.innerHTML = originalHtml;
+    td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+}
+
+/** 刷新单个单元格的显示内容（保存成功后调用） */
+function refreshReportCell(td, rowId, field) {
+    const rowData = allReportGameData.find(r => r._id == rowId);
+    if (!rowData) return;
+
+    td.classList.remove('editing');
+    td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+
+    if (field === 'name') {
+        td.textContent = rowData.name || '';
+    } else if (field === 'status') {
+        const sInfo = getStatusInfo(rowData.status);
+        td.textContent = sInfo.label;
+        td.style.color = sInfo.color;
+        td.style.fontWeight = '600';
+    } else if (field === 'platform') {
+        td.textContent = rowData.platform || '';
     }
 }
 
@@ -518,7 +577,6 @@ function deleteReportRow(rowId) {
     filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
     renderReportTable();
 
-    // 通知服务器删除
     authFetch(API_BASE + '/reports/delete-row', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -592,4 +650,32 @@ function escapeHtml(str) {
     return String(str)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/** 旧版兼容接口 */
+function saveReportOverride(inputEl) {
+    const rowId = inputEl.getAttribute('data-row-id') || inputEl.getAttribute('data-entity');
+    if (inputEl.hasAttribute('data-row-id')) {
+        // 新版不再使用独立 onchange，此处兼容旧 HTML 残留
+        console.warn('[reports] saveReportObsolete 已废弃，请使用新版行内编辑');
+    } else {
+        const type = inputEl.getAttribute('data-report-type');
+        const entity = inputEl.getAttribute('data-entity');
+        const field = inputEl.getAttribute('data-field');
+        const newVal = inputEl.value.trim();
+        const oldVal = inputEl.getAttribute('data-old');
+        if (!type || !entity || !field || newVal === oldVal) return;
+        authFetch(API_BASE + '/reports/overrides', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_type: type, entity_key: entity, field, value: newVal })
+        }).then(r => r.json()).then(res => {
+            if (res.success) { inputEl.setAttribute('data-old', newVal); showToast('已保存','success'); }
+            else throw new Error(res.error);
+        }).catch(err => { inputEl.value = oldVal||''; showToast('保存失败','danger'); });
+    }
+}
+
+/** 旧版兼容（onReportFieldChange 已移除，保留空壳防报错） */
+function onReportFieldChange(el) {
+    /* 已废弃：新版使用 startReportDropdownEdit / startReportNotesEdit */
 }

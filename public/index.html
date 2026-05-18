@@ -2157,24 +2157,18 @@
                 <!-- 汇报报表 -->
                 <section id="reports" class="tab-content">
                     <style>
-                        /* 状态徽章（仅用于导出/非编辑场景） */
+                        /* 状态徽章（非编辑场景复用） */
                         .report-status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
                         .adapting-badge { background:#e8f4fd; color:#0369a1; border:1px solid #bae6fd; }
                         .bug-badge { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
                         .completed-badge { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
                         .pending-badge { background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db; }
 
-                        /* 编辑控件统一样式 */
-                        .report-select { width:100%; border:1px solid #ddd; border-radius:5px; padding:4px 8px; font-size:13px; cursor:pointer; transition:all 0.2s; box-sizing:border-box; appearance:auto; -webkit-appearance:auto; background-image:none; height:30px; }
-                        .report-select:hover, .report-select:focus { border-color:var(--primary,#2563eb); outline:none; box-shadow:0 1px 4px rgba(37,99,235,0.15); }
-                        .report-select-name { min-width:160px; font-weight:500; }
-                        .report-select-status { font-weight:700 !important; text-align:center; }
-                        .report-select-platform { text-align:center; }
-
-                        /* 备注输入框 */
-                        .report-text-edit { width:100%; border:1px dashed transparent; background:transparent; border-radius:4px; padding:4px 6px; font-size:13px; color:var(--text,#333); cursor:pointer; transition:all 0.2s; box-sizing:border-box; }
-                        .report-text-edit:hover,.report-text-edit:focus { border-color:var(--primary,#2563eb); outline:none; background:var(--card-bg,#fff); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
-                        .report-text-edit::placeholder { color:#bbb; font-style:italic; }
+                        /* 报表单元格：继承全局 editable-cell 样式，微调 */
+                        #reports .editable-cell { position:relative; cursor:pointer; padding:6px 8px; vertical-align:middle; }
+                        #reports .editable-cell:hover { background:rgba(37,99,235,0.04); }
+                        #reports td.cell-game-name { font-weight:500; min-width:120px; }
+                        #reports td.cell-wrap { max-width:300px; }
 
                         /* 兜底横幅 */
                         .report-fallback-banner { display:flex; align-items:center; gap:8px; padding:8px 14px; margin:0 0 10px 0; background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:6px; font-size:13px; animation:fadeIn 0.3s ease; }
@@ -2206,9 +2200,9 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th data-field="name">游戏名称 <small style="color:#999;font-weight:400;">▼下拉选择</small></th>
-                                    <th data-field="status" width="110">适配状态 <small style="color:#999;font-weight:400;">▼</small></th>
-                                    <th data-field="platform" width="105">平台 <small style="color:#999;font-weight:400;">▼</small></th>
+                                    <th data-field="name">游戏名称</th>
+                                    <th data-field="status" width="110">适配状态</th>
+                                    <th data-field="platform" width="105">平台</th>
                                     <th data-field="notes">备注</th>
                                     <th width="40"></th>
                                 </tr>

@@ -2701,8 +2701,41 @@ function updateSelectOptions(selectId, data, valueField, textField, defaultText)
 // ==================== 列宽手动拖拽调节 ====================
 
 /**
+ * 获取表格的列宽存储 key（基于 table id 或 index）
+ */
+function _getColWidthKey(table) {
+    return 'colWidths_' + (table.id || 'table_' + Array.from(document.querySelectorAll('.data-table')).indexOf(table));
+}
+
+/**
+ * 从 localStorage 读取已保存的列宽配置
+ */
+function getSavedColWidths(table) {
+    try {
+        const raw = localStorage.getItem(_getColWidthKey(table));
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+
+/**
+ * 将当前列宽保存到 localStorage（拖拽结束时调用）
+ */
+function saveColWidths(table) {
+    const ths = table.querySelectorAll('thead th');
+    const widths = [];
+    ths.forEach((th, i) => {
+        // 序号列和操作列也记录，保持数组位置对应
+        widths.push(th.offsetWidth);
+    });
+    try {
+        localStorage.setItem(_getColWidthKey(table), JSON.stringify(widths));
+    } catch(e) { /* storage full 等异常静默忽略 */ }
+}
+
+/**
  * 为所有 .data-table 的表头单元格添加拖拽 resize 手柄。
  * 拖拽只改当前列宽度，其他列不受影响，表格总宽度可增长/缩小。
+ * 列宽会自动保存到 localStorage，刷新后自动恢复。
  */
 function initColumnResize() {
     document.querySelectorAll('.data-table').forEach(table => {
@@ -2714,27 +2747,33 @@ function initColumnResize() {
 
         // 第一步：快照每列实际宽度并锁定为 px 值
         if (!table.dataset.colLocked) {
-            const widths = [];
-            ths.forEach(th => widths.push(th.offsetWidth));
-            const totalWidth = widths.reduce((a, b) => a + b, 0);
+            const savedWidths = getSavedColWidths(table);
+            let totalWidth = 0;
 
-            // 写入每列的 px 宽度
+            // 写入每列的 px 宽度（优先使用保存值）
             ths.forEach((th, i) => {
                 const thText = th.textContent.trim();
                 if (th.classList.contains('batch-th')) {
                     th.style.width = '36px';
                     th.style.minWidth = '36px';
                     th.style.maxWidth = '36px';
+                    totalWidth += 36;
                     return;
                 }
                 if (thText === '序号') {
                     th.style.width = '50px';
                     th.style.minWidth = '50px';
                     th.style.maxWidth = '50px';
+                    totalWidth += 50;
                     return;
                 }
-                th.style.width = widths[i] + 'px';
+
+                // ★ 优先从 localStorage 恢复，否则用当前计算宽度
+                const savedW = (savedWidths && savedWidths[i]) ? savedWidths[i] : th.offsetWidth;
+                const w = Math.max(40, savedW);
+                th.style.width = w + 'px';
                 th.style.minWidth = '40px';
+                totalWidth += w;
             });
 
             // 用 table-layout:fixed + 精确总宽，确保浏览器严格按 px 渲染
@@ -2782,6 +2821,8 @@ function initColumnResize() {
                     document.body.classList.remove('col-resizing');
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
+                    // ★ 持久化保存列宽
+                    saveColWidths(table);
                 };
 
                 document.addEventListener('mousemove', onMouseMove);
