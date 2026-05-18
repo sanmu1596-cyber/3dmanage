@@ -2555,6 +2555,54 @@ reportsRouter.post('/overrides', auth.checkPermission('games', 'edit'), (req, re
   );
 });
 
+// 创建 report_rows 表（报表自定义行数据）
+db.run(`CREATE TABLE IF NOT EXISTS report_rows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  row_id TEXT UNIQUE,
+  name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  platform TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+// 保存报表行数据（新增/更新）
+reportsRouter.post('/save-row', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { _id, name, status, platform, notes } = req.body;
+  if (!_id || !name) {
+    return res.status(400).json({ error: '缺少必要字段: _id 或 name' });
+  }
+
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO report_rows (row_id, name, status, platform, notes, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(row_id) DO UPDATE SET
+       name=excluded.name, status=excluded.status, platform=excluded.platform,
+       notes=excluded.notes, updated_at=datetime('now')`,
+    [_id, name, status || 'pending', platform || '', notes || '', now],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('update', 'report_row', this.lastID, `保存报表行:${name}`);
+      res.json({ success: true, id: this.lastID });
+    }
+  );
+});
+
+// 删除报表行
+reportsRouter.post('/delete-row', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { _id } = req.body;
+  if (!_id) return res.status(400).json({ error: '缺少 _id' });
+
+  db.run(`DELETE FROM report_rows WHERE row_id = ?`, [_id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('delete', 'report_row', null, `删除报表行:${_id}`);
+    res.json({ success: true, deleted: this.changes > 0 });
+  });
+});
+
 app.use('/api/reports', reportsRouter);
 
 // [P0] 挂载增强功能：需求指派/关联计划 + 评论CRUD + 管理者看板 + 工作流引擎
