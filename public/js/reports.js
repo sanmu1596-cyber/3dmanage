@@ -17,6 +17,25 @@ let reportSearchTerm = '';
 let reportCurrentPage = 1;
 const REPORT_PAGE_SIZE = 20;         // 每页条数，-1表示全部
 
+// ==================== 默认兜底数据 ====================
+/**
+ * 当API加载失败时，返回示例占位数据
+ * 让用户能看到表格结构和各单元格的填写提示
+ */
+function getDefaultReportData() {
+    return [
+        { name: '艾尔登法环', status: 'inProgress', statusLabel: '适配中', statusBadge: 'adapting-badge', platform: 'Steam', notes: '场景切换偶发闪退，排查中' },
+        { name: '黑神话：悟空', status: 'inProgress', statusLabel: '适配中', statusBadge: 'adapting-badge', platform: 'WeGame', notes: '分辨率缩放算法待优化' },
+        { name: '霍格沃茨之遗', status: 'inProgress', statusLabel: '适配中', statusBadge: 'adapting-badge', platform: 'Steam', notes: '光影渲染需进一步调校' },
+        { name: '幻兽帕鲁', status: 'inProgress', statusLabel: '适配中', statusBadge: 'adapting-badge', platform: 'Steam', notes: '联机模式3D适配进行中' },
+        { name: '暗黑破坏神 IV', status: 'hasBugs', statusLabel: '有BUG', statusBadge: 'bug-badge', platform: 'Steam', notes: '优先级:medium | 帧率3D后降至28fps | Acer-27' },
+        { name: '真·三国无双8', status: 'hasBugs', statusLabel: '有BUG', statusBadge: 'bug-badge', platform: 'Steam', notes: '优先级:critical | 过场动画70%闪退 | 泰坦军团' },
+        { name: '博德之门 3', status: 'completed', statusLabel: '已完成', statusBadge: 'completed-badge', platform: 'Steam', notes: '适配完成并通过测试', quality: 'normal' },
+        { name: '赛博朋克 2077', status: 'completed', statusLabel: '已完成', statusBadge: 'completed-badge', platform: 'Steam', notes: '', quality: 'normal' },
+        { name: '古墓丽影：暗影', status: 'completed', statusLabel: '已完成', statusBadge: 'completed-badge', platform: 'Steam', notes: '3D效果优秀，已上线', quality: 'normal' }
+    ];
+}
+
 // ==================== 主入口 ====================
 function loadReports() {
     if (typeof authFetch !== 'function') {
@@ -68,28 +87,64 @@ function loadReportData() {
                 if (el) el.textContent = '更新于 ' + new Date(result.data.lastUpdated).toLocaleString('zh-CN');
             }
 
+            // 隐藏提示横幅（如果有）
+            hideReportBanner();
+
             // 渲染
             renderReportTable();
         })
         .catch(err => {
             console.error('[reports] 加载失败:', err);
-            setReportError('加载失败: ' + err.message);
 
-            // 开发模式降级
+            // ★ 兜底：使用默认示例数据，让用户能看到表格效果
+            allReportGameData = getDefaultReportData();
+            filteredReportGameData = [...allReportGameData];
+            reportDataCache = null;
+
+            // 显示提示横幅
+            showReportBanner('数据加载异常，当前显示的是示例数据。点击「刷新」重试。');
+
+            // 仍然渲染表格（用默认数据）
+            renderReportTable();
+
+            // 后台静默重试一次（仅 localhost）
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 fetch(API_BASE + '/reports/data', { credentials: 'include' })
                     .then(r2 => r2.json())
                     .then(result2 => {
-                        if (result2.success) {
+                        if (result2 && result2.success) {
                             reportDataCache = result2.data;
                             allReportGameData = flattenGameStatus(result2.data.gameStatus);
                             filteredReportGameData = [...allReportGameData];
+                            hideReportBanner();
                             renderReportTable();
                         }
                     })
                     .catch(() => {});
             }
         });
+}
+
+/**
+ * 在工具栏下方显示提示横幅
+ */
+function showReportBanner(msg) {
+    let banner = document.getElementById('report-banner');
+    if (!banner) {
+        const toolbar = document.querySelector('#reports .toolbar');
+        if (!toolbar) return;
+        banner = document.createElement('div');
+        banner.id = 'report-banner';
+        banner.className = 'report-fallback-banner';
+        toolbar.parentNode.insertBefore(banner, toolbar.nextSibling);
+    }
+    banner.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${escapeHtml(msg)} <a href="#" onclick="refreshReports();return false;" style="margin-left:8px;color:#0369a1;font-weight:600;">刷新</a>`;
+    banner.style.display = '';
+}
+
+function hideReportBanner() {
+    const banner = document.getElementById('report-banner');
+    if (banner) banner.style.display = 'none';
 }
 
 /**

@@ -2356,14 +2356,22 @@ db.run(`CREATE TABLE IF NOT EXISTS report_overrides (
 
 // 获取报表数据（一次性返回两个表全部数据）
 reportsRouter.get('/data', (req, res) => {
+  try {
   const result = { deviceSummary: [], gameStatus: { inProgress: [], hasBugs: [], completed: [] } };
   let completed = 0;
   const totalQueries = 4;
   let query4Finished = false; // 防止 finishQuery4 被多次调用导致重复响应
 
-  // Q1: 设备汇总 — 从 devices 表获取设备列表
-  db.all('SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations, online_games FROM devices ORDER BY id', (err, devices) => {
-    if (err) return res.status(500).json({ error: err.message });
+  // 统一错误响应（只调用一次）
+  let errorSent = false;
+  const sendError = (code, msg) => {
+    if (!errorSent) { errorSent = true; return res.status(code).json({ error: msg }); }
+  };
+
+  // Q1: 设备汇总 — 从 devices 表获取设备列表（兼容不同数据库 schema）
+  db.all(`SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations
+          FROM devices ORDER BY id`, (err, devices) => {
+    if (err) return sendError(500, err.message);
     result.devices = devices || [];
 
     // 获取手动修正值
@@ -2523,6 +2531,9 @@ reportsRouter.get('/data', (req, res) => {
       });
     });
   });
+  } catch(e) {
+    if (!errorSent) res.status(500).json({ error: e.message });
+  }
 });
 
 // 保存手动修正值
