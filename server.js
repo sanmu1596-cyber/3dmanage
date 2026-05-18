@@ -5,6 +5,7 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const db = require('./database');
 const path = require('path');
+const fs = require('fs');
 const auth = require('./auth');
 const usersController = require('./usersController');
 const gameIssuesRouter = require('./game-issues');
@@ -2616,6 +2617,50 @@ setInterval(() => {
     }
   });
 }, 60 * 60 * 1000);
+
+// ==================== 数据库健康检查 API ====================
+app.get('/api/db-health', (req, res) => {
+  const stats = fs.existsSync(db.DB_PATH) ? fs.statSync(db.DB_PATH) : null;
+  const tables = ['users', 'games', 'devices', 'tests', 'bugs', 'plans'];
+
+  const results = {};
+  let done = 0;
+  tables.forEach(t => {
+    db.get(`SELECT COUNT(*) as cnt FROM [${t}]`, (e, r) => {
+      results[t] = e ? { error: e.message } : (r ? r.cnt : 0);
+      done++;
+      if (done === tables.length) {
+        let backups = [];
+        try {
+          if (typeof db.BACKUP_DIR !== 'undefined' && fs.existsSync(db.BACKUP_DIR)) {
+            backups = fs.readdirSync(db.BACKUP_DIR)
+              .filter(f => f.startsWith('db_') && f.endsWith('.sqlite'))
+              .map(f => ({
+                name: f,
+                size: Math.round(fs.statSync(path.join(db.BACKUP_DIR, f)).size / 1024) + 'KB',
+                mtime: fs.statSync(path.join(db.BACKUP_DIR, f)).mtime.toISOString()
+              }))
+              .sort((a, b) => b.mtime > a.mtime ? 1 : -1).slice(0, 5);
+          }
+        } catch(e) {}
+
+        res.json({
+          success: true,
+          db: { exists: !!stats, size: stats ? Math.round(stats.size/1024)+'KB' : 0, modified: stats ? stats.mtime.toISOString() : null, path: db.DB_PATH },
+          tables: results,
+          backups: backups,
+          backupCount: backups.length,
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+  });
+});
+
+app.post('/api/db-backup', auth.checkPermission('games', 'edit'), (req, res) => {
+  const result = (db.backupDatabase && db.backupDatabase()) || null;
+  res.json({ success: !!result, message: result ? '备份成功: '+path.basename(result) : '备份失败' });
+});
 
 // 启动服务器 (监听所有网络接口，支持外网访问)
 const HOST = process.env.HOST || '0.0.0.0';
