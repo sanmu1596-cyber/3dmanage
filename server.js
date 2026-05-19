@@ -439,7 +439,7 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'),
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
-  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine'];
+  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine', 'online_status'];
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {
@@ -668,7 +668,7 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
             {value:'pending',label:'待适配'},{value:'in_progress',label:'适配中'},{value:'completed',label:'已完成'},{value:'failed',label:'失败'}
           ]), 6],
           ['online_status', '上线状态', '游戏管理', JSON.stringify([
-            {value:'pending',label:'待上线'},{value:'in_progress',label:'适配中'},{value:'paused',label:'暂停适配'},{value:'online',label:'已上线'}
+            {value:'pending_dev',label:'待开发'},{value:'pending',label:'待上线'},{value:'fixing',label:'待修复'},{value:'online',label:'已上线'}
           ]), 7],
           ['quality', '品质', '游戏管理', JSON.stringify([
             {value:'normal',label:'一般'},{value:'recommended',label:'推荐'}

@@ -402,7 +402,7 @@ function renderGamesPage() {
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
                         break;
                     case 'online_status':
-                        rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'online_status', 'online_status', '${escapeHtml(game.online_status || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
                         break;
                     case 'quality':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
@@ -776,10 +776,10 @@ function filterGames() {
     setSearchKeyword('games-table', searchTerm);
 
     filteredGamesData = allGamesData.filter(game => {
-        // 搜索匹配（游戏名称或ID）
+        // 搜索匹配（游戏名称或英文名称）
         const matchesSearch = !searchTerm ||
             (game.name && game.name.toLowerCase().includes(searchTerm)) ||
-            (game.game_id && game.game_id.toString().includes(searchTerm));
+            (game.english_name && game.english_name.toLowerCase().includes(searchTerm));
 
         // 平台匹配
         const matchesPlatform = !platformFilter || game.platform === platformFilter;
