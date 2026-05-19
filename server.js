@@ -2522,8 +2522,29 @@ reportsRouter.get('/data', (req, res) => {
                 });
               });
 
-              result.lastUpdated = new Date().toISOString();
-              res.json({ success: true, data: result });
+              // Q5: 合并 report_rows 自定义行数据
+              db.all(`SELECT row_id, name, status, platform, notes FROM report_rows ORDER BY sort_order, id`, (err8, customRows) => {
+                if (!err8 && customRows && customRows.length > 0) {
+                  const existingNames = new Set(result.gameStatus.completed.map(g => g.name));
+                  customRows.forEach(row => {
+                    const item = { name: row.name, platform: row.platform || '', notes: row.notes || '', _customId: row.row_id };
+                    if (row.status === 'completed' || row.status === '已适配') {
+                      if (!existingNames.has(row.name)) {
+                        result.gameStatus.completed.push(item);
+                        existingNames.add(row.name);
+                      }
+                    } else if (row.status === 'inProgress' || row.status === '适配中') {
+                      result.gameStatus.inProgress.push(item);
+                    } else {
+                      // pending → 放入 inProgress
+                      result.gameStatus.inProgress.push(item);
+                    }
+                  });
+                }
+
+                result.lastUpdated = new Date().toISOString();
+                res.json({ success: true, data: result });
+              });
             });
           });
         }
