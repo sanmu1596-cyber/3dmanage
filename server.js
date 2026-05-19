@@ -439,14 +439,28 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'),
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
+  // 字段白名单 + 合法值校验（enum类型字段只接受预定义值）
   const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine', 'online_status'];
+  const enumValidValues = {
+    online_status: ['pending_dev', 'pending', 'fixing', 'online'],
+    quality: ['normal', 'recommended']
+  };
+  const maxLengths = { description: 2000, game_account: 2000, name: 100 };
+
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {
-    if (allowedFields.includes(key)) {
-      updates.push(`${key} = ?`);
-      values.push(val);
+    if (!allowedFields.includes(key)) continue;
+    // 枚举字段校验：值必须在允许范围内，空字符串允许（表示清空）
+    if (enumValidValues[key] && val !== '' && val !== null && !enumValidValues[key].includes(val)) {
+      return res.status(400).json({ error: `${key} 的值 "${val}" 不合法，可选值: ${enumValidValues[key].join(', ')}` });
     }
+    // 长度限制
+    if (maxLengths[key] && String(val || '').length > maxLengths[key]) {
+      return res.status(400).json({ error: `${key} 超过最大长度 ${maxLengths[key]} 字符` });
+    }
+    updates.push(`${key} = ?`);
+    values.push(val);
   }
   if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
   values.push(req.params.id);
@@ -2597,6 +2611,17 @@ reportsRouter.post('/save-row', auth.checkPermission('games', 'edit'), (req, res
     return res.status(400).json({ error: '缺少必要字段: _id 或 name' });
   }
 
+  // 输入消毒：去除HTML标签，截断超长文本
+  const sanitize = (str, maxLen) => {
+    if (!str) return '';
+    let s = String(str).replace(/<[^>]*>/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+    return s.length > maxLen ? s.slice(0, maxLen) : s;
+  };
+  const safeName = sanitize(name, 200);
+  const safeNotes = sanitize(notes, 2000);
+  const validStatuses = ['pending', 'inProgress', 'completed'];
+  const safeStatus = validStatuses.includes(status) ? status : 'pending';
+
   const now = new Date().toISOString();
   db.run(
     `INSERT INTO report_rows (row_id, name, status, platform, notes, updated_at)
@@ -2604,10 +2629,10 @@ reportsRouter.post('/save-row', auth.checkPermission('games', 'edit'), (req, res
      ON CONFLICT(row_id) DO UPDATE SET
        name=excluded.name, status=excluded.status, platform=excluded.platform,
        notes=excluded.notes, updated_at=datetime('now')`,
-    [_id, name, status || 'pending', platform || '', notes || '', now],
+    [_id, safeName, safeStatus, platform || '', safeNotes, now],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      logActivity('update', 'report_row', this.lastID, `保存报表行:${name}`);
+      logActivity('update', 'report_row', this.lastID, `保存报表行:${safeName}`);
       res.json({ success: true, id: this.lastID });
     }
   );
