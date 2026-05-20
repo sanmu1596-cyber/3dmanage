@@ -387,6 +387,8 @@
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
                                     <div class="dropdown-item" onclick="exportToPDF('项目成员'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="toggleMemberColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    <div class="dropdown-divider"></div>
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
@@ -399,16 +401,35 @@
                             </select>
                         </div>
                     </div>
+                    <!-- 成员字段显示设置面板 -->
+                    <div id="member-column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="cancelMemberColumnSettings()" title="取消">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllMemberColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllMemberColumns()">取消全选</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyMemberColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>姓名</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="wechat_id" checked><span>企业微信ID</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="role" checked><span>角色</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="duty" checked><span>职责</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="status" checked><span>状态</span></label></div>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th>姓名</th>
-                                    <th>企业微信ID</th>
-                                    <th>角色</th>
-                                    <th>职责</th>
-                                    <th>状态</th>
+                                    <th data-field="name">姓名</th>
+                                    <th data-field="wechat_id">企业微信ID</th>
+                                    <th data-field="role">角色</th>
+                                    <th data-field="duty">职责</th>
+                                    <th data-field="status">状态</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -689,10 +710,19 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openModal('test-modal')"><span class="tool-icon">＋</span>添加测试</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="exportToExcel('tests')"><span class="tool-icon">📤</span>导出</button>
-                            <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
-                            <button class="tool-btn" onclick="exportToPDF('测试列表')"><span class="tool-icon">📄</span>PDF</button>
+                            <div class="more-actions-wrapper">
+                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                <div class="more-actions-dropdown">
+                                    <div class="dropdown-item" onclick="exportToExcel('tests'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('测试列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="toggleTestColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('tests'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                </div>
+                            </div>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="tests-search" class="filter-input" placeholder="搜索测试名称/游戏..." style="width:180px" oninput="filterModule('tests')">
                             <select id="tests-status-filter" class="compact-select" onchange="filterModule('tests')">
@@ -702,6 +732,28 @@
                                 <option value="completed">已完成</option>
                                 <option value="failed">失败</option>
                             </select>
+                        </div>
+                    </div>
+                    <!-- 测试字段显示设置面板 -->
+                    <div id="test-column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="cancelTestColumnSettings()" title="取消">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllTestColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllTestColumns()">取消全选</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyTestColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>测试名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_name" checked><span>游戏</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>设备</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="tester_name" checked><span>测试人</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="test_date" checked><span>测试日期</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="status" checked><span>状态</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="priority" checked><span>优先级</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="bugs_count" checked><span>缺陷数</span></label></div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -733,10 +785,19 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openModal('bug-modal')"><span class="tool-icon">＋</span>添加缺陷</button>
-                            <span class="toolbar-divider"></span>
-                            <button class="tool-btn" onclick="exportToExcel('bugs')"><span class="tool-icon">📤</span>导出</button>
-                            <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
-                            <button class="tool-btn" onclick="exportToPDF('缺陷列表')"><span class="tool-icon">📄</span>PDF</button>
+                            <div class="more-actions-wrapper">
+                                <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                <div class="more-actions-dropdown">
+                                    <div class="dropdown-item" onclick="exportToExcel('bugs'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('缺陷列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="toggleBugColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('bugs'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                </div>
+                            </div>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="bugs-search" class="filter-input" placeholder="搜索描述/设备/负责人..." style="width:180px" oninput="filterModule('bugs')">
                             <select id="bugs-status-filter" class="compact-select" onchange="filterModule('bugs')">
@@ -746,6 +807,28 @@
                                 <option value="fixed">已修复</option>
                                 <option value="closed">已关闭</option>
                             </select>
+                        </div>
+                    </div>
+                    <!-- 缺陷字段显示设置面板 -->
+                    <div id="bug-column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="cancelBugColumnSettings()" title="取消">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllBugColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllBugColumns()">取消全选</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyBugColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="versions" checked><span>涉及版本</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>设备名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="discovery_time" checked><span>发现时间</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="bug_status" checked><span>缺陷状态</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="priority" checked><span>优先级</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="problem_type" checked><span>问题类型</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="description" checked><span>描述</span></label></div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -1194,6 +1277,12 @@
                         <div class="toolbar">
                             <div class="toolbar-left">
                                 <button class="tool-btn tool-btn-primary" onclick="showCreatePlanView()"><span class="tool-icon">＋</span>新增适配计划</button>
+                                <div class="more-actions-wrapper">
+                                    <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
+                                    <div class="more-actions-dropdown">
+                                        <div class="dropdown-item" onclick="togglePlanListColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    </div>
+                                </div>
                                 <span class="toolbar-divider"></span>
                                 <select id="plan-status-filter" class="compact-select" onchange="filterPlans()">
                                     <option value="">全部状态</option>
@@ -1210,6 +1299,29 @@
                                 <div class="plans-summary" id="plans-summary-bar"></div>
                             </div>
                         </div>
+                        <!-- 配置计划字段显示设置面板 -->
+                        <div id="planList-column-settings" class="column-settings-panel" style="display: none;">
+                            <div class="settings-header">
+                                <h3>选择要显示的列</h3>
+                                <button class="settings-close-btn" onclick="cancelPlanListColumnSettings()" title="取消">×</button>
+                                <div class="settings-actions">
+                                    <button class="tool-btn" onclick="selectAllPlanListColumns()">全选</button>
+                                    <button class="tool-btn" onclick="deselectAllPlanListColumns()">取消全选</button>
+                                    <button class="tool-btn tool-btn-primary" onclick="applyPlanListColumnSettings()">应用</button>
+                                </div>
+                            </div>
+                            <div class="settings-content">
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="number" checked><span>编号</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="title" checked><span>标题</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="status" checked><span>状态</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="date" checked><span>日期</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_count" checked><span>游戏数</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="assignee_count" checked><span>参与人</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="progress" checked><span>进度</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirement" checked><span>关联需求</span></label></div>
+                                <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="creator" checked><span>创建者</span></label></div>
+                            </div>
+                        </div>
                         <!-- 计划列表卡片 -->
                         <div id="plan-cards-container" class="plan-cards-grid">
                             <div class="empty-state-full"><div class="empty-icon">📋</div><div>暂无适配计划</div><div class="empty-sub">点击"新增适配计划"创建第一个计划</div></div>
@@ -1220,15 +1332,15 @@
                                 <thead>
                                     <tr>
                                         <th width="50">序号</th>
-                                        <th style="width:12%">编号</th>
-                                        <th style="width:18%">标题</th>
-                                        <th style="width:8%">状态</th>
-                                        <th style="width:10%">日期</th>
-                                        <th style="width:7%">游戏数</th>
-                                        <th style="width:7%">参与人</th>
-                                        <th style="width:10%">进度</th>
-                                        <th style="width:10%">关联需求</th>
-                                        <th style="width:8%">创建者</th>
+                                        <th data-field="number" style="width:12%">编号</th>
+                                        <th data-field="title" style="width:18%">标题</th>
+                                        <th data-field="status" style="width:8%">状态</th>
+                                        <th data-field="date" style="width:10%">日期</th>
+                                        <th data-field="game_count" style="width:7%">游戏数</th>
+                                        <th data-field="assignee_count" style="width:7%">参与人</th>
+                                        <th data-field="progress" style="width:10%">进度</th>
+                                        <th data-field="requirement" style="width:10%">关联需求</th>
+                                        <th data-field="creator" style="width:8%">创建者</th>
                                         <th style="width:120px">操作</th>
                                     </tr>
                                 </thead>

@@ -1396,36 +1396,90 @@ function togglePlanView(mode) {
 // 渲染计划列表表格
 function renderPlanListTable(filtered) {
     const tbody = document.getElementById('plan-list-table');
+    if (!tbody) return;
+
+    // 无参调用时（如字段设置应用后），重新计算筛选数据
+    if (!filtered) {
+        filtered = configPlans;
+        if (typeof planStatusFilter !== 'undefined' && planStatusFilter) {
+            filtered = filtered.filter(p => p.status === planStatusFilter);
+        }
+        filtered = filtered.slice().sort((a, b) => {
+            const da = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
+            const db = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+            return db - da;
+        });
+    }
+
+    // 更新表头列顺序 + 可见性 + 拖拽
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('plan-list-table');
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('plan-list-table');
+
+    const defaultOrder = ['number', 'title', 'status', 'date', 'game_count',
+        'assignee_count', 'progress', 'requirement', 'creator'];
+    const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('plan-list-table') : defaultOrder;
+
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><div class="empty-icon">📋</div><div>${configPlans.length === 0 ? '暂无配置计划' : '没有符合筛选条件的计划'}</div></td></tr>`;
+        // 动态 colspan
+        let visCount = 1; // 序号
+        colOrder.forEach(f => { if (typeof planListVisibleColumns === 'undefined' || planListVisibleColumns[f]) visCount++; });
+        visCount += 1; // 操作
+        tbody.innerHTML = `<tr><td colspan="${visCount}" class="empty-state"><div class="empty-icon">📋</div><div>${configPlans.length === 0 ? '暂无配置计划' : '没有符合筛选条件的计划'}</div></td></tr>`;
         return;
     }
+
     tbody.innerHTML = filtered.map((plan, i) => {
         const statusLabel = { published: '✅ 已发布', closed: '🏁 已完成', draft: '📝 草稿' }[plan.status] || plan.status;
         const progress = plan.avgProgress || 0;
         const idx = configPlans.indexOf(plan);
-        return `<tr>
-            <td class="text-center"><strong>${i + 1}</strong></td>
-            <td style="font-size:12px;color:var(--text-muted);">${escapeHtml(plan.planNo)}</td>
-            <td><a href="javascript:void(0)" onclick="openPlanDetail(${idx})" style="color:var(--primary);font-weight:500;">${escapeHtml(plan.title)}</a></td>
-            <td>${statusLabel}</td>
-            <td>${plan.date || '-'}</td>
-            <td class="text-center">${plan.gameCount}</td>
-            <td class="text-center">${plan.assigneeCount}</td>
-            <td>
-                <div class="plan-card-progress" style="margin:0;">
-                    <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
-                    <span class="plan-card-pct" style="font-size:11px;">${progress}%</span>
-                </div>
-            </td>
-            <td>${plan.requirementTitle ? `<a href="javascript:void(0)" onclick="switchTab('requirements');setTimeout(()=>openReqDetail(${plan.requirementId}),300);" style="color:var(--primary);font-size:12px;">${escapeHtml(plan.requirementTitle)}</a>` : '-'}</td>
-            <td style="font-size:12px;">${escapeHtml(plan.creatorName || '-')}</td>
-            <td>
-                <button class="btn btn-small btn-edit" onclick="editPlan(${idx})">编辑</button>
-                ${plan.status === 'draft' ? `<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishPlan(${idx})">发布</button>` : ''}
-                <button class="btn btn-small btn-delete" onclick="deletePlan(${idx})">删除</button>
-            </td>
-        </tr>`;
+
+        let rowHtml = `<td class="text-center"><strong>${i + 1}</strong></td>`;
+
+        colOrder.forEach(field => {
+            if (typeof planListVisibleColumns !== 'undefined' && !planListVisibleColumns[field]) return;
+            switch (field) {
+                case 'number':
+                    rowHtml += `<td style="font-size:12px;color:var(--text-muted);">${escapeHtml(plan.planNo)}</td>`;
+                    break;
+                case 'title':
+                    rowHtml += `<td><a href="javascript:void(0)" onclick="openPlanDetail(${idx})" style="color:var(--primary);font-weight:500;">${escapeHtml(plan.title)}</a></td>`;
+                    break;
+                case 'status':
+                    rowHtml += `<td>${statusLabel}</td>`;
+                    break;
+                case 'date':
+                    rowHtml += `<td>${plan.date || '-'}</td>`;
+                    break;
+                case 'game_count':
+                    rowHtml += `<td class="text-center">${plan.gameCount}</td>`;
+                    break;
+                case 'assignee_count':
+                    rowHtml += `<td class="text-center">${plan.assigneeCount}</td>`;
+                    break;
+                case 'progress':
+                    rowHtml += `<td>
+                        <div class="plan-card-progress" style="margin:0;">
+                            <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
+                            <span class="plan-card-pct" style="font-size:11px;">${progress}%</span>
+                        </div>
+                    </td>`;
+                    break;
+                case 'requirement':
+                    rowHtml += `<td>${plan.requirementTitle ? `<a href="javascript:void(0)" onclick="switchTab('requirements');setTimeout(()=>openReqDetail(${plan.requirementId}),300);" style="color:var(--primary);font-size:12px;">${escapeHtml(plan.requirementTitle)}</a>` : '-'}</td>`;
+                    break;
+                case 'creator':
+                    rowHtml += `<td style="font-size:12px;">${escapeHtml(plan.creatorName || '-')}</td>`;
+                    break;
+            }
+        });
+
+        rowHtml += `<td>
+            <button class="btn btn-small btn-edit" onclick="editPlan(${idx})">编辑</button>
+            ${plan.status === 'draft' ? `<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishPlan(${idx})">发布</button>` : ''}
+            <button class="btn btn-small btn-delete" onclick="deletePlan(${idx})">删除</button>
+        </td>`;
+
+        return `<tr>${rowHtml}</tr>`;
     }).join('');
 }
 

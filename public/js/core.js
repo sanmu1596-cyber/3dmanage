@@ -159,6 +159,52 @@ var deviceVisibleColumns = {
     online_games: true
 };
 
+// 成员列表显示列配置（var 声明确保挂载到 window）
+var memberVisibleColumns = {
+    name: true,
+    wechat_id: true,
+    role: true,
+    duty: true,
+    status: true
+};
+
+// 测试列表显示列配置
+var testVisibleColumns = {
+    name: true,
+    game_name: true,
+    device_name: true,
+    tester_name: true,
+    test_date: true,
+    status: true,
+    priority: true,
+    bugs_count: true
+};
+
+// 缺陷列表显示列配置
+var bugVisibleColumns = {
+    versions: true,
+    device_name: true,
+    discovery_time: true,
+    owner: true,
+    bug_status: true,
+    priority: true,
+    problem_type: true,
+    description: true
+};
+
+// 配置计划列表显示列配置
+var planListVisibleColumns = {
+    number: true,
+    title: true,
+    status: true,
+    date: true,
+    game_count: true,
+    assignee_count: true,
+    progress: true,
+    requirement: true,
+    creator: true
+};
+
 // 适配进展状态
 let allDevicesData = [];
 let allGamesForProgress = [];

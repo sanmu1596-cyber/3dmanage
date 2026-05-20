@@ -96,6 +96,13 @@ registerColumnConfig('bugs-table',
     'bugsColumnOrder'
 );
 
+// 配置计划模块列顺序
+registerColumnConfig('plan-list-table',
+    ['number', 'title', 'status', 'date', 'game_count', 'assignee_count',
+     'progress', 'requirement', 'creator'],
+    'planListColumnOrder'
+);
+
 // 报表游戏状态表列顺序
 registerColumnConfig('report-games-table',
     ['name', 'status', 'platform', 'notes'],
@@ -1141,6 +1148,7 @@ function renderTestsTable(data) {
             let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
+                if (typeof testVisibleColumns !== 'undefined' && !testVisibleColumns[field]) return;
                 switch (field) {
                     case 'name':
                         rowHtml += `<td>${highlightSearch(test.name, 'tests-table')}</td>`;
@@ -1228,6 +1236,7 @@ function renderBugsTable(data) {
             let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
+                if (typeof bugVisibleColumns !== 'undefined' && !bugVisibleColumns[field]) return;
                 switch (field) {
                     case 'versions':
                         rowHtml += `<td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>`;
@@ -2346,9 +2355,10 @@ function updateColumnHeaders(tableId) {
     const visibilityMap = {
         'games-table': () => typeof visibleColumns !== 'undefined' ? visibleColumns : null,
         'devices-table': () => typeof deviceVisibleColumns !== 'undefined' ? deviceVisibleColumns : null,
-        'members-table': () => null,
-        'tests-table': () => null,
-        'bugs-table': () => null
+        'members-table': () => typeof memberVisibleColumns !== 'undefined' ? memberVisibleColumns : null,
+        'tests-table': () => typeof testVisibleColumns !== 'undefined' ? testVisibleColumns : null,
+        'bugs-table': () => typeof bugVisibleColumns !== 'undefined' ? bugVisibleColumns : null,
+        'plan-list-table': () => typeof planListVisibleColumns !== 'undefined' ? planListVisibleColumns : null
     };
     const getVisibility = visibilityMap[tableId];
     if (typeof getVisibility === 'function') {
@@ -2518,6 +2528,137 @@ function loadDeviceColumnSettings() {
         }
     } catch (e) { console.error('加载设备列设置失败:', e); }
 }
+
+// ==================== 通用列设置面板逻辑（4 模块共享）====================
+// 每模块只需提供：moduleKey('member'/'test'/'bug'/'planList')、visibleColumns 对象引用、重渲染函数
+function _genericColumnPanel(moduleKey, getVisibleObj, doRender) {
+    var panelId = moduleKey + '-column-settings';
+    var storageKey = moduleKey + 'VisibleColumns';
+
+    return {
+        toggle: function() {
+            var panel = document.getElementById(panelId);
+            if (!panel) return;
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                panel.style.display = 'block';
+                panel._snapshot = JSON.stringify(getVisibleObj() || {});
+            } else { panel.style.display = 'none'; }
+        },
+        close: function() {
+            var p = document.getElementById(panelId);
+            if (p) p.style.display = 'none';
+        },
+        cancel: function() {
+            var panel = document.getElementById(panelId);
+            if (panel && panel._snapshot) {
+                try {
+                    var snap = JSON.parse(panel._snapshot);
+                    var vis = getVisibleObj();
+                    for (var k in snap) { if (k in vis) vis[k] = snap[k]; }
+                    panel.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                        cb.checked = vis[cb.value] || false;
+                    });
+                } catch (e) {}
+            }
+            var p = document.getElementById(panelId);
+            if (p) p.style.display = 'none';
+        },
+        selectAll: function() {
+            document.querySelectorAll('#' + panelId + ' input[type="checkbox"]').forEach(function(cb) { cb.checked = true; });
+        },
+        deselectAll: function() {
+            document.querySelectorAll('#' + panelId + ' input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+        },
+        apply: function() {
+            var vis = getVisibleObj();
+            document.querySelectorAll('#' + panelId + ' input[type="checkbox"]').forEach(function(cb) {
+                if (cb.value in vis) vis[cb.value] = cb.checked;
+            });
+            try { localStorage.setItem(storageKey, JSON.stringify(vis)); } catch (e) {}
+            if (typeof doRender === 'function') doRender();
+            var p = document.getElementById(panelId);
+            if (p) p.style.display = 'none';
+        },
+        load: function() {
+            try {
+                var saved = localStorage.getItem(storageKey);
+                if (saved) {
+                    var parsed = JSON.parse(saved);
+                    var vis = getVisibleObj();
+                    if (!vis) return;
+                    for (var k in parsed) { if (k in vis) vis[k] = parsed[k]; }
+                    document.querySelectorAll('#' + panelId + ' input[type="checkbox"]').forEach(function(cb) {
+                        cb.checked = vis[cb.value] || false;
+                    });
+                }
+            } catch (e) {}
+        }
+    };
+}
+
+// ===== 成员模块 =====
+var _memberPanel = _genericColumnPanel('member',
+    function() { return typeof memberVisibleColumns !== 'undefined' ? memberVisibleColumns : null; },
+    function() { if (typeof renderMembersTable === 'function' && typeof allMembersData !== 'undefined') renderMembersTable(allMembersData); }
+);
+function toggleMemberColumnSettings() { _memberPanel.toggle(); }
+function closeMemberColumnSettings() { _memberPanel.close(); }
+function cancelMemberColumnSettings() { _memberPanel.cancel(); }
+function selectAllMemberColumns() { _memberPanel.selectAll(); }
+function deselectAllMemberColumns() { _memberPanel.deselectAll(); }
+function applyMemberColumnSettings() { _memberPanel.apply(); }
+function loadMemberColumnSettings() { _memberPanel.load(); }
+
+// ===== 测试模块 =====
+var _testPanel = _genericColumnPanel('test',
+    function() { return typeof testVisibleColumns !== 'undefined' ? testVisibleColumns : null; },
+    function() {
+        if (typeof renderTestsTable === 'function') {
+            var data = (typeof filteredTestsData !== 'undefined' && filteredTestsData && filteredTestsData.length) ? filteredTestsData
+                : (typeof allTestsData !== 'undefined' ? allTestsData : []);
+            renderTestsTable(data);
+        }
+    }
+);
+function toggleTestColumnSettings() { _testPanel.toggle(); }
+function closeTestColumnSettings() { _testPanel.close(); }
+function cancelTestColumnSettings() { _testPanel.cancel(); }
+function selectAllTestColumns() { _testPanel.selectAll(); }
+function deselectAllTestColumns() { _testPanel.deselectAll(); }
+function applyTestColumnSettings() { _testPanel.apply(); }
+function loadTestColumnSettings() { _testPanel.load(); }
+
+// ===== 缺陷模块 =====
+var _bugPanel = _genericColumnPanel('bug',
+    function() { return typeof bugVisibleColumns !== 'undefined' ? bugVisibleColumns : null; },
+    function() {
+        if (typeof renderBugsTable === 'function') {
+            var data = (typeof filteredBugsData !== 'undefined' && filteredBugsData && filteredBugsData.length) ? filteredBugsData
+                : (typeof allBugsData !== 'undefined' ? allBugsData : []);
+            renderBugsTable(data);
+        }
+    }
+);
+function toggleBugColumnSettings() { _bugPanel.toggle(); }
+function closeBugColumnSettings() { _bugPanel.close(); }
+function cancelBugColumnSettings() { _bugPanel.cancel(); }
+function selectAllBugColumns() { _bugPanel.selectAll(); }
+function deselectAllBugColumns() { _bugPanel.deselectAll(); }
+function applyBugColumnSettings() { _bugPanel.apply(); }
+function loadBugColumnSettings() { _bugPanel.load(); }
+
+// ===== 配置计划模块 =====
+var _planListPanel = _genericColumnPanel('planList',
+    function() { return typeof planListVisibleColumns !== 'undefined' ? planListVisibleColumns : null; },
+    function() { if (typeof renderPlanListTable === 'function') renderPlanListTable(); }
+);
+function togglePlanListColumnSettings() { _planListPanel.toggle(); }
+function closePlanListColumnSettings() { _planListPanel.close(); }
+function cancelPlanListColumnSettings() { _planListPanel.cancel(); }
+function selectAllPlanListColumns() { _planListPanel.selectAll(); }
+function deselectAllPlanListColumns() { _planListPanel.deselectAll(); }
+function applyPlanListColumnSettings() { _planListPanel.apply(); }
+function loadPlanListColumnSettings() { _planListPanel.load(); }
 
 // ==================== 通用表格列排序功能 ====================
 

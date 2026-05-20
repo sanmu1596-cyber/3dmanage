@@ -316,6 +316,8 @@ function renderMembersTable(data) {
             let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
+                // 跳过隐藏列
+                if (typeof memberVisibleColumns !== 'undefined' && !memberVisibleColumns[field]) return;
                 switch (field) {
                     case 'name':
                         rowHtml += `<td class="editable-cell" ondblclick="startMemberInlineEdit(this, ${member.id}, 'name', 'text')" title="双击编辑">${highlightSearch(member.name, 'members-table')}</td>`;

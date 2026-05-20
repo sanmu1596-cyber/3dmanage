@@ -192,17 +192,22 @@ document.addEventListener('keydown', function(e) {
         }
 
         // ESC 关闭字段设置面板
-        var gamePanel = document.getElementById('column-settings');
-        var devPanel = document.getElementById('device-column-settings');
-        if (gamePanel && gamePanel.style.display !== 'none') {
-            e.preventDefault();
-            if (typeof cancelColumnSettings === 'function') cancelColumnSettings();
-            return;
-        }
-        if (devPanel && devPanel.style.display !== 'none') {
-            e.preventDefault();
-            if (typeof cancelDeviceColumnSettings === 'function') cancelDeviceColumnSettings();
-            return;
+        var _allPanels = [
+            { id: 'column-settings', cancel: 'cancelColumnSettings' },
+            { id: 'device-column-settings', cancel: 'cancelDeviceColumnSettings' },
+            { id: 'member-column-settings', cancel: 'cancelMemberColumnSettings' },
+            { id: 'test-column-settings', cancel: 'cancelTestColumnSettings' },
+            { id: 'bug-column-settings', cancel: 'cancelBugColumnSettings' },
+            { id: 'planList-column-settings', cancel: 'cancelPlanListColumnSettings' }
+        ];
+        for (var _pi = 0; _pi < _allPanels.length; _pi++) {
+            var _p = document.getElementById(_allPanels[_pi].id);
+            if (_p && _p.style.display !== 'none') {
+                e.preventDefault();
+                var _fn = window[_allPanels[_pi].cancel];
+                if (typeof _fn === 'function') _fn();
+                return;
+            }
         }
     }
 
@@ -339,14 +344,23 @@ document.addEventListener('click', function(e) {
     if (!e.target.closest('.more-actions-wrapper')) {
         closeAllMoreActions();
     }
-    // 点击字段设置面板外部时关闭（游戏+设备）
-    var gamePanel = document.getElementById('column-settings');
-    var devPanel = document.getElementById('device-column-settings');
-    if (gamePanel && gamePanel.style.display !== 'none' && !e.target.closest('#column-settings') && !e.target.closest('.more-actions-dropdown')) {
-        if (typeof cancelColumnSettings === 'function') cancelColumnSettings();
-    }
-    if (devPanel && devPanel.style.display !== 'none' && !e.target.closest('#device-column-settings') && !e.target.closest('.more-actions-dropdown')) {
-        if (typeof cancelDeviceColumnSettings === 'function') cancelDeviceColumnSettings();
+    // 点击字段设置面板外部时关闭（游戏+设备+成员+测试+缺陷+配置计划）
+    var _panelDefs = [
+        { id: 'column-settings', cancel: 'cancelColumnSettings' },
+        { id: 'device-column-settings', cancel: 'cancelDeviceColumnSettings' },
+        { id: 'member-column-settings', cancel: 'cancelMemberColumnSettings' },
+        { id: 'test-column-settings', cancel: 'cancelTestColumnSettings' },
+        { id: 'bug-column-settings', cancel: 'cancelBugColumnSettings' },
+        { id: 'planList-column-settings', cancel: 'cancelPlanListColumnSettings' }
+    ];
+    for (var _i = 0; _i < _panelDefs.length; _i++) {
+        var _panel = document.getElementById(_panelDefs[_i].id);
+        if (_panel && _panel.style.display !== 'none'
+            && !e.target.closest('#' + _panelDefs[_i].id)
+            && !e.target.closest('.more-actions-dropdown')) {
+            var _fn = window[_panelDefs[_i].cancel];
+            if (typeof _fn === 'function') _fn();
+        }
     }
 });
 

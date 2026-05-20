@@ -290,6 +290,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTabs();
     loadColumnSettings(); // 加载游戏列显示设置
     loadDeviceColumnSettings(); // 加载设备列显示设置
+    if (typeof loadMemberColumnSettings === 'function') loadMemberColumnSettings();
+    if (typeof loadTestColumnSettings === 'function') loadTestColumnSettings();
+    if (typeof loadBugColumnSettings === 'function') loadBugColumnSettings();
+    if (typeof loadPlanListColumnSettings === 'function') loadPlanListColumnSettings();
     loadGameAccounts(); // 加载游戏账号数据
     // 首次加载：先加载全局基础数据（字段选项、成员），再由 initHashRouter 按需加载当前 tab
     await loadFieldOptions();
