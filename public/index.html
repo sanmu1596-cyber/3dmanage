@@ -131,6 +131,9 @@
                         <a class="sidebar-item" data-tab="my-tasks" onclick="switchTab('my-tasks')">
                             <span class="sidebar-icon">📌</span>我的任务
                         </a>
+                        <a class="sidebar-item" data-tab="reports" onclick="switchTab('reports')">
+                            <span class="sidebar-icon">📊</span>汇报报表
+                        </a>
                     </div>
                 </div>
                 <!-- 设置 -->
@@ -300,7 +303,6 @@
                                 </select>
                             </div>
                             <button class="tool-btn" onclick="resetFilters()">重置</button>
-                            <button id="reset-sort-btn" class="tool-btn" onclick="resetGamesSort()" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                         </div>
                     </div>
 
@@ -388,7 +390,6 @@
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
-                            <button id="reset-sort-members-btn" class="tool-btn" onclick="resetTableSort('members-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="members-search" class="filter-input" placeholder="搜索姓名/角色..." style="width:180px" oninput="filterModule('members')">
                             <select id="members-status-filter" class="compact-select" onchange="filterModule('members')">
@@ -403,11 +404,11 @@
                             <thead>
                                 <tr>
                                     <th width="50">序号</th>
-                                    <th data-field="name">姓名</th>
-                                    <th data-field="wechat_id">企业微信ID</th>
-                                    <th data-field="role">角色</th>
-                                    <th data-field="duty">职责</th>
-                                    <th data-field="status">状态</th>
+                                    <th>姓名</th>
+                                    <th>企业微信ID</th>
+                                    <th>角色</th>
+                                    <th>职责</th>
+                                    <th>状态</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -547,10 +548,11 @@
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
                                     <div class="dropdown-item" onclick="exportToPDF('设备列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
+                                    <div class="dropdown-item" onclick="toggleDeviceColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
+                                    <div class="dropdown-divider"></div>
                                     <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
-                            <button id="reset-sort-devices-btn" class="tool-btn" onclick="resetTableSort('devices-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
@@ -562,11 +564,36 @@
                             </select>
                         </div>
                     </div>
+                    <!-- 设备字段显示设置面板 -->
+                    <div id="device-column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="cancelDeviceColumnSettings()" title="取消">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllDeviceColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllDeviceColumns()">取消全选</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyDeviceColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>厂商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_type" checked><span>设备类型</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>设备名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirements" checked><span>设备需求</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quantity" checked><span>数量</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="keeper" checked><span>保管者</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_completion_rate" checked><span>适配完成率</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="total_bugs" checked><span>总BUG数</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="completed_adaptations" checked><span>适配完成数</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_games" checked><span>适配游戏数</span></label></div>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th width="50">序号</th>
+                                    <th width="40"></th>
                                     <th data-field="manufacturer">厂商</th>
                                     <th data-field="device_type">设备类型</th>
                                     <th data-field="name">设备名称</th>
@@ -666,7 +693,6 @@
                             <button class="tool-btn" onclick="exportToExcel('tests')"><span class="tool-icon">📤</span>导出</button>
                             <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
                             <button class="tool-btn" onclick="exportToPDF('测试列表')"><span class="tool-icon">📄</span>PDF</button>
-                            <button id="reset-sort-tests-btn" class="tool-btn" onclick="resetTableSort('tests-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="tests-search" class="filter-input" placeholder="搜索测试名称/游戏..." style="width:180px" oninput="filterModule('tests')">
                             <select id="tests-status-filter" class="compact-select" onchange="filterModule('tests')">
@@ -711,7 +737,6 @@
                             <button class="tool-btn" onclick="exportToExcel('bugs')"><span class="tool-icon">📤</span>导出</button>
                             <button class="tool-btn" onclick="printCurrentPage()"><span class="tool-icon">🖨</span>打印</button>
                             <button class="tool-btn" onclick="exportToPDF('缺陷列表')"><span class="tool-icon">📄</span>PDF</button>
-                            <button id="reset-sort-bugs-btn" class="tool-btn" onclick="resetTableSort('bugs-table')" style="display:none;" title="恢复初始顺序">↕ 重置排序</button>
                             <span class="toolbar-divider"></span>
                             <input type="text" id="bugs-search" class="filter-input" placeholder="搜索描述/设备/负责人..." style="width:180px" oninput="filterModule('bugs')">
                             <select id="bugs-status-filter" class="compact-select" onchange="filterModule('bugs')">
@@ -2151,6 +2176,51 @@
                     </div>
                 </section>
 
+                <!-- 汇报报表 -->
+                <section id="reports" class="tab-content">
+                    <style>
+                        .report-status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
+                        .adapting-badge { background:#e8f4fd; color:#0369a1; border:1px solid #bae6fd; }
+                        .bug-badge { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+                        .completed-badge { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+                        .report-text-edit { width:100%; border:1px dashed transparent; background:transparent; border-radius:4px; padding:4px 6px; font-size:13px; color:var(--text,#333); cursor:pointer; transition:all 0.2s; box-sizing:border-box; }
+                        .report-text-edit:hover,.report-text-edit:focus { border-color:var(--primary,#2563eb); outline:none; background:var(--card-bg,#fff); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+                        .report-text-edit::placeholder { color:#bbb; font-style:italic; }
+                    </style>
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <div style="position:relative;">
+                                <input type="text" id="report-search-input" placeholder="🔍 搜索游戏名称/状态/平台..." onkeyup="filterReports()">
+                            </div>
+                            <button class="tool-btn" onclick="resetReportFilters()" title="重置筛选">重置</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <span id="report-page-info" class="text-muted" style="font-size:12px;margin-right:8px;"></span>
+                            <button class="tool-btn" id="report-prev-page" onclick="reportPrevPage()" title="上一页">◀</button>
+                            <button class="tool-btn" id="report-next-page" onclick="reportNextPage()" title="下一页">▶</button>
+                            <button class="tool-btn tool-btn-primary" onclick="refreshReports()" title="刷新数据"><i class="fas fa-sync-alt"></i> 刷新</button>
+                            <button class="tool-btn" onclick="exportReport()" title="导出Excel" style="background:#28a745;color:#fff;"><i class="fas fa-file-excel"></i> 导出Excel</button>
+                            <span id="reports-updated" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="report-games-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">序号</th>
+                                    <th data-field="name">游戏名称</th>
+                                    <th data-field="status" width="100">适配状态</th>
+                                    <th data-field="platform" width="100">平台</th>
+                                    <th data-field="notes">备注</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-games-tbody">
+                                <tr><td colspan="5" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
             </main>
         </div>
     </div>
@@ -2903,6 +2973,7 @@
     <script src="js/testcases.js?v=20260508"></script>
     <script src="js/issues-versions.js?v=20260509"></script>
     <script src="js/social.js?v=20260508"></script>
+    <script src="js/reports.js?v=20260514"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
 </body>

@@ -6266,3 +6266,45 @@ mark.search-highlight {
     background: linear-gradient(120deg, #4a3800 0%, #6b5200 100%);
     color: #ffd666;
 }
+
+/* ==================== 行拖拽排序样式 ==================== */
+.drag-handle {
+    cursor: grab;
+    font-size: 16px;
+    letter-spacing: -2px;
+    color: #999;
+    user-select: none;
+    transition: color 0.15s;
+}
+.drag-handle:hover {
+    color: #1890ff;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.draggable-row.dragging {
+    opacity: 0.4;
+    background: #e6f7ff !important;
+}
+
+.row-drop-indicator {
+    position: absolute;
+    left: 0;
+    height: 3px;
+    background: #1890ff;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 1px 3px rgba(24, 144, 255, 0.4);
+}
+
+[data-theme="dark"] .drag-handle {
+    color: #666;
+}
+[data-theme="dark"] .drag-handle:hover {
+    color: #4dacff;
+}
+[data-theme="dark"] .draggable-row.dragging {
+    background: #1a2a3a !important;
+}

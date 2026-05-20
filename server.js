@@ -121,6 +121,18 @@ newModuleTables.forEach((sql, i) => {
   });
 });
 
+// 兼容旧库：确保 devices 表有 sort_order 列
+db.all("PRAGMA table_info(devices)", [], (err, columns) => {
+  if (err || !columns) return;
+  const hasSortOrder = columns.some(c => c.name === 'sort_order');
+  if (!hasSortOrder) {
+    db.run("ALTER TABLE devices ADD COLUMN sort_order INTEGER DEFAULT 0", (e) => {
+      if (e) console.error('  [启动] devices添加sort_order失败:', e.message);
+      else console.log('  [启动] devices表已添加sort_order列');
+    });
+  }
+});
+
 // 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
 function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
   const userName = (req && req.user) ? (req.user.real_name || req.user.username) : 'system';
@@ -272,7 +284,7 @@ devicesRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
   const sql = `SELECT d.*, u.real_name as assigned_to_name
                FROM devices d
                LEFT JOIN users u ON d.assigned_to = u.id
-               ORDER BY d.created_at DESC`;
+               ORDER BY d.sort_order ASC, d.id ASC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -294,8 +306,10 @@ devicesRouter.post('/', auth.checkPermission('devices', 'edit'),
           total_games, status, assigned_to } = req.body;
   const sql = `INSERT INTO devices (manufacturer, device_type, name, requirements, quantity,
                                    keeper, notes, adapter_completion_rate, total_bugs,
-                                   completed_adaptations, total_games, status, assigned_to)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                                   completed_adaptations, total_games, status, assigned_to,
+                                   sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM devices))`;
   db.run(sql, [manufacturer, device_type, name, requirements, quantity, keeper,
                notes, adapter_completion_rate, total_bugs, completed_adaptations,
                total_games, status, assigned_to], function(err) {
@@ -329,6 +343,42 @@ devicesRouter.put('/:id', auth.checkPermission('devices', 'edit'),
     }
     console.log('[PUT /devices/:id] 更新成功, ID:', req.params.id);
     res.json({ success: true });
+  });
+});
+
+// 设备行拖拽排序（必须在 /:id 路由之前）
+devicesRouter.patch('/reorder', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const { orders } = req.body;
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return res.status(400).json({ error: 'orders 必须是非空数组' });
+  }
+  const validIds = orders.filter(o => Number.isInteger(o.id) && Number.isInteger(o.sort_order));
+  if (validIds.length !== orders.length) {
+    return res.status(400).json({ error: '每项必须包含有效的 id 和 sort_order 整数' });
+  }
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+    const sql = 'UPDATE devices SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    let pending = validIds.length;
+    let hasError = false;
+    validIds.forEach(({ id, sort_order }) => {
+      if (hasError) return;
+      db.run(sql, [sort_order, id], (err) => {
+        if (err) { hasError = true; return; }
+        if (--pending === 0 && !hasError) {
+          db.run('COMMIT');
+          console.log('[PATCH /devices/reorder] 排序更新成功，共', validIds.length, '条');
+          res.json({ success: true, updated: validIds.length });
+        } else if (pending === 0 && hasError) {
+          db.run('ROLLBACK');
+          res.status(500).json({ error: '排序更新失败' });
+        }
+      });
+    });
+    if (validIds.length === 0) {
+      db.run('ROLLBACK');
+      res.status(400).json({ error: '无有效数据' });
+    }
   });
 });
 
@@ -2336,6 +2386,212 @@ app.use('/api/game-versions', gameVersionsRouter);
 app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
+
+// ==================== 汇报报表 API ====================
+const reportsRouter = express.Router();
+reportsRouter.use(auth.verifyToken);
+
+// 创建 report_overrides 表（用于存储手动修正值）
+db.run(`CREATE TABLE IF NOT EXISTS report_overrides (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_type TEXT NOT NULL,
+  entity_key TEXT NOT NULL,
+  field TEXT NOT NULL,
+  value TEXT,
+  updated_by INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(report_type, entity_key, field)
+)`);
+
+// 获取报表数据（一次性返回两个表全部数据）
+reportsRouter.get('/data', (req, res) => {
+  const result = { deviceSummary: [], gameStatus: { inProgress: [], hasBugs: [], completed: [] } };
+  let completed = 0;
+  const totalQueries = 4;
+
+  // Q1: 设备汇总 — 从 devices 表获取设备列表
+  db.all('SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations, online_games FROM devices ORDER BY id', (err, devices) => {
+    if (err) return res.status(500).json({ error: err.message });
+    result.devices = devices || [];
+
+    // 获取手动修正值
+    db.all("SELECT * FROM report_overrides WHERE report_type = 'device_summary'", (err2, overrides) => {
+      const overrideMap = {};
+      if (!err2 && overrides) overrides.forEach(o => { overrideMap[o.entity_key + '|' + o.field] = o.value; });
+
+      // Q1b: 统计每台设备关联的游戏数（通过 plan_games + plans.devices_json）
+      db.all(`
+        SELECT pg.game_name, pg.game_platform, p.devices_json, p.title as plan_title
+        FROM plan_games pg
+        JOIN plans p ON pg.plan_id = p.id
+        WHERE p.status = 'published'
+        ORDER BY p.id, pg.id
+      `, (err3, planGameRows) => {
+        // 按设备聚合游戏
+        const deviceGameMap = {}; // { deviceName: { total, wegame, steam } }
+        devices.forEach(d => { deviceGameMap[d.name] = { total: 0, wegame: 0, steam: 0 }; });
+
+        if (planGameRows) {
+          planGameRows.forEach(row => {
+            try {
+              const devList = typeof row.devices_json === 'string' ? JSON.parse(row.devices_json || '[]') : (row.devices_json || []);
+              devList.forEach(dev => {
+                const dName = dev.name || '';
+                if (deviceGameMap[dName]) {
+                  deviceGameMap[dName].total++;
+                  if ((row.game_platform || '').toUpperCase() === 'WEGAME' || (row.game_platform || '').includes('WeGame')) {
+                    deviceGameMap[dName].wegoame++;
+                  } else if ((row.game_platform || '').toUpperCase() === 'STEAM' || (row.game_platform || '').includes('Steam')) {
+                    deviceGameMap[dName].steam++;
+                  }
+                }
+              });
+            } catch(e) {}
+          });
+        }
+
+        // 如果 plan_games 没有关联数据，用 games 全局分布按设备均分作为兜底
+        const hasAnyData = Object.values(deviceGameMap).some(v => v.total > 0);
+
+        // 构建设备汇总行
+        result.deviceSummary = devices.map(d => {
+          const keyPrefix = d.name;
+          const autoData = hasAnyData ? deviceGameMap[d.name] || { total:0, wegame:0, steam:0 } : null;
+          const totalCount = overrideMap[keyPrefix + '|totalCount']
+            ? parseInt(overrideMap[keyPrefix + '|totalCount'])
+            : (autoData ? autoData.total : (parseInt(d.completed_adaptations) || 0));
+          const wegameCount = overrideMap[keyPrefix + '|wegoameCount']
+            ? parseInt(overrideMap[keyPrefix + '|wegoameCount'])
+            : (autoData ? autoData.wegoame : 0);
+          const steamCount = overrideMap[keyPrefix + '|steamCount']
+            ? parseInt(overrideMap[keyPrefix + '|steamCount'])
+            : (autoData ? autoData.steam : 0);
+          const weeklyNote = overrideMap[keyPrefix + '|weeklyNote'] || '';
+
+          return {
+            id: d.id,
+            name: d.name,
+            type: d.device_type === 'Laptop' ? '笔记本' :
+                 d.device_type.includes('显示器') ? '显示器' :
+                 d.device_type.includes('带交织') ? '显示器' :
+                 d.device_type === '笔电' ? '笔记本' : (d.device_type || '-'),
+            totalCount: totalCount || 0,
+            wegameCount: wegameCount || 0,
+            steamCount: steamCount || 0,
+            weeklyNote: weeklyNote,
+            autoTotal: autoData ? autoData.total : (parseInt(d.completed_adaptations) || 0)
+          };
+        });
+
+        completed++;
+        if (completed >= totalQueries - 1) finishQuery4();
+
+        // Q2: 游戏状态 — 适配中
+        db.all(`
+          SELECT g.id, g.name, g.platform,
+                 COALESCE(g.adaptation_notes,
+                   (SELECT pg.remark FROM plan_games pg WHERE pg.game_id = g.id
+                     AND pg.adapt_status IN ('adapting','in_progress') LIMIT 1), '') as notes
+          FROM games g
+          WHERE g.adaptation_status IN ('adapting', 'in_progress', 'testing')
+             OR g.id IN (SELECT game_id FROM plan_games WHERE adapt_status IN ('adapting', 'in_progress'))
+             OR g.online_status IN ('in_progress', 'adapting')
+          ORDER BY g.name
+        `, (err4, inProgressGames) => {
+          result.gameStatus.inProgress = (inProgressGames || []).map(g => ({
+            name: g.name, notes: g.notes || '', platform: g.platform || ''
+          }));
+          completed++;
+          if (completed >= totalQueries - 1) finishQuery4();
+        });
+
+        // Q3: 游戏状态 — 已适配有BUG
+        db.all(`
+          SELECT DISTINCT g.id, g.name,
+                 COALESCE(b.description, '') as bugNotes,
+                 b.bug_status, b.priority, b.device_name
+          FROM games g
+          LEFT JOIN bugs b ON g.name LIKE ('%' || b.game_name || '%') OR b.game_name LIKE ('%' || g.name || '%')
+          WHERE b.id IS NOT NULL AND b.bug_status NOT IN ('fixed', 'closed', '已验证')
+          ORDER BY g.name
+        `, (err5, bugGames) => {
+          const seen = new Set();
+          result.gameStatus.hasBugs = (bugGames || [])
+            .filter(g => { if (seen.has(g.name)) return false; seen.add(g.name); return true; })
+            .map(g => ({
+              name: g.name,
+              bugNotes: `优先级:${g.priority||'-'} | ${g.bugNotes}${g.device_name?' | '+g.device_name:''}`,
+              deviceName: g.device_name || ''
+            }));
+          completed++;
+          if (completed >= totalQueries - 1) finishQuery4();
+        });
+
+        // Q4: 游戏状态 — 已适配完成
+        function finishQuery4() {
+          db.all(`
+            SELECT g.id, g.name, g.platform, g.quality, g.online_status,
+                   COALESCE(g.adaptation_notes,
+                     (SELECT pg.remark FROM plan_games pg WHERE pg.game_id = g.id
+                       AND pg.adapt_status = 'finished' LIMIT 1), '') as notes
+            FROM games g
+            WHERE g.online_status = 'online'
+               OR g.id IN (SELECT game_id FROM plan_games WHERE adapt_status = 'finished')
+               OR g.adaptation_status = 'completed'
+            ORDER BY g.name
+          `, (err6, doneGames) => {
+            result.gameStatus.completed = (doneGames || []).map(g => ({
+              name: g.name, quality: g.quality || '', notes: g.notes || ''
+            }));
+
+            // 获取游戏状态的手动修正
+            db.all("SELECT * FROM report_overrides WHERE report_type = 'game_status'", (err7, go) => {
+              const gOverrideMap = {};
+              if (!err7 && go) go.forEach(o => { gOverrideMap[o.entity_key + '|' + o.field] = o.value; });
+
+              // 应用修正到 gameStatus
+              ['inProgress','hasBugs','completed'].forEach(section => {
+                result.gameStatus[section].forEach(item => {
+                  for (const [k,v] of Object.entries(gOverrideMap)) {
+                    const [ek, f] = k.split('|');
+                    if (ek === item.name && f) item[f] = v;
+                  }
+                });
+              });
+
+              result.lastUpdated = new Date().toISOString();
+              res.json({ success: true, data: result });
+            });
+          });
+        }
+        // 启动Q4
+        finishQuery4();
+      });
+    });
+  });
+});
+
+// 保存手动修正值
+reportsRouter.post('/overrides', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { report_type, entity_key, field, value } = req.body;
+  if (!report_type || !entity_key || !field) {
+    return res.status(400).json({ error: '缺少必要字段: report_type, entity_key, field' });
+  }
+  db.run(
+    `INSERT INTO report_overrides (report_type, entity_key, field, value, updated_by, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(report_type, entity_key, field) DO UPDATE SET value=excluded.value, updated_by=excluded.updated_by, updated_at=datetime('now')`,
+    [report_type, entity_key, field, value, req.user?.id || null],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logActivity('update', 'report_override', this.lastID, `修正${report_type}/${entity_key}/${field}`);
+      res.json({ success: true, id: this.lastID });
+    }
+  );
+});
+
+app.use('/api/reports', reportsRouter);
 
 // [P0] 挂载增强功能：需求指派/关联计划 + 评论CRUD + 管理者看板 + 工作流引擎
 require('./p0_routes').mountP0Routes(app);

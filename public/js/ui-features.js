@@ -190,6 +190,20 @@ document.addEventListener('keydown', function(e) {
             if (closeBtn) closeBtn.click();
             return;
         }
+
+        // ESC 关闭字段设置面板
+        var gamePanel = document.getElementById('column-settings');
+        var devPanel = document.getElementById('device-column-settings');
+        if (gamePanel && gamePanel.style.display !== 'none') {
+            e.preventDefault();
+            if (typeof cancelColumnSettings === 'function') cancelColumnSettings();
+            return;
+        }
+        if (devPanel && devPanel.style.display !== 'none') {
+            e.preventDefault();
+            if (typeof cancelDeviceColumnSettings === 'function') cancelDeviceColumnSettings();
+            return;
+        }
     }
 
     // 以下快捷键仅在非输入状态生效
@@ -320,10 +334,19 @@ function batchDeletePrompt(moduleName) {
     batchDelete();
 }
 
-// 点击页面其他区域时关闭下拉菜单
+// 点击页面其他区域时关闭下拉菜单和字段设置面板
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.more-actions-wrapper')) {
         closeAllMoreActions();
+    }
+    // 点击字段设置面板外部时关闭（游戏+设备）
+    var gamePanel = document.getElementById('column-settings');
+    var devPanel = document.getElementById('device-column-settings');
+    if (gamePanel && gamePanel.style.display !== 'none' && !e.target.closest('#column-settings') && !e.target.closest('.more-actions-dropdown')) {
+        if (typeof cancelColumnSettings === 'function') cancelColumnSettings();
+    }
+    if (devPanel && devPanel.style.display !== 'none' && !e.target.closest('#device-column-settings') && !e.target.closest('.more-actions-dropdown')) {
+        if (typeof cancelDeviceColumnSettings === 'function') cancelDeviceColumnSettings();
     }
 });
 
@@ -486,7 +509,12 @@ function injectBatchCheckboxes(tableId) {
     
     // 如果已有 checkbox 列头，不重复添加
     if (theadRow.querySelector('.batch-th')) return;
-    
+
+    // 清除旧行级 checkbox（防止 MutationObserver 重复触发导致多注入）
+    table.querySelectorAll('td > input.row-checkbox').forEach(cb => {
+        cb.closest('td').remove();
+    });
+
     // 在序号列之前添加 checkbox 表头
     const th = document.createElement('th');
     th.className = 'batch-th';

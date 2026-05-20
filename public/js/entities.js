@@ -96,6 +96,12 @@ registerColumnConfig('bugs-table',
     'bugsColumnOrder'
 );
 
+// 报表游戏状态表列顺序
+registerColumnConfig('report-games-table',
+    ['name', 'status', 'platform', 'notes'],
+    'reportGamesColumnOrder'
+);
+
 // ==================== 设备行内编辑 ====================
 
 // P1.1: 行内编辑焦点管理 - 记录当前编辑的td
@@ -945,6 +951,15 @@ const exportConfigs = {
             { key: 'steps', label: '复现步骤' }, { key: 'planned_fix_time', label: '计划修复' },
             { key: 'actual_fix_time', label: '实际修复' }
         ]
+    },
+    reports: {
+        sheetName: '游戏适配状态详情',
+        getData: () => typeof allReportGameData !== 'undefined' ? allReportGameData : [],
+        columns: [
+            { key: 'name', label: '游戏名称' }, { key: 'statusLabel', label: '适配状态' },
+            { key: 'platform', label: '平台' }, { key: 'notes', label: '备注' }
+        ],
+        customExport: typeof exportReport === 'function' ? exportReport : null
     }
 };
 
@@ -2325,6 +2340,28 @@ function updateColumnHeaders(tableId) {
             headerRow.appendChild(header);
         }
     });
+
+    // 同步表头可见性（根据各表的 visibleColumns 隐藏对应 th）
+    // 注意：visibleColumns/deviceVisibleColumns 在 core.js 中用 let 声明，不挂 window，需直接访问
+    const visibilityMap = {
+        'games-table': () => typeof visibleColumns !== 'undefined' ? visibleColumns : null,
+        'devices-table': () => typeof deviceVisibleColumns !== 'undefined' ? deviceVisibleColumns : null,
+        'members-table': () => null,
+        'tests-table': () => null,
+        'bugs-table': () => null
+    };
+    const getVisibility = visibilityMap[tableId];
+    if (typeof getVisibility === 'function') {
+        const visConfig = getVisibility();
+        if (visConfig) {
+            sortedHeaders.forEach(th => {
+                const field = th.dataset.field;
+                if (field && field in visConfig) {
+                    th.style.display = visConfig[field] ? '' : 'none';
+                }
+            });
+        }
+    }
 }
 
 // 切换字段显示设置面板
@@ -2401,6 +2438,85 @@ function loadColumnSettings() {
             console.error('加载列显示设置失败:', error);
         }
     }
+}
+
+// ==================== 设备列显示设置（对标游戏列表）====================
+
+/** 切换设备字段设置面板 */
+function toggleDeviceColumnSettings() {
+    var panel = document.getElementById('device-column-settings');
+    if (!panel) return;
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        panel._snapshot = JSON.stringify(window.deviceVisibleColumns || {});
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+/** 关闭设备字段设置面板 */
+function closeDeviceColumnSettings() {
+    var panel = document.getElementById('device-column-settings');
+    if (panel) panel.style.display = 'none';
+}
+
+/** 取消设备字段设置修改，恢复快照 */
+function cancelDeviceColumnSettings() {
+    var panel = document.getElementById('device-column-settings');
+    if (panel && panel._snapshot) {
+        try {
+            window.deviceVisibleColumns = JSON.parse(panel._snapshot);
+            var checkboxes = panel.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(function(cb) { cb.checked = window.deviceVisibleColumns[cb.value] || false; });
+        } catch (e) { console.warn('恢复快照失败:', e); }
+    }
+    closeDeviceColumnSettings();
+}
+
+/** 设备列表全选列 */
+function selectAllDeviceColumns() {
+    var checkboxes = document.querySelectorAll('#device-column-settings input[type="checkbox"]');
+    checkboxes.forEach(function(cb) { cb.checked = true; });
+}
+
+/** 设备列表取消全选列 */
+function deselectAllDeviceColumns() {
+    var checkboxes = document.querySelectorAll('#device-column-settings input[type="checkbox"]');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+}
+
+/** 应用设备列显示设置 */
+function applyDeviceColumnSettings() {
+    var panel = document.getElementById('device-column-settings');
+    var checkboxes = panel.querySelectorAll('#device-column-settings input[type="checkbox"]');
+    checkboxes.forEach(function(checkbox) {
+        var field = checkbox.value;
+        if (window.deviceVisibleColumns && field in window.deviceVisibleColumns) {
+            window.deviceVisibleColumns[field] = checkbox.checked;
+        }
+    });
+    try {
+        localStorage.setItem('deviceVisibleColumns', JSON.stringify(window.deviceVisibleColumns));
+    } catch (e) { console.warn('保存设备列设置失败:', e); }
+    renderDevicesTable(filteredDevicesData || allDevicesData);
+    closeDeviceColumnSettings();
+}
+
+/** 从localStorage加载设备列设置（页面加载时调用） */
+function loadDeviceColumnSettings() {
+    try {
+        var saved = localStorage.getItem('deviceVisibleColumns');
+        if (saved && window.deviceVisibleColumns) {
+            var parsed = JSON.parse(saved);
+            for (var key in parsed) {
+                if (key in window.deviceVisibleColumns) {
+                    window.deviceVisibleColumns[key] = parsed[key];
+                }
+            }
+            var checkboxes = document.querySelectorAll('#device-column-settings input[type="checkbox"]');
+            checkboxes.forEach(function(cb) { cb.checked = window.deviceVisibleColumns[cb.value] || false; });
+        }
+    } catch (e) { console.error('加载设备列设置失败:', e); }
 }
 
 // ==================== 通用表格列排序功能 ====================
@@ -2509,7 +2625,8 @@ function applyTableSort(tableId) {
         'members-table': { data: () => window.filteredMembersData || window.allMembersData || [], render: () => { if(typeof renderMembersTable === 'function' && window.allMembersData) renderMembersTable(window.allMembersData); }, page: () => {} },
         'devices-table': { data: () => window.filteredDevicesData || window.allDevicesData || [], render: () => { if(typeof renderDevicesTable === 'function' && window.allDevicesData) renderDevicesTable(window.allDevicesData); }, page: () => {} },
         'tests-table': { data: () => window.filteredTestsData || window.allTestsData || [], render: () => { if(typeof renderTestsTable === 'function') renderTestsTable(filteredTestsData || allTestsData || []); }, page: () => {} },
-        'bugs-table': { data: () => window.filteredBugsData || window.allBugsData || [], render: () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }, page: () => {} }
+        'bugs-table': { data: () => window.filteredBugsData || window.allBugsData || [], render: () => { if(typeof renderBugsTable === 'function') renderBugsTable(filteredBugsData || allBugsData || []); }, page: () => {} },
+        'report-games-table': { data: () => filteredReportGameData, render: () => renderReportTable(), page: () => { reportCurrentPage = 1; } }
     };
 
     const cfg = tableConfigs[tableId];
@@ -2824,13 +2941,14 @@ function initHeaderDrag(tableId) {
 
         saveColumnOrderForTable(tableId);
 
-        // 根据tableId调用对应的重渲染函数
+        // 根据tableId调用对应的重渲染函数（注意：核心数据用let声明，不挂window，需直接访问）
         const renderFns = {
             'games-table': () => renderGamesPage(),
-            'members-table': typeof renderMembersTable === 'function' ? () => { if(window.allMembersData) renderMembersTable(allMembersData); } : null,
-            'devices-table': typeof renderDevicesTable === 'function' ? () => { if(window.allDevicesData) renderDevicesTable(allDevicesData); } : null,
-            'tests-table': typeof renderTestsTable === 'function' ? () => { if(window.filteredTestsData || window.allTestsData) renderTestsTable(filteredTestsData || allTestsData); } : null,
-            'bugs-table': typeof renderBugsTable === 'function' ? () => { if(window.filteredBugsData || window.allBugsData) renderBugsTable(filteredBugsData || allBugsData); } : null
+            'members-table': typeof renderMembersTable === 'function' ? () => { if(typeof allMembersData !== 'undefined') renderMembersTable(allMembersData); } : null,
+            'devices-table': typeof renderDevicesTable === 'function' ? () => { if(typeof allDevicesData !== 'undefined') renderDevicesTable(typeof filteredDevicesData !== 'undefined' && filteredDevicesData ? filteredDevicesData : allDevicesData); } : null,
+            'tests-table': typeof renderTestsTable === 'function' ? () => { if(typeof allTestsData !== 'undefined') renderTestsTable(typeof filteredTestsData !== 'undefined' && filteredTestsData ? filteredTestsData : allTestsData); } : null,
+            'bugs-table': typeof renderBugsTable === 'function' ? () => { if(typeof allBugsData !== 'undefined') renderBugsTable(typeof filteredBugsData !== 'undefined' && filteredBugsData ? filteredBugsData : allBugsData); } : null,
+            'report-games-table': typeof renderReportTable === 'function' ? () => renderReportTable() : null
         };
         const renderFn = renderFns[tableId];
         if (renderFn) renderFn();

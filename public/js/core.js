@@ -144,6 +144,21 @@ let visibleColumns = {
     game_engine: true
 };
 
+// 设备列表显示列配置（var 声明确保挂载到 window）
+var deviceVisibleColumns = {
+    manufacturer: true,
+    device_type: true,
+    name: true,
+    requirements: true,
+    quantity: true,
+    keeper: true,
+    notes: true,
+    adapter_completion_rate: true,
+    total_bugs: true,
+    completed_adaptations: true,
+    online_games: true
+};
+
 // 适配进展状态
 let allDevicesData = [];
 let allGamesForProgress = [];

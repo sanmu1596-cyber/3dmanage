@@ -245,6 +245,9 @@ async function _doLoadTabData(tabId, switchId) {
             await loadVersions();
             await loadClientIssues();
             break;
+        case 'reports':
+            loadReports();
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -422,27 +425,44 @@ async function loadDevices() {
     }
 }
 
-// P0: 渲染设备表格（支持筛选后的子集）
+// P0: 渲染设备表格（支持列隐藏/显示、行拖拽排序、筛选后的子集）
 function renderDevicesTable(data) {
     const tbody = document.getElementById('devices-table');
 
     // 更新表头列顺序
     if (typeof updateColumnHeaders === 'function') updateColumnHeaders('devices-table');
-    // 初始化拖拽排序
+    // 初始化表头列拖拽排序
     if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('devices-table');
 
+    // 设备表默认列顺序（与表头th的data-field一一对应）
+    const defaultDeviceColOrder = ['manufacturer', 'device_type', 'name', 'requirements',
+        'quantity', 'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
+        'completed_adaptations', 'online_games'];
+
     if (data && data.length > 0) {
-        const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('devices-table') :
-            ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
-             'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
-             'completed_adaptations', 'online_games'];
+        const colOrder = typeof getColumnOrder === 'function'
+            ? getColumnOrder('devices-table') : [...defaultDeviceColOrder];
+
+        // 计算可见列数量（用于空状态colspan）
+        let visibleCount = 1; // 拖拽手柄列始终可见
+        colOrder.forEach(field => {
+            if (window.deviceVisibleColumns && !window.deviceVisibleColumns[field]) return;
+            visibleCount++;
+        });
+        visibleCount += 1; // 操作列
+        tbody.setAttribute('data-visible-cols', visibleCount);
 
         tbody.innerHTML = data.map((device, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // 第一列：拖拽手柄（替代序号）
+            let rowHtml = `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
 
+            // 动态渲染各列（支持隐藏）
             colOrder.forEach(field => {
+                // 跳过隐藏列
+                if (window.deviceVisibleColumns && !window.deviceVisibleColumns[field]) return;
+
                 switch (field) {
                     case 'manufacturer':
                         rowHtml += `<td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
@@ -472,7 +492,7 @@ function renderDevicesTable(data) {
                         rowHtml += `<td>${escapeHtml(device.total_bugs || 0)}</td>`;
                         break;
                     case 'completed_adaptations':
-                        rowHtml += `<td>${escapeHtml(device.completed_adaptations || 0)}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(device.completed_adaptations || 0)}</td>`;
                         break;
                     case 'online_games':
                         rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
@@ -480,22 +500,29 @@ function renderDevicesTable(data) {
                 }
             });
 
+            // 操作列
             rowHtml += `
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
                     <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
                 </td>
             `;
-            return `<tr class="clickable" data-id="${device.id}">${rowHtml}</tr>`;
+            // draggable-row 类启用行拖拽
+            return `<tr class="clickable draggable-row" data-id="${device.id}" draggable="true">${rowHtml}</tr>`;
         }).join('');
 
         // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
 
+        applyCellTooltips && applyCellTooltips('devices-table');
+        // 初始化行拖拽排序
+        if (typeof initRowDrag === 'function') initRowDrag('devices-table', data);
         updateDevicesPagination(data.length);
     } else {
+        // 计算colspan（总列数 = 手柄 + 所有数据列 + 操作列）
+        const totalCols = (typeof getColumnOrder === 'function' ? getColumnOrder('devices-table').length : defaultDeviceColOrder.length) + 2;
         tbody.innerHTML = `
             <tr>
-                <td colspan="14" class="empty-state">
+                <td colspan="${totalCols}" class="empty-state">
                     <div class="empty-icon">📱</div>
                     <div class="empty-text">还没有测试设备</div>
                     <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
@@ -509,6 +536,124 @@ function renderDevicesTable(data) {
         const pgDiv = document.getElementById('devices-pagination');
         if (pgDiv) pgDiv.style.display = 'none';
     }
+}
+
+// ==================== 设备表行拖拽排序 ====================
+// 全局变量：拖拽中的行引用
+let _dragSrcRow = null;
+
+/**
+ * 初始化设备表的行拖拽排序
+ * @param {string} tableId - 表格ID ('devices-table')
+ * @param {Array} data - 当前显示的设备数据（用于保存排序）
+ */
+function initRowDrag(tableId, data) {
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('.draggable-row');
+    rows.forEach(row => {
+        row.addEventListener('dragstart', function(e) {
+            _dragSrcRow = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.id);
+            // 延迟设置透明度，避免拖拽图标变透明
+            setTimeout(() => this.style.opacity = '0.4', 0);
+        });
+        row.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            this.style.opacity = '';
+            _dragSrcRow = null;
+            removeRowDropIndicator();
+            // 拖拽结束后保存新顺序到后端
+            saveDeviceRowOrder(tableId);
+        });
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (_dragSrcRow && _dragSrcRow !== this) {
+                const rect = this.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                showRowDropIndicator(this, e.clientY < midY ? 'before' : 'after');
+            }
+        });
+        row.addEventListener('dragleave', function() {
+            removeRowDropIndicator();
+        });
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            removeRowDropIndicator();
+            if (_dragSrcRow && _dragSrcRow !== this) {
+                const rect = this.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                if (e.clientY < midY) {
+                    this.parentNode.insertBefore(_dragSrcRow, this);
+                } else {
+                    this.parentNode.insertBefore(_dragSrcRow, this.nextSibling);
+                }
+            }
+        });
+    });
+}
+
+/**
+ * 在目标行旁边显示蓝色放置指示线
+ */
+function showRowDropIndicator(targetRow, position) {
+    removeRowDropIndicator();
+    const indicator = document.createElement('div');
+    indicator.className = 'row-drop-indicator';
+    indicator.style.width = targetRow.offsetWidth + 'px';
+    indicator.style.left = targetRow.offsetLeft + 'px';
+    if (position === 'before') {
+        indicator.style.top = targetRow.offsetTop + 'px';
+    } else {
+        indicator.style.top = (targetRow.offsetTop + targetRow.offsetHeight) + 'px';
+    }
+    targetRow.parentNode.parentNode.style.position = 'relative';
+    targetRow.parentNode.parentNode.appendChild(indicator);
+}
+
+/** 移除放置指示线 */
+function removeRowDropIndicator() {
+    const existing = document.querySelector('.row-drop-indicator');
+    if (existing) existing.remove();
+}
+
+/**
+ * 将当前DOM行顺序保存到后端
+ * 遍历表格中所有 draggable-row，按当前DOM顺序分配 sort_order 并批量提交
+ */
+function saveDeviceRowOrder(tableId) {
+    var tbody = document.getElementById(tableId);
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll('.draggable-row');
+    var orders = [];
+    rows.forEach(function(row, index) {
+        var id = parseInt(row.dataset.id);
+        if (!isNaN(id)) {
+            orders.push({ id: id, sort_order: index });
+        }
+    });
+    if (orders.length === 0) return;
+    fetch('/api/devices/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: orders })
+    }).then(function(res) {
+        if (!res.ok) {
+            return res.json().then(function(d) {
+                throw new Error(d.error || '排序保存失败(' + res.status + ')');
+            });
+        }
+        return res.json();
+    }).then(function(result) {
+        console.log('[设备行拖拽] 排序已保存，共', result.updated || orders.length, '条');
+    }).catch(function(err) {
+        console.error('[设备行拖拽] 保存失败:', err.message);
+        showToast('排序保存失败: ' + err.message, 'error');
+    });
 }
 
 // P1.7: 更新设备表分页增强控件
@@ -578,7 +723,8 @@ const BREADCRUMB_MAP = {
     'game-versions':{label:'游戏版本', icon: '🎯', parent: 'games' },
     'interlace-issues':{label:'交错问题', icon: '🔀', parent: 'games' },
     'interlace-versions':{label:'交错版本', icon: '🔀', parent: 'devices' },
-    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' }
+    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' },
+    'reports':    { label: '汇报报表', icon: '📊', parent: null }
 };
 
 function updateBreadcrumb(tabId) {
