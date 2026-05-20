@@ -288,7 +288,8 @@ async function logout() {
 document.addEventListener('DOMContentLoaded', async () => {
     await checkLoginStatus(); // 必须先确认登录状态和 DEV_MODE
     initTabs();
-    loadColumnSettings(); // 加载列显示设置
+    loadColumnSettings(); // 加载列显示设置（游戏）
+    if (typeof loadDeviceColumnSettings === 'function') loadDeviceColumnSettings(); // 加载设备列显示设置
     loadGameAccounts(); // 加载游戏账号数据
     // 首次加载：先加载全局基础数据（字段选项、成员），再由 initHashRouter 按需加载当前 tab
     await loadFieldOptions();

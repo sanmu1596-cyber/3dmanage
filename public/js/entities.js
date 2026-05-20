@@ -82,6 +82,13 @@ registerColumnConfig('devices-table',
     'devicesColumnOrder'
 );
 
+// 设备模块可见列配置
+var deviceVisibleColumns = {
+    manufacturer: true, device_type: true, name: true, requirements: true,
+    quantity: true, keeper: true, notes: true, adapter_completion_rate: true,
+    total_bugs: true, completed_adaptations: true, online_games: true
+};
+
 // 测试模块列顺序
 registerColumnConfig('tests-table',
     ['name', 'game_name', 'device_name', 'tester_name', 'test_date',
@@ -2439,6 +2446,63 @@ function loadColumnSettings() {
         } catch (error) {
             console.error('加载列显示设置失败:', error);
         }
+    }
+}
+
+// ==================== 设备字段设置面板 ====================
+
+function toggleDeviceColumnSettings() {
+    const panel = document.getElementById('device-column-settings');
+    if (panel.style.display === 'none' || !panel.style.display) {
+        panel._snapshot = JSON.parse(JSON.stringify(deviceVisibleColumns));
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function closeDeviceColumnSettings() {
+    const panel = document.getElementById('device-column-settings');
+    panel.style.display = 'none';
+}
+
+function cancelDeviceColumnSettings() {
+    const panel = document.getElementById('device-column-settings');
+    if (panel._snapshot) {
+        Object.assign(deviceVisibleColumns, panel._snapshot);
+        const checkboxes = document.querySelectorAll('#device-column-settings input[type="checkbox"]');
+        checkboxes.forEach(checkbox => { checkbox.checked = deviceVisibleColumns[checkbox.value] || false; });
+    }
+    panel.style.display = 'none';
+}
+
+function selectAllDeviceColumns() {
+    document.querySelectorAll('#device-column-settings input[type="checkbox"]').forEach(cb => cb.checked = true);
+}
+
+function deselectAllDeviceColumns() {
+    document.querySelectorAll('#device-column-settings input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+
+function applyDeviceColumnSettings() {
+    const checkboxes = document.querySelectorAll('#device-column-settings input[type="checkbox"]');
+    checkboxes.forEach(checkbox => { deviceVisibleColumns[checkbox.value] = checkbox.checked; });
+    try { localStorage.setItem('deviceVisibleColumns', JSON.stringify(deviceVisibleColumns)); } catch (e) {}
+    // 重渲染设备表
+    if (typeof renderDevicesTable === 'function' && window.allDevicesData) renderDevicesTable(allDevicesData);
+    document.getElementById('device-column-settings').style.display = 'none';
+}
+
+function loadDeviceColumnSettings() {
+    const saved = localStorage.getItem('deviceVisibleColumns');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            for (const key in parsed) { if (key in deviceVisibleColumns) deviceVisibleColumns[key] = parsed[key]; }
+            document.querySelectorAll('#device-column-settings input[type="checkbox"]').forEach(cb => {
+                cb.checked = deviceVisibleColumns[cb.value] || false;
+            });
+        } catch (e) {}
     }
 }
 

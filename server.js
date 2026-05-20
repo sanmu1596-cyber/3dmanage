@@ -273,7 +273,7 @@ devicesRouter.get('/', auth.checkPermission('devices', 'view'), (req, res) => {
   const sql = `SELECT d.*, u.real_name as assigned_to_name
                FROM devices d
                LEFT JOIN users u ON d.assigned_to = u.id
-               ORDER BY d.created_at DESC`;
+               ORDER BY d.sort_order ASC, d.id ASC`;
   db.all(sql, [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -295,8 +295,8 @@ devicesRouter.post('/', auth.checkPermission('devices', 'edit'),
           total_games, status, assigned_to } = req.body;
   const sql = `INSERT INTO devices (manufacturer, device_type, name, requirements, quantity,
                                    keeper, notes, adapter_completion_rate, total_bugs,
-                                   completed_adaptations, total_games, status, assigned_to)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                                   completed_adaptations, total_games, status, assigned_to, sort_order)
+               SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), 0) + 1 FROM devices`;
   db.run(sql, [manufacturer, device_type, name, requirements, quantity, keeper,
                notes, adapter_completion_rate, total_bugs, completed_adaptations,
                total_games, status, assigned_to], function(err) {
@@ -353,6 +353,31 @@ devicesRouter.patch('/:id', auth.checkPermission('devices', 'edit'), (req, res) 
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
+});
+
+// 批量更新排序（行拖拽用）
+devicesRouter.patch('/reorder', auth.checkPermission('devices', 'edit'), (req, res) => {
+  const { orders } = req.body;
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return res.status(400).json({ error: 'orders 必须是非空数组' });
+  }
+  // 校验每项格式
+  for (const item of orders) {
+    if (!item.id || typeof item.sort_order !== 'number') {
+      return res.status(400).json({ error: 'orders 每项需包含 id 和 sort_order(数字)' });
+    }
+  }
+  // 批量 UPDATE
+  const stmt = db.prepare('UPDATE devices SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  let success = 0, fail = 0;
+  for (const item of orders) {
+    try {
+      stmt.run(item.sort_order, item.id);
+      success++;
+    } catch (e) { fail++; }
+  }
+  stmt.finalize();
+  res.json({ success: true, updated: success, failed: fail });
 });
 
 devicesRouter.delete('/:id', auth.checkPermission('devices', 'delete'), (req, res) => {
@@ -2709,6 +2734,16 @@ app.post('/api/db-backup', auth.checkPermission('games', 'edit'), (req, res) => 
 });
 
 // 启动服务器 (监听所有网络接口，支持外网访问)
+
+// 确保设备表有 sort_order 字段（兼容旧库）
+db pragma(`PRAGMA table_info(devices)`, [], (err, rows) => {
+    if (!err && rows && !rows.some(r => r.name === 'sort_order')) {
+        db.run(`ALTER TABLE devices ADD COLUMN sort_order INTEGER DEFAULT 0`);
+        db.run(`UPDATE devices SET sort_order = id`, (e) => {
+            if (!e) console.log('[迁移] devices.sort_order 字段已添加并初始化');
+        });
+    }
+});
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`服务器运行在 http://${HOST}:${PORT}`);

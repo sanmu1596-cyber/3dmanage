@@ -325,11 +325,17 @@ document.addEventListener('click', function(e) {
     if (!e.target.closest('.more-actions-wrapper')) {
         closeAllMoreActions();
     }
-    // 点击字段设置面板外部时收起面板
+    // 点击字段设置面板外部时收起面板（游戏）
     const columnPanel = document.getElementById('column-settings');
     if (columnPanel && columnPanel.style.display !== 'none' &&
         !e.target.closest('#column-settings') && !e.target.closest('.more-actions-wrapper')) {
         closeColumnSettings();
+    }
+    // 点击设备字段设置面板外部时收起
+    const deviceColumnPanel = document.getElementById('device-column-settings');
+    if (deviceColumnPanel && deviceColumnPanel.style.display !== 'none' &&
+        !e.target.closest('#device-column-settings') && !e.target.closest('.more-actions-wrapper')) {
+        closeDeviceColumnSettings();
     }
 });
 
@@ -339,6 +345,10 @@ document.addEventListener('keydown', function(e) {
         const panel = document.getElementById('column-settings');
         if (panel && panel.style.display !== 'none') {
             closeColumnSettings();
+        }
+        const dPanel = document.getElementById('device-column-settings');
+        if (dPanel && dPanel.style.display !== 'none') {
+            closeDeviceColumnSettings();
         }
     }
 });
