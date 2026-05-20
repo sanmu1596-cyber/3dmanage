@@ -385,7 +385,8 @@ async function logout() {
 document.addEventListener('DOMContentLoaded', async () => {
     await checkLoginStatus(); // 必须先确认登录状态和 DEV_MODE
     initTabs();
-    loadColumnSettings(); // 加载列显示设置
+    loadColumnSettings(); // 加载列显示设置（游戏）
+    if (typeof loadDeviceColumnSettings === 'function') loadDeviceColumnSettings(); // 加载设备列显示设置
     loadGameAccounts(); // 加载游戏账号数据
     // 首次加载：先加载全局基础数据（字段选项、成员），再由 initHashRouter 按需加载当前 tab
     await loadFieldOptions();
@@ -735,35 +736,85 @@ async function loadDevices() {
     }
 }
 
-// P0: 渲染设备表格（支持筛选后的子集）
+// P0: 渲染设备表格（支持列自定义 + 列拖拽 + 行拖拽排序）
 function renderDevicesTable(data) {
     const tbody = document.getElementById('devices-table');
+
+    // 更新表头的显示/隐藏和顺序
+    if (typeof updateColumnHeaders === 'function') updateColumnHeaders('devices-table');
+    // 初始化表头拖拽排序
+    if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
+
     if (data && data.length > 0) {
-        tbody.innerHTML = data.map((device, index) => `
-            <tr class="clickable" data-id="${device.id}">
-                <td class="text-center"><strong>${index + 1}</strong></td>
-                <td>${escapeHtml(device.manufacturer || '-')}</td>
-                <td>${escapeHtml(device.device_type || '-')}</td>
-                <td>${escapeHtml(device.name)}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>
-                <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>
-                <td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>
-                <td>${escapeHtml(device.total_bugs || 0)}</td>
-                <td>${escapeHtml(device.completed_adaptations || 0)}</td>
-                <td>${getDeviceOnlineGameCount(device.name)}</td>
+        const colOrder = typeof getColumnOrder === 'function'
+            ? getColumnOrder('devices-table')
+            : ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
+               'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
+               'completed_adaptations', 'online_games'];
+
+        tbody.innerHTML = data.map((device, index) => {
+            let rowHtml = `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
+
+            colOrder.forEach(field => {
+                if (window.deviceVisibleColumns && !deviceVisibleColumns[field]) return;
+
+                switch (field) {
+                    case 'manufacturer':
+                        rowHtml += `<td>${escapeHtml(device.manufacturer || '-')}</td>`;
+                        break;
+                    case 'device_type':
+                        rowHtml += `<td>${escapeHtml(device.device_type || '-')}</td>`;
+                        break;
+                    case 'name':
+                        rowHtml += `<td>${escapeHtml(device.name)}</td>`;
+                        break;
+                    case 'requirements':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>`;
+                        break;
+                    case 'quantity':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>`;
+                        break;
+                    case 'keeper':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>`;
+                        break;
+                    case 'notes':
+                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>`;
+                        break;
+                    case 'adapter_completion_rate':
+                        rowHtml += `<td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>`;
+                        break;
+                    case 'total_bugs':
+                        rowHtml += `<td>${escapeHtml(device.total_bugs || 0)}</td>`;
+                        break;
+                    case 'completed_adaptations':
+                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(device.completed_adaptations || 0)}</td>`;
+                        break;
+                    case 'online_games':
+                        rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
+                        break;
+                }
+            });
+
+            rowHtml += `
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
                     <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
                 </td>
-            </tr>
-        `).join('');
+            `;
+
+            return `<tr class="clickable draggable-row" data-id="${device.id}" draggable="true">${rowHtml}</tr>`;
+        }).join('');
+
         applyCellTooltips('devices-table');
+        // 初始化行拖拽排序
+        if (typeof initRowDrag === 'function') initRowDrag('devices-table', data);
     } else {
+        const visibleCount = window.deviceVisibleColumns
+            ? Object.values(deviceVisibleColumns).filter(v => v).length + 2  // +2 for drag handle and actions
+            : 13;
         tbody.innerHTML = `
             <tr>
-                <td colspan="13" class="empty-state">
+                <td colspan="${visibleCount}" class="empty-state">
                     <div class="empty-icon">📱</div>
                     <div class="empty-text">还没有测试设备</div>
                     <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
@@ -776,7 +827,117 @@ function renderDevicesTable(data) {
     }
 }
 
-// ==================== 设备行内编辑 ====================
+// ==================== 设备行拖拽排序 ====================
+let _rowDragState = { dragging: false, dragRow: null, dragId: null, indicator: null };
+
+function initRowDrag(tableId, data) {
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('.draggable-row');
+    if (rows.length === 0) return;
+
+    rows.forEach(row => {
+        row.addEventListener('dragstart', function(e) {
+            _rowDragState.dragging = true;
+            _rowDragState.dragRow = row;
+            _rowDragState.dragId = parseInt(row.dataset.id);
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+            // 延迟添加半透明样式（避免拖拽缩略图也变透明）
+            requestAnimationFrame(() => row.style.opacity = '0.4');
+        });
+
+        row.addEventListener('dragend', function(e) {
+            _rowDragState.dragging = false;
+            row.classList.remove('dragging');
+            row.style.opacity = '';
+            removeRowDragIndicator();
+        });
+
+        row.addEventListener('dragover', function(e) {
+            if (!_rowDragState.dragging || row === _rowDragState.dragRow) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            showRowDragIndicator(row, e.clientY);
+        });
+
+        row.addEventListener('dragleave', function(e) {
+            if (!_rowDragState.dragging) return;
+            // 只在真正离开行时隐藏指示器
+            const related = e.relatedTarget;
+            if (related && !row.contains(related) && !related.closest?.('.draggable-row')) {
+                removeRowDragIndicator();
+            }
+        });
+
+        row.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            if (!_rowDragState.dragging || row === _rowDragState.dragRow) return;
+            const targetId = parseInt(row.dataset.id);
+            await saveDeviceRowOrder(_rowDragState.dragId, targetId, data);
+            removeRowDragIndicator();
+        });
+    });
+}
+
+function showRowDragIndicator(targetRow, mouseY) {
+    let indicator = document.getElementById('row-drag-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'row-drag-indicator';
+        indicator.className = 'row-drop-indicator';
+        document.body.appendChild(indicator);
+    }
+    const rect = targetRow.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    indicator.style.top = (mouseY < midY ? rect.top : rect.bottom) + 'px';
+    indicator.style.left = rect.left + 'px';
+    indicator.style.width = rect.width + 'px';
+    indicator.style.display = 'block';
+}
+
+function removeRowDragIndicator() {
+    const el = document.getElementById('row-drag-indicator');
+    if (el) { el.style.display = 'none'; }
+}
+
+async function saveDeviceRowOrder(dragId, targetId, currentData) {
+    // 找到目标位置索引
+    const targetIndex = currentData.findIndex(d => d.id === targetId);
+    const dragIndex = currentData.findIndex(d => d.id === dragId);
+    if (targetIndex === -1 || dragIndex === -1) return;
+
+    // 从原数组中移除并插入到新位置
+    const [moved] = currentData.splice(dragIndex, 1);
+    // 判断插入在目标前还是后
+    const dropAfter = dragIndex < targetIndex;  // 向下拖
+    const insertIndex = dropAfter ? targetIndex : targetIndex;
+    currentData.splice(insertIndex, 0, moved);
+
+    // 构建 sort_order 数组
+    const orders = currentData.map((d, idx) => ({ id: d.id, sort_order: idx }));
+
+    try {
+        const resp = await authFetch(`${API_BASE}/devices/reorder`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orders })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast('排序已保存', 'success');
+            // 重渲染以反映新顺序
+            if (typeof renderDevicesTable === 'function') renderDevicesTable(currentData);
+        } else {
+            throw new Error(result.error || '保存失败');
+        }
+    } catch (err) {
+        showToast('排序保存失败: ' + err.message, 'danger');
+        // 回滚：重新加载数据
+        if (typeof loadDevices === 'function') loadDevices();
+    }
+}
 
 /**
  * 双击单元格进入编辑模式
@@ -886,7 +1047,7 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
 
     // 构造PATCH请求体
     const body = {};
-    body[field] = field === 'quantity' ? (parseInt(trimmed) || 1) : trimmed;
+    body[field] = ['quantity', 'completed_adaptations', 'total_bugs', 'total_games'].includes(field) ? (parseInt(trimmed) || 0) : trimmed;
 
     try {
         const response = await authFetch(`${API_BASE}/devices/${deviceId}`, {
@@ -1098,7 +1259,6 @@ function renderGamesPage() {
             `;
 
             return `<tr class="clickable" data-id="${game.id}">${rowHtml}</tr>`;
-        }).join('');
         }).join('');
     } else {
         // 计算显示的列数（包括序号和操作列）

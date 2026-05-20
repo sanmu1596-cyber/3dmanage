@@ -1206,6 +1206,40 @@ body.col-resizing * {
     width: 60%;
 }
 
+/* ========== 行拖拽排序样式 ========== */
+.drag-handle {
+    cursor: grab;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    letter-spacing: -2px;
+    user-select: none;
+    transition: color 0.2s, background 0.2s;
+}
+.drag-handle:hover {
+    color: var(--primary);
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+}
+
+.draggable-row.dragging {
+    opacity: 0.4 !important;
+    background: var(--primary-light) !important;
+}
+
+.data-table tbody .draggable-row[draggable="true"]:hover {
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.row-drop-indicator {
+    position: fixed;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.4);
+    z-index: 9999;
+    pointer-events: none;
+}
+
 .data-table td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border-light);
