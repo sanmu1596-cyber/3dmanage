@@ -643,6 +643,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+    position: relative;
 }
 
 .settings-header h3 {
@@ -650,6 +651,28 @@ body {
     font-size: 13px;
     font-weight: 700;
     color: var(--primary);
+}
+
+.settings-close-btn {
+    position: absolute;
+    right: 0;
+    top: -2px;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.settings-close-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .settings-actions {

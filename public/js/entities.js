@@ -2347,10 +2347,33 @@ function updateColumnHeaders(tableId) {
 function toggleColumnSettings() {
     const panel = document.getElementById('column-settings');
     if (panel.style.display === 'none' || !panel.style.display) {
+        // 打开前保存当前状态，用于取消时恢复
+        panel._snapshot = JSON.parse(JSON.stringify(visibleColumns));
         panel.style.display = 'block';
     } else {
         panel.style.display = 'none';
     }
+}
+
+// 直接收起面板（不保存、不恢复）
+function closeColumnSettings() {
+    const panel = document.getElementById('column-settings');
+    panel.style.display = 'none';
+}
+
+// 取消修改：恢复打开前的状态并关闭
+function cancelColumnSettings() {
+    const panel = document.getElementById('column-settings');
+    // 恢复快照状态
+    if (panel._snapshot) {
+        Object.assign(visibleColumns, panel._snapshot);
+        // 恢复复选框
+        const checkboxes = document.querySelectorAll('.column-settings-panel input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = visibleColumns[checkbox.value] || false;
+        });
+    }
+    panel.style.display = 'none';
 }
 
 // 全选所有列

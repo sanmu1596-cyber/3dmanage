@@ -325,6 +325,22 @@ document.addEventListener('click', function(e) {
     if (!e.target.closest('.more-actions-wrapper')) {
         closeAllMoreActions();
     }
+    // 点击字段设置面板外部时收起面板
+    const columnPanel = document.getElementById('column-settings');
+    if (columnPanel && columnPanel.style.display !== 'none' &&
+        !e.target.closest('#column-settings') && !e.target.closest('.more-actions-wrapper')) {
+        closeColumnSettings();
+    }
+});
+
+// ESC 键收起字段设置面板
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const panel = document.getElementById('column-settings');
+        if (panel && panel.style.display !== 'none') {
+            closeColumnSettings();
+        }
+    }
 });
 
 // ========== 附件上传/管理 ==========
