@@ -568,6 +568,32 @@
                             </select>
                         </div>
                     </div>
+                    <!-- 设备字段设置面板（在表格上方，与游戏列表一致） -->
+                    <div id="device-column-settings" class="column-settings-panel" style="display: none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="closeDeviceColumnSettings()" title="收起">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllDeviceColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllDeviceColumns()">取消全选</button>
+                                <button class="tool-btn" onclick="cancelDeviceColumnSettings()">取消</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyDeviceColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>厂商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_type" checked><span>设备类型</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>设备名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirements" checked><span>设备需求</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quantity" checked><span>数量</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="keeper" checked><span>保管者</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_completion_rate" checked><span>适配完成率</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="total_bugs" checked><span>总BUG数</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="completed_adaptations" checked><span>适配完成数</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_games" checked><span>适配游戏数</span></label></div>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
@@ -592,32 +618,6 @@
                         <!-- 设备表分页增强控件 -->
                         <div class="pagination-extra" id="devices-pagination" style="display:none;">
                             <div id="devices-page-numbers" class="page-numbers"></div>
-                        </div>
-                    </div>
-                    <!-- 设备字段设置面板 -->
-                    <div id="device-column-settings" class="column-settings-panel" style="display: none;">
-                        <div class="settings-header">
-                            <h3>选择要显示的列</h3>
-                            <button class="settings-close-btn" onclick="closeDeviceColumnSettings()" title="收起">×</button>
-                            <div class="settings-actions">
-                                <button class="tool-btn" onclick="selectAllDeviceColumns()">全选</button>
-                                <button class="tool-btn" onclick="deselectAllDeviceColumns()">取消全选</button>
-                                <button class="tool-btn" onclick="cancelDeviceColumnSettings()">取消</button>
-                                <button class="tool-btn tool-btn-primary" onclick="applyDeviceColumnSettings()">应用</button>
-                            </div>
-                        </div>
-                        <div class="settings-content">
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>厂商</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_type" checked><span>设备类型</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>设备名称</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirements" checked><span>设备需求</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quantity" checked><span>数量</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="keeper" checked><span>保管者</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_completion_rate" checked><span>适配完成率</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="total_bugs" checked><span>总BUG数</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="completed_adaptations" checked><span>适配完成数</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_games" checked><span>适配游戏数</span></label></div>
                         </div>
                     </div>
                     <div class="module-stats" id="devices-stats">

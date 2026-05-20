@@ -443,9 +443,13 @@ function renderDevicesTable(data) {
              'completed_adaptations', 'online_games'];
 
         tbody.innerHTML = data.map((device, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // 第一列：拖拽手柄
+            let rowHtml = `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
 
             colOrder.forEach(field => {
+                // 跳过隐藏列
+                if (window.deviceVisibleColumns && !deviceVisibleColumns[field]) return;
+
                 switch (field) {
                     case 'manufacturer':
                         rowHtml += `<td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
@@ -489,16 +493,21 @@ function renderDevicesTable(data) {
                     <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
                 </td>
             `;
-            return `<tr class="clickable" data-id="${device.id}">${rowHtml}</tr>`;
+            return `<tr class="clickable draggable-row" data-id="${device.id}" draggable="true">${rowHtml}</tr>`;
         }).join('');
 
-        // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入
+        applyCellTooltips('devices-table');
+        // 初始化行拖拽排序
+        if (typeof initRowDrag === 'function') initRowDrag('devices-table', data);
 
         updateDevicesPagination(data.length);
     } else {
+        const visibleCount = window.deviceVisibleColumns
+            ? Object.values(deviceVisibleColumns).filter(v => v).length + 2  // +2 for drag handle and actions
+            : 13;
         tbody.innerHTML = `
             <tr>
-                <td colspan="14" class="empty-state">
+                <td colspan="${visibleCount}" class="empty-state">
                     <div class="empty-icon">📱</div>
                     <div class="empty-text">还没有测试设备</div>
                     <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
@@ -511,6 +520,110 @@ function renderDevicesTable(data) {
         // 清空分页控件
         const pgDiv = document.getElementById('devices-pagination');
         if (pgDiv) pgDiv.style.display = 'none';
+    }
+}
+
+// ==================== 设备行拖拽排序 ====================
+let _rowDragState = { dragging: false, dragRow: null, dragId: null, indicator: null };
+
+function initRowDrag(tableId, data) {
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('.draggable-row');
+    if (rows.length === 0) return;
+
+    rows.forEach(row => {
+        row.addEventListener('dragstart', function(e) {
+            _rowDragState.dragging = true;
+            _rowDragState.dragRow = row;
+            _rowDragState.dragId = parseInt(row.dataset.id);
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+            requestAnimationFrame(() => row.style.opacity = '0.4');
+        });
+
+        row.addEventListener('dragend', function(e) {
+            _rowDragState.dragging = false;
+            row.classList.remove('dragging');
+            row.style.opacity = '';
+            removeRowDragIndicator();
+        });
+
+        row.addEventListener('dragover', function(e) {
+            if (!_rowDragState.dragging || row === _rowDragState.dragRow) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            showRowDragIndicator(row, e.clientY);
+        });
+
+        row.addEventListener('dragleave', function(e) {
+            if (!_rowDragState.dragging) return;
+            const related = e.relatedTarget;
+            if (related && !row.contains(related) && !related.closest?.('.draggable-row')) {
+                removeRowDragIndicator();
+            }
+        });
+
+        row.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            if (!_rowDragState.dragging || row === _rowDragState.dragRow) return;
+            const targetId = parseInt(row.dataset.id);
+            await saveDeviceRowOrder(_rowDragState.dragId, targetId, data);
+            removeRowDragIndicator();
+        });
+    });
+}
+
+function showRowDragIndicator(targetRow, mouseY) {
+    let indicator = document.getElementById('row-drag-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'row-drag-indicator';
+        indicator.className = 'row-drop-indicator';
+        document.body.appendChild(indicator);
+    }
+    const rect = targetRow.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    indicator.style.top = (mouseY < midY ? rect.top : rect.bottom) + 'px';
+    indicator.style.left = rect.left + 'px';
+    indicator.style.width = rect.width + 'px';
+    indicator.style.display = 'block';
+}
+
+function removeRowDragIndicator() {
+    const el = document.getElementById('row-drag-indicator');
+    if (el) { el.style.display = 'none'; }
+}
+
+async function saveDeviceRowOrder(dragId, targetId, currentData) {
+    const targetIndex = currentData.findIndex(d => d.id === targetId);
+    const dragIndex = currentData.findIndex(d => d.id === dragId);
+    if (targetIndex === -1 || dragIndex === -1) return;
+
+    const [moved] = currentData.splice(dragIndex, 1);
+    const dropAfter = dragIndex < targetIndex;
+    const insertIndex = dropAfter ? targetIndex : targetIndex;
+    currentData.splice(insertIndex, 0, moved);
+
+    const orders = currentData.map((d, idx) => ({ id: d.id, sort_order: idx }));
+
+    try {
+        const resp = await authFetch(`${API_BASE}/devices/reorder`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orders })
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast('排序已保存', 'success');
+            if (typeof renderDevicesTable === 'function') renderDevicesTable(currentData);
+        } else {
+            throw new Error(result.error || '保存失败');
+        }
+    } catch (err) {
+        showToast('排序保存失败: ' + err.message, 'danger');
+        if (typeof loadDevices === 'function') loadDevices();
     }
 }
 
