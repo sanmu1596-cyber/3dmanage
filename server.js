@@ -2736,7 +2736,7 @@ app.post('/api/db-backup', auth.checkPermission('games', 'edit'), (req, res) => 
 // 启动服务器 (监听所有网络接口，支持外网访问)
 
 // 确保设备表有 sort_order 字段（兼容旧库）
-db pragma(`PRAGMA table_info(devices)`, [], (err, rows) => {
+db.all(`PRAGMA table_info(devices)`, [], (err, rows) => {
     if (!err && rows && !rows.some(r => r.name === 'sort_order')) {
         db.run(`ALTER TABLE devices ADD COLUMN sort_order INTEGER DEFAULT 0`);
         db.run(`UPDATE devices SET sort_order = id`, (e) => {
