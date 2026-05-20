@@ -751,7 +751,7 @@ function renderDevicesTable(data) {
                 <td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>
                 <td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>
                 <td>${escapeHtml(device.total_bugs || 0)}</td>
-                <td>${escapeHtml(device.completed_adaptations || 0)}</td>
+                <td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(device.completed_adaptations || 0)}</td>
                 <td>${getDeviceOnlineGameCount(device.name)}</td>
                 <td class="text-center action-icons">
                     <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
@@ -888,7 +888,7 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
 
     // 构造PATCH请求体
     const body = {};
-    body[field] = field === 'quantity' ? (parseInt(trimmed) || 1) : trimmed;
+    body[field] = ['quantity', 'completed_adaptations', 'total_bugs', 'total_games'].includes(field) ? (parseInt(trimmed) || 0) : trimmed;
 
     try {
         const response = await authFetch(`${API_BASE}/devices/${deviceId}`, {

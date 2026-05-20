@@ -475,7 +475,7 @@ function renderDevicesTable(data) {
                         rowHtml += `<td>${escapeHtml(device.total_bugs || 0)}</td>`;
                         break;
                     case 'completed_adaptations':
-                        rowHtml += `<td>${escapeHtml(device.completed_adaptations || 0)}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(device.completed_adaptations || 0)}</td>`;
                         break;
                     case 'online_games':
                         rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
