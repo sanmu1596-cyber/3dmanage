@@ -93,29 +93,31 @@
    所有依赖 var() 的组件自动切换
    ========================================== */
 [data-theme="dark"] {
-    /* 背景体系 — 深蓝黑 */
-    --bg-deep: #0a0f1a;              /* 页面底色 */
-    --bg-card: rgba(12, 22, 36, 0.92); /* 卡片深色 */
-    --bg-surface: rgba(15, 25, 40, 0.85); /* 表面色 */
-    --bg-elevated: rgba(24, 144, 255, 0.08); /* 悬停高亮 */
-    --bg-input: rgba(18, 30, 48, 0.9);  /* 输入框 */
+    /* 背景体系 — 深邃蓝黑（按设计规范 2026-05-21）*/
+    --bg-deep: #0D1A2C;              /* 页面背景：深邃，作为基底 */
+    --bg-card: #101828;              /* 数据背景：极暗，保持沉浸感 */
+    --bg-surface: #182636;           /* 表头背景：稍微提亮，确立头部权威感 */
+    --bg-elevated: #182636;          /* 悬停高亮（同表头）*/
+    --bg-input: #131F2E;             /* 输入框 */
 
-    /* 边框体系 */
-    --border: rgba(255, 255, 255, 0.10);
-    --border-light: rgba(255, 255, 255, 0.06);
+    /* 边框体系 — 极暗的线条，若有似无 */
+    --border: #1E2A38;
+    --border-light: #1E2A38;
 
     /* 文字体系 */
     --text-primary: #e8eaed;
     --text-secondary: #9aa0b0;
     --text-light: #606878;
 
-    /* 表格隔行 */
-    --row-odd: rgba(255, 255, 255, 0.02);
-    --row-even: rgba(255, 255, 255, 0.05);
-    --row-hover: rgba(24, 144, 255, 0.12);
+    /* 表格隔行 — 用极微弱的差异拉开层次 */
+    --row-odd: #101828;
+    --row-even: #131F2E;
+    --row-hover: rgba(0, 168, 204, 0.14);
 
-    /* 调整主色调在深色下的表现 */
-    --primary-light: rgba(24, 144, 255, 0.15);
+    /* 主色调 — 科技蓝，内敛而不失活力 */
+    --primary: #00A8CC;
+    --primary-hover: #0099BB;
+    --primary-light: rgba(0, 168, 204, 0.15);
 
     /* 阴影 — 深色下更弱 */
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -123,15 +125,15 @@
     --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
 
     /* 补齐缺失变量 — 兼容全量组件 */
-    --bg-white: #0c1726;
-    --bg-primary: #0c1726;
-    --bg-body: #0a0f1a;
-    --primary-bg: rgba(24, 144, 255, 0.12);
+    --bg-white: #101828;
+    --bg-primary: #101828;
+    --bg-body: #0D1A2C;
+    --primary-bg: rgba(0, 168, 204, 0.12);
     --text-main: #e8eaed;
     --text-muted: #9aa0b0;
     --text-tertiary: #606878;
-    --border-main: rgba(255, 255, 255, 0.10);
-    --border-color: rgba(255, 255, 255, 0.10);
+    --border-main: #1E2A38;
+    --border-color: #1E2A38;
 }
 
 body {
@@ -4645,17 +4647,17 @@ tr:hover .action-icon-btn:hover {
 [data-theme="dark"] .field-card,
 [data-theme="dark"] .notification-panel,
 [data-theme="dark"] .gs-panel {
-    background: rgba(12, 22, 36, 0.92);
-    backdrop-filter: blur(12px);
+    background: #101828;
+    backdrop-filter: none;
 }
 
 [data-theme="dark"] .tab-content {
-    background: rgba(10, 18, 30, 0.80);
+    background: #0D1A2C;
 }
 
 [data-theme="dark"] .data-table th {
-    background: rgba(17, 29, 46, 0.85);
-    backdrop-filter: blur(6px);
+    background: #182636;
+    backdrop-filter: none;
     color: var(--text-secondary);
     border-bottom: 1px solid var(--border);
 }
