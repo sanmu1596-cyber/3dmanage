@@ -2592,8 +2592,7 @@ reportsRouter.get('/data', (req, res) => {
             });
           });
         }
-        // 启动Q4
-        finishQuery4();
+        // Q2/Q3完成后通过计数器自动触发Q4（不再显式调用）
       });
     });
   };
