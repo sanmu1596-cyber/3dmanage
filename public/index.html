@@ -313,9 +313,11 @@
                     <div id="column-settings" class="column-settings-panel" style="display: none;">
                         <div class="settings-header">
                             <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="closeColumnSettings()" title="收起">×</button>
                             <div class="settings-actions">
                                 <button class="tool-btn" onclick="selectAllColumns()">全选</button>
                                 <button class="tool-btn" onclick="deselectAllColumns()">取消全选</button>
+                                <button class="tool-btn" onclick="cancelColumnSettings()">取消</button>
                                 <button class="tool-btn tool-btn-primary" onclick="applyColumnSettings()">应用</button>
                             </div>
                         </div>
