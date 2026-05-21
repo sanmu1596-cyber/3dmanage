@@ -131,6 +131,20 @@ db.all("PRAGMA table_info(devices)", [], (err, columns) => {
       else console.log('  [启动] devices表已添加sort_order列');
     });
   }
+  const hasOnlineGames = columns.some(c => c.name === 'online_games');
+  if (!hasOnlineGames) {
+    db.run("ALTER TABLE devices ADD COLUMN online_games INTEGER DEFAULT 0", (e) => {
+      if (e) console.error('  [启动] devices添加online_games失败:', e.message);
+      else console.log('  [启动] devices表已添加online_games列');
+    });
+  }
+  const hasTotalGames = columns.some(c => c.name === 'total_games');
+  if (!hasTotalGames) {
+    db.run("ALTER TABLE devices ADD COLUMN total_games INTEGER DEFAULT 0", (e) => {
+      if (e) console.error('  [启动] devices添加total_games失败:', e.message);
+      else console.log('  [启动] devices表已添加total_games列');
+    });
+  }
 });
 
 // 兼容旧库：确保 adaptation_records 表有 issue_notes 列
@@ -2423,9 +2437,9 @@ reportsRouter.get('/data', (req, res) => {
   let completed = 0;
   const totalQueries = 4;
 
-  // Q1: 设备汇总 — 从 devices 表获取设备列表
-  db.all('SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations, online_games FROM devices ORDER BY id', (err, devices) => {
-    if (err) return res.status(500).json({ error: err.message });
+  // Q1: 设备汇总 — 从 devices 表获取设备列表（容错：online_games/total_games 列可能不存在）
+  // 用闭包包装内部逻辑，便于在退化分支中复用
+  const _runDeviceSummary = (devices) => {
     result.devices = devices || [];
 
     // 获取手动修正值
@@ -2454,7 +2468,7 @@ reportsRouter.get('/data', (req, res) => {
                 if (deviceGameMap[dName]) {
                   deviceGameMap[dName].total++;
                   if ((row.game_platform || '').toUpperCase() === 'WEGAME' || (row.game_platform || '').includes('WeGame')) {
-                    deviceGameMap[dName].wegoame++;
+                    deviceGameMap[dName].wegame++;
                   } else if ((row.game_platform || '').toUpperCase() === 'STEAM' || (row.game_platform || '').includes('Steam')) {
                     deviceGameMap[dName].steam++;
                   }
@@ -2474,9 +2488,9 @@ reportsRouter.get('/data', (req, res) => {
           const totalCount = overrideMap[keyPrefix + '|totalCount']
             ? parseInt(overrideMap[keyPrefix + '|totalCount'])
             : (autoData ? autoData.total : (parseInt(d.completed_adaptations) || 0));
-          const wegameCount = overrideMap[keyPrefix + '|wegoameCount']
-            ? parseInt(overrideMap[keyPrefix + '|wegoameCount'])
-            : (autoData ? autoData.wegoame : 0);
+          const wegameCount = overrideMap[keyPrefix + '|wegameCount']
+            ? parseInt(overrideMap[keyPrefix + '|wegameCount'])
+            : (autoData ? autoData.wegame : 0);
           const steamCount = overrideMap[keyPrefix + '|steamCount']
             ? parseInt(overrideMap[keyPrefix + '|steamCount'])
             : (autoData ? autoData.steam : 0);
@@ -2485,10 +2499,10 @@ reportsRouter.get('/data', (req, res) => {
           return {
             id: d.id,
             name: d.name,
-            type: d.device_type === 'Laptop' ? '笔记本' :
-                 d.device_type.includes('显示器') ? '显示器' :
-                 d.device_type.includes('带交织') ? '显示器' :
-                 d.device_type === '笔电' ? '笔记本' : (d.device_type || '-'),
+            type: (d.device_type === 'Laptop' ? '笔记本' :
+                 (d.device_type || '').includes('显示器') ? '显示器' :
+                 (d.device_type || '').includes('带交织') ? '显示器' :
+                 d.device_type === '笔电' ? '笔记本' : (d.device_type || '-')),
             totalCount: totalCount || 0,
             wegameCount: wegameCount || 0,
             steamCount: steamCount || 0,
@@ -2582,6 +2596,20 @@ reportsRouter.get('/data', (req, res) => {
         finishQuery4();
       });
     });
+  };
+
+  // 主查询：先尝试带 online_games/total_games 的查询，失败时退化
+  db.all('SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations, COALESCE(online_games, 0) as online_games, COALESCE(total_games, 0) as total_games FROM devices ORDER BY id', (err, devices) => {
+    if (err) {
+      console.warn('[reports/data] 设备查询失败，使用退化查询:', err.message);
+      db.all('SELECT id, name, device_type, manufacturer, adapter_completion_rate, completed_adaptations FROM devices ORDER BY id', (err0, devices0) => {
+        if (err0) return res.status(500).json({ error: err0.message });
+        const fallback = (devices0 || []).map(d => ({ ...d, online_games: 0, total_games: 0 }));
+        _runDeviceSummary(fallback);
+      });
+      return;
+    }
+    _runDeviceSummary(devices || []);
   });
 });
 
