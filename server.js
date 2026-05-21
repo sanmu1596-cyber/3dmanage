@@ -133,6 +133,18 @@ db.all("PRAGMA table_info(devices)", [], (err, columns) => {
   }
 });
 
+// 兼容旧库：确保 adaptation_records 表有 issue_notes 列
+db.all("PRAGMA table_info(adaptation_records)", [], (err, columns) => {
+  if (err || !columns) return;
+  const hasIssueNotes = columns.some(c => c.name === 'issue_notes');
+  if (!hasIssueNotes) {
+    db.run("ALTER TABLE adaptation_records ADD COLUMN issue_notes TEXT DEFAULT ''", (e) => {
+      if (e) console.error('  [启动] adaptation_records添加issue_notes失败:', e.message);
+      else console.log('  [启动] adaptation_records表已添加issue_notes列');
+    });
+  }
+});
+
 // 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
 function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
   const userName = (req && req.user) ? (req.user.real_name || req.user.username) : 'system';
@@ -892,11 +904,12 @@ adaptationRouter.post('/batch', (req, res) => {
 adaptationRouter.put('/:id',
   validate({ adapter_progress: rules.optional().isInt().min(0).max(100) }),
   (req, res) => {
-  const { adapter_progress, owner_name, online_status, quality } = req.body;
+  const { adapter_progress, owner_name, online_status, quality, issue_notes } = req.body;
   const sql = `UPDATE adaptation_records SET adapter_progress = COALESCE(?, adapter_progress), 
                owner_name = COALESCE(?, owner_name), online_status = COALESCE(?, online_status), 
-               quality = COALESCE(?, quality), updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-  db.run(sql, [adapter_progress, owner_name, online_status, quality, req.params.id], function(err) {
+               quality = COALESCE(?, quality), issue_notes = COALESCE(?, issue_notes),
+               updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, [adapter_progress, owner_name, online_status, quality, issue_notes, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });

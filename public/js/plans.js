@@ -72,6 +72,7 @@ async function loadAdaptationRecords() {
                 ownerName: r.owner_name || '-',
                 onlineStatus: r.online_status || 'pending',
                 quality: r.quality || 'normal',
+                issueNotes: r.issue_notes || '',
                 updatedAt: r.updated_at || null
             }));
 
@@ -172,12 +173,6 @@ function renderProgressTable(deviceIndex) {
             <td>${escapeHtml(gameData.gameName)}</td>
             <td>${escapeHtml(gameData.gamePlatform || '-')}</td>
             <td>${escapeHtml(gameData.gameType || '-')}</td>
-            <td>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-track"><div class="progress-bar" style="width: ${gameData.adapterProgress}%"></div></div>
-                    <span class="progress-text">${gameData.adapterProgress}%</span>
-                </div>
-            </td>
             <td class="editable-cell" data-field="ownerName" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(gameData.ownerName || '-')}</span>
             </td>
@@ -186,6 +181,9 @@ function renderProgressTable(deviceIndex) {
             </td>
             <td class="editable-cell text-center" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(qualityMap[gameData.quality] || '-')}</span>
+            </td>
+            <td class="editable-cell" data-field="issueNotes" data-row-index="${index}" data-device-index="${deviceIndex}" title="单击编辑">
+                <span class="cell-value">${escapeHtml(gameData.issueNotes || '-')}</span>
             </td>
             <td class="text-center">${gameData.updatedAt ? formatDate(gameData.updatedAt) : '-'}</td>
             <td class="text-center">
@@ -226,6 +224,59 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     cell.style.maxWidth = rect.width + 'px';
     cell.style.height = rect.height + 'px';
     cell.style.boxSizing = 'border-box';
+
+    // ===== 文本输入分支：问题备注 =====
+    if (field === 'issueNotes') {
+        const cellValueEl = cell.querySelector('.cell-value');
+        cellValueEl.style.display = 'none';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'edit-input';
+        input.value = gameData.issueNotes || '';
+        input.maxLength = 500;
+        input.style.width = '100%';
+        input.style.boxSizing = 'border-box';
+        input.style.padding = '4px 6px';
+        input.style.border = '1px solid var(--primary)';
+        input.style.borderRadius = '3px';
+        input.style.fontSize = '13px';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+
+        let _saved = false;
+        const finishEdit = async (commit) => {
+            if (_saved) return;
+            _saved = true;
+            const newVal = commit ? input.value.trim() : (gameData.issueNotes || '');
+            if (commit && newVal !== (gameData.issueNotes || '')) {
+                gameData.issueNotes = newVal;
+                try {
+                    await authFetch(`${API_BASE}/adaptations/${gameData.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ issue_notes: newVal })
+                    });
+                    showToast('问题备注已保存', 'success');
+                } catch (e) {
+                    console.error('保存问题备注失败:', e);
+                    showToast('保存失败: ' + e.message, 'error');
+                }
+            }
+            cellValueEl.innerHTML = escapeHtml(gameData.issueNotes || '-');
+            cellValueEl.style.display = '';
+            input.remove();
+            cell.classList.remove('editing');
+            cell.style.width = ''; cell.style.minWidth = ''; cell.style.maxWidth = ''; cell.style.height = '';
+        };
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); finishEdit(true); }
+            else if (e.key === 'Escape') { e.preventDefault(); finishEdit(false); }
+        });
+        input.addEventListener('blur', () => finishEdit(true));
+        input.addEventListener('click', (e) => e.stopPropagation());
+        return;
+    }
 
     // 创建下拉选择框
     const select = document.createElement('select');
