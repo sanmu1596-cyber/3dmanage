@@ -2684,6 +2684,19 @@ function deselectAllPlanListColumns() { _planListPanel.deselectAll(); }
 function applyPlanListColumnSettings() { _planListPanel.apply(); }
 function loadPlanListColumnSettings() { _planListPanel.load(); }
 
+// ===== 报表模块 =====
+var _reportPanel = _genericColumnPanel('report',
+    function() { return typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null; },
+    function() { if (typeof renderReportTable === 'function') renderReportTable(); }
+);
+function toggleReportColumnSettings() { _reportPanel.toggle(); }
+function closeReportColumnSettings() { _reportPanel.close(); }
+function cancelReportColumnSettings() { _reportPanel.cancel(); }
+function selectAllReportColumns() { _reportPanel.selectAll(); }
+function deselectAllReportColumns() { _reportPanel.deselectAll(); }
+function applyReportColumnSettings() { _reportPanel.apply(); }
+function loadReportColumnSettings() { _reportPanel.load(); }
+
 // ==================== 通用表格列排序功能 ====================
 
 /**

@@ -2323,7 +2323,7 @@
                             <button class="tool-btn tool-btn-primary" onclick="addReportRow()" title="新增报表行"><span class="tool-icon">＋</span> 新增</button>
                             <button class="tool-btn" onclick="exportReport()" title="导出Excel" style="background:#28a745;color:#fff;"><i class="fas fa-file-excel"></i> 导出Excel</button>
                             <div class="more-actions-wrapper" style="display:inline-block;vertical-align:middle;margin-left:4px;">
-                                <button class="tool-btn more-actions-btn" onclick="toggleColumnSettings()" title="字段设置">⚙</button>
+                                <button class="tool-btn more-actions-btn" onclick="toggleReportColumnSettings()" title="字段设置">⚙</button>
                             </div>
                             <span id="reports-updated" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
                         </div>
@@ -2346,16 +2346,16 @@
                             </tbody>
                         </table>
                     </div>
-                    <!-- 报表字段设置面板（与游戏列表共用 column-settings 面板ID） -->
-                    <div id="column-settings" class="column-settings-panel" style="display:none;">
+                    <!-- 报表字段设置面板 -->
+                    <div id="report-column-settings" class="column-settings-panel" style="display:none;">
                         <div class="settings-header">
                             <h3>选择要显示的列</h3>
-                            <button class="settings-close-btn" onclick="closeColumnSettings()" title="收起">×</button>
+                            <button class="settings-close-btn" onclick="closeReportColumnSettings()" title="收起">×</button>
                             <div class="settings-actions">
-                                <button class="tool-btn" onclick="selectAllColumns()">全选</button>
-                                <button class="tool-btn" onclick="deselectAllColumns()">取消全选</button>
-                                <button class="tool-btn" onclick="cancelColumnSettings()">取消</button>
-                                <button class="tool-btn tool-btn-primary" onclick="applyColumnSettings()">应用</button>
+                                <button class="tool-btn" onclick="selectAllReportColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllReportColumns()">取消全选</button>
+                                <button class="tool-btn" onclick="cancelReportColumnSettings()">取消</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyReportColumnSettings()">应用</button>
                             </div>
                         </div>
                         <div class="settings-content checkbox-group">
