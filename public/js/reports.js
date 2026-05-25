@@ -15,6 +15,7 @@ var reportSearchTerm = '';
 var reportCurrentPage = 1;
 var reportGameListCache = [];        // 游戏列表缓存（用于下拉选项）
 var _reportDragSrcRow = null;        // 行拖拽源行引用
+var reportVisibleColumns = { name: true, status: true, platform: true, notes: true, action: true };  // 列显隐配置
 const REPORT_PAGE_SIZE = 20;
 
 // ==================== 下拉选项定义 ====================
@@ -59,12 +60,12 @@ function refreshReports() {
 }
 
 function showReportLoading() {
-    const tbody = document.getElementById('report-games-tbody');
+    const tbody = document.getElementById('report-games-table');
     if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>';
 }
 
 function setReportError(msg) {
-    const tbody = document.getElementById('report-games-tbody');
+    const tbody = document.getElementById('report-games-table');
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(msg)} <a href="#" onclick="loadReportData()" style="margin-left:8px;">重试</a></td></tr>`;
     }
@@ -218,7 +219,7 @@ function resetReportFilters() {
 
 // ==================== 表格渲染（TAPD 风格 Click-to-Edit） ====================
 function renderReportTable() {
-    const tbody = document.getElementById('report-games-tbody');
+    const tbody = document.getElementById('report-games-table');
     if (!tbody) return;
 
     let dataToShow = filteredReportGameData;
@@ -563,7 +564,7 @@ function addReportRow() {
         cancelPendingAddRow();
     }
 
-    const tbody = document.getElementById('report-games-tbody');
+    const tbody = document.getElementById('report-games-table');
     if (!tbody) return;
 
     const tempId = 'pending_' + Date.now();
@@ -683,7 +684,7 @@ function cancelPendingAddRow() {
     if (tr) tr.remove();
     _pendingAddRowId = null;
     // 如果表格空了，重新渲染（会显示空状态）
-    if (document.getElementById('report-games-tbody')?.children.length === 0) {
+    if (document.getElementById('report-games-table')?.children.length === 0) {
         renderReportTable();
     }
 }
@@ -818,7 +819,7 @@ function onReportFieldChange(el) {
  * 初始化报表表格行拖拽排序（参照设备列表 initRowDrag）
  */
 function initReportRowDrag() {
-    var tbody = document.getElementById('report-games-tbody');
+    var tbody = document.getElementById('report-games-table');
     if (!tbody) return;
 
     var rows = tbody.querySelectorAll('.draggable-row');
@@ -870,7 +871,7 @@ function initReportRowDrag() {
  * 将当前DOM行顺序保存到后端
  */
 function saveReportRowOrder() {
-    var tbody = document.getElementById('report-games-tbody');
+    var tbody = document.getElementById('report-games-table');
     if (!tbody) return;
 
     var rows = tbody.querySelectorAll('.draggable-row');

@@ -2358,7 +2358,8 @@ function updateColumnHeaders(tableId) {
         'members-table': () => typeof memberVisibleColumns !== 'undefined' ? memberVisibleColumns : null,
         'tests-table': () => typeof testVisibleColumns !== 'undefined' ? testVisibleColumns : null,
         'bugs-table': () => typeof bugVisibleColumns !== 'undefined' ? bugVisibleColumns : null,
-        'plan-list-table': () => typeof planListVisibleColumns !== 'undefined' ? planListVisibleColumns : null
+        'plan-list-table': () => typeof planListVisibleColumns !== 'undefined' ? planListVisibleColumns : null,
+        'report-games-table': () => typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null
     };
     const getVisibility = visibilityMap[tableId];
     if (typeof getVisibility === 'function') {
