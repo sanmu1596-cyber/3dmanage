@@ -2588,7 +2588,26 @@ reportsRouter.get('/data', (req, res) => {
               });
 
               result.lastUpdated = new Date().toISOString();
-              res.json({ success: true, data: result });
+
+              // 追加用户自定义报表行数据
+              db.all(
+                'SELECT * FROM report_rows ORDER BY sort_order ASC, id ASC',
+                [],
+                (errR, customRows) => {
+                  if (!errR && customRows) {
+                    result.customRows = customRows.map((r) => ({
+                      _id: r.row_id,
+                      name: r.name,
+                      status: r.status,
+                      platform: r.platform,
+                      notes: r.notes,
+                    }));
+                  } else {
+                    result.customRows = [];
+                  }
+                  res.json({ success: true, data: result });
+                }
+              );
             });
           });
         }
@@ -2627,6 +2646,90 @@ reportsRouter.post('/overrides', auth.checkPermission('games', 'edit'), (req, re
       if (err) return res.status(500).json({ error: err.message });
       logActivity('update', 'report_override', this.lastID, `修正${report_type}/${entity_key}/${field}`);
       res.json({ success: true, id: this.lastID });
+    }
+  );
+});
+
+// ==================== 报表行 CRUD ====================
+
+// 保存/更新报表行（UPSERT）
+reportsRouter.post('/save-row', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { _id, name, status, platform, notes } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: '游戏名称不能为空' });
+  }
+
+  if (_id && String(_id).startsWith('new_')) {
+    // 新行：INSERT
+    db.run(
+      `INSERT INTO report_rows (row_id, name, status, platform, notes, sort_order)
+       VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order),0)+1 FROM report_rows))`,
+      [_id, name.trim(), status || 'pending', platform || '', notes || ''],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        logActivity('create', 'report_row', this.lastID, `新增报表行:${name.trim()}`);
+        res.json({ success: true, id: this.lastID, row_id: _id });
+      }
+    );
+  } else {
+    // 已有行：UPDATE
+    db.run(
+      `UPDATE report_rows SET name=?, status=?, platform=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE row_id=?`,
+      [name.trim(), status || 'pending', platform || '', notes || '', _id],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        logActivity('update', 'report_row', null, `更新报表行:${_id}`);
+        res.json({ success: true, id: this.changes, row_id: _id });
+      }
+    );
+  }
+});
+
+// 删除报表行
+reportsRouter.post('/delete-row', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { _id } = req.body;
+  if (!_id) {
+    return res.status(400).json({ error: '缺少行标识(_id)' });
+  }
+  db.run(`DELETE FROM report_rows WHERE row_id = ?`, [_id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    logActivity('delete', 'report_row', null, `删除报表行:${_id}`);
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+// 报表行排序
+reportsRouter.patch('/reorder', auth.checkPermission('games', 'edit'), (req, res) => {
+  const { orders } = req.body;
+  if (!Array.isArray(orders)) {
+    return res.status(400).json({ error: 'orders必须是数组' });
+  }
+  const validOrders = orders.filter((o) => o.row_id && Number.isInteger(o.sort_order));
+  if (validOrders.length === 0) {
+    return res.status(400).json({ error: '无效的排序数据' });
+  }
+
+  let completed = 0;
+  validOrders.forEach(({ row_id, sort_order }) => {
+    db.run(
+      'UPDATE report_rows SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE row_id = ?',
+      [sort_order, row_id],
+      (err) => { if (!err) completed++; }
+    );
+  });
+
+  console.log(`[PATCH /reports/reorder] 排序更新成功，共 ${completed} 条`);
+  res.json({ success: true, updated: completed });
+});
+
+// 查询报表自定义行数据（用于 /data 接口补充）
+reportsRouter.get('/rows', (req, res) => {
+  db.all(
+    'SELECT * FROM report_rows ORDER BY sort_order ASC, id ASC',
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, data: rows || [] });
     }
   );
 });

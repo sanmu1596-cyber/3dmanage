@@ -7,13 +7,14 @@
  * - 备注   → 双击文本输入
  */
 
-// ==================== 全局变量 ====================
-let reportDataCache = null;
-let allReportGameData = [];          // 全量扁平游戏数据
-let filteredReportGameData = [];     // 筛选后数据
-let reportSearchTerm = '';
-let reportCurrentPage = 1;
-let reportGameListCache = [];        // 游戏列表缓存（用于下拉选项）
+// ==================== 全局变量（必须用 var，踩坑 #1） ====================
+var reportDataCache = null;
+var allReportGameData = [];          // 全量扁平游戏数据
+var filteredReportGameData = [];     // 筛选后数据
+var reportSearchTerm = '';
+var reportCurrentPage = 1;
+var reportGameListCache = [];        // 游戏列表缓存（用于下拉选项）
+var _reportDragSrcRow = null;        // 行拖拽源行引用
 const REPORT_PAGE_SIZE = 20;
 
 // ==================== 下拉选项定义 ====================
@@ -247,7 +248,8 @@ function renderReportTable() {
         const rowId = g._id || idx;
         const sInfo = getStatusInfo(g.status);
 
-        let html = `<td class="text-center"><strong>${globalIdx}</strong></td>`;
+        let html = `<td class="drag-handle" title="拖拽排序">⋮⋮</td>
+                       <td class="text-center"><strong>${globalIdx}</strong></td>`;
 
         // 获取列顺序
         let colOrder = ['name', 'status', 'platform', 'notes'];
@@ -290,7 +292,7 @@ function renderReportTable() {
             }
         });
 
-        return `<tr data-row-id="${rowId}">${html}
+        return `<tr data-row-id="${rowId}" class="draggable-row" draggable="true">${html}
             <td class="text-center">
                 <button class="report-del-btn" onclick="deleteReportRow('${rowId}')" title="删除此行"><i class="fas fa-trash-alt" style="font-size:12px;color:#ef4444;cursor:pointer;"></i></button>
             </td>
@@ -302,6 +304,9 @@ function renderReportTable() {
     if (typeof applyCellTooltips === 'function') applyCellTooltips('report-games-table');
     if (typeof initHeaderDrag === 'function') try { initHeaderDrag('report-games-table'); } catch(e) {}
     if (typeof initTableSort === 'function') try { initTableSort('report-games-table'); } catch(e) {}
+    if (typeof initColumnResize === 'function') try { initColumnResize('report-games-table'); } catch(e) {}
+    // 行拖拽排序
+    initReportRowDrag();
 }
 
 /**
@@ -545,9 +550,8 @@ function refreshReportCell(td, rowId, field) {
     }
 }
 
-// ==================== 添加新行 ====================
+// ==================== 添加新行（持久化到后端）====================
 function addReportRow() {
-    const maxId = Math.max(0, ...allReportGameData.map(r => Number(r._id) || 0));
     const newRow = {
         _id: 'new_' + Date.now(),
         name: '',
@@ -556,27 +560,63 @@ function addReportRow() {
         platform: '',
         notes: ''
     };
-    allReportGameData.unshift(newRow);
-    filteredReportGameData = [...allReportGameData];
-    reportCurrentPage = 1;
-    renderReportTable();
-    showToast('已添加新行，请填写内容', 'info');
+
+    // 立即保存到后端
+    authFetch(API_BASE + '/reports/save-row', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRow)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            if (result.row_id) newRow._id = result.row_id;
+            allReportGameData.unshift(newRow);
+            filteredReportGameData = [...allReportGameData];
+            reportCurrentPage = 1;
+            renderReportTable();
+            showToast('已添加新行，请填写内容', 'success');
+        } else {
+            showToast(result.error || '添加失败', 'warning');
+        }
+    })
+    .catch(() => {
+        // 降级：仅前端显示（离线模式）
+        allReportGameData.unshift(newRow);
+        filteredReportGameData = [...allReportGameData];
+        reportCurrentPage = 1;
+        renderReportTable();
+        showToast('已添加（离线模式，刷新后可能丢失）', 'info');
+    });
 }
 
-// ==================== 删除当前行 ====================
+// ==================== 删除当前行（持久化到后端）====================
 function deleteReportRow(rowId) {
     if (!confirm('确定删除这条记录吗？')) return;
-
-    allReportGameData = allReportGameData.filter(r => r._id != rowId);
-    filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
-    renderReportTable();
 
     authFetch(API_BASE + '/reports/delete-row', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _id: rowId })
-    }).catch(() => {});
-    showToast('已删除', 'success');
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            allReportGameData = allReportGameData.filter(r => r._id != rowId);
+            filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
+            renderReportTable();
+            showToast('已删除', 'success');
+        } else {
+            showToast(result.error || '删除失败', 'warning');
+        }
+    })
+    .catch(() => {
+        // 降级：仅前端删除
+        allReportGameData = allReportGameData.filter(r => r._id != rowId);
+        filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
+        renderReportTable();
+        showToast('已删除（离线模式）', 'info');
+    });
 }
 
 // ==================== 分页控制 ====================
@@ -672,4 +712,101 @@ function saveReportOverride(inputEl) {
 /** 旧版兼容（onReportFieldChange 已移除，保留空壳防报错） */
 function onReportFieldChange(el) {
     /* 已废弃：新版使用 startReportDropdownEdit / startReportNotesEdit */
+}
+
+// ==================== 报表行拖拽排序 ====================
+
+/**
+ * 初始化报表表格行拖拽排序（参照设备列表 initRowDrag）
+ */
+function initReportRowDrag() {
+    var tbody = document.getElementById('report-games-tbody');
+    if (!tbody) return;
+
+    var rows = tbody.querySelectorAll('.draggable-row');
+    rows.forEach(function(row) {
+        row.addEventListener('dragstart', function(e) {
+            _reportDragSrcRow = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.rowId);
+            setTimeout(() => { this.style.opacity = '0.4'; }, 0);
+        });
+        row.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            this.style.opacity = '';
+            _reportDragSrcRow = null;
+            removeRowDropIndicator();
+            saveReportRowOrder();
+        });
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (_reportDragSrcRow && _reportDragSrcRow !== this) {
+                var rect = this.getBoundingClientRect();
+                var midY = rect.top + rect.height / 2;
+                showRowDropIndicator(this, e.clientY < midY ? 'before' : 'after');
+            }
+        });
+        row.addEventListener('dragleave', function() {
+            removeRowDropIndicator();
+        });
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            removeRowDropIndicator();
+            if (_reportDragSrcRow && _reportDragSrcRow !== this) {
+                var rect = this.getBoundingClientRect();
+                var midY = rect.top + rect.height / 2;
+                if (e.clientY < midY) {
+                    this.parentNode.insertBefore(_reportDragSrcRow, this);
+                } else {
+                    this.parentNode.insertBefore(_reportDragSrcRow, this.nextSibling);
+                }
+            }
+        });
+    });
+}
+
+/**
+ * 将当前DOM行顺序保存到后端
+ */
+function saveReportRowOrder() {
+    var tbody = document.getElementById('report-games-tbody');
+    if (!tbody) return;
+
+    var rows = tbody.querySelectorAll('.draggable-row');
+    var orders = [];
+    rows.forEach(function(row, idx) {
+        var rowId = row.dataset.rowId || row.getAttribute('data-row-id');
+        if (rowId) {
+            orders.push({ row_id: rowId, sort_order: idx + 1 });
+        }
+    });
+
+    if (orders.length < 2) return; // 无需保存
+
+    authFetch(API_BASE + '/reports/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: orders })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            // 同步本地数据顺序
+            var newOrder = [];
+            orders.forEach(function(o) {
+                var found = allReportGameData.find(function(r) { return r._id == o.row_id; });
+                if (found) newOrder.push(found);
+            });
+            // 补上未在DOM中的行
+            allReportGameData.forEach(function(r) {
+                if (!newOrder.find(function(n) { return n._id === r._id; })) newOrder.push(r);
+            });
+            allReportGameData = newOrder;
+            filteredReportGameData = [...allReportGameData];
+        }
+    })
+    .catch(() => {});
 }

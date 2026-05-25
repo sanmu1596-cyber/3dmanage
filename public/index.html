@@ -2300,6 +2300,9 @@
                         .report-text-edit { width:100%; border:1px dashed transparent; background:transparent; border-radius:4px; padding:4px 6px; font-size:13px; color:var(--text,#333); cursor:pointer; transition:all 0.2s; box-sizing:border-box; }
                         .report-text-edit:hover,.report-text-edit:focus { border-color:var(--primary,#2563eb); outline:none; background:var(--card-bg,#fff); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
                         .report-text-edit::placeholder { color:#bbb; font-style:italic; }
+                        .report-del-btn { background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:4px; transition:all 0.2s; }
+                        .report-del-btn:hover { background:#fef2f2; }
+                        th.no-sort { cursor: default; }
                     </style>
                     <div class="toolbar">
                         <div class="toolbar-left">
@@ -2313,7 +2316,11 @@
                             <button class="tool-btn" id="report-prev-page" onclick="reportPrevPage()" title="上一页">◀</button>
                             <button class="tool-btn" id="report-next-page" onclick="reportNextPage()" title="下一页">▶</button>
                             <button class="tool-btn tool-btn-primary" onclick="refreshReports()" title="刷新数据"><i class="fas fa-sync-alt"></i> 刷新</button>
+                            <button class="tool-btn tool-btn-primary" onclick="addReportRow()" title="新增报表行"><span class="tool-icon">＋</span> 新增</button>
                             <button class="tool-btn" onclick="exportReport()" title="导出Excel" style="background:#28a745;color:#fff;"><i class="fas fa-file-excel"></i> 导出Excel</button>
+                            <div class="more-actions-wrapper" style="display:inline-block;vertical-align:middle;margin-left:4px;">
+                                <button class="tool-btn more-actions-btn" onclick="toggleColumnSettings()" title="字段设置">⚙</button>
+                            </div>
                             <span id="reports-updated" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
                         </div>
                     </div>
@@ -2321,17 +2328,40 @@
                         <table class="data-table" id="report-games-table">
                             <thead>
                                 <tr>
+                                    <th width="40" class="no-sort"></th>
                                     <th width="50">序号</th>
                                     <th data-field="name">游戏名称</th>
                                     <th data-field="status" width="100">适配状态</th>
                                     <th data-field="platform" width="100">平台</th>
                                     <th data-field="notes">备注</th>
+                                    <th width="60">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="report-games-tbody">
-                                <tr><td colspan="5" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- 报表字段设置面板（与游戏列表共用 column-settings 面板ID） -->
+                    <div id="column-settings" class="column-settings-panel" style="display:none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="closeColumnSettings()" title="收起">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllColumns()">取消全选</button>
+                                <button class="tool-btn" onclick="cancelColumnSettings()">取消</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" value="seq" checked><span>序号</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="name" checked><span>游戏名称</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="status" checked><span>适配状态</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="platform" checked><span>平台</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="action" checked><span>操作</span></label>
+                        </div>
                     </div>
                 </section>
 
@@ -3087,7 +3117,7 @@
     <script src="js/testcases.js?v=20260508"></script>
     <script src="js/issues-versions.js?v=20260509"></script>
     <script src="js/social.js?v=20260508"></script>
-    <script src="js/reports.js?v=20260521"></script>
+    <script src="js/reports.js?v=20260525"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
 </body>
