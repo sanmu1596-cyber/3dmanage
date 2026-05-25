@@ -550,44 +550,142 @@ function refreshReportCell(td, rowId, field) {
     }
 }
 
-// ==================== 添加新行（持久化到后端）====================
+// ==================== 添加新行（先选游戏再保存）====================
+/**
+ * 新增流程：点击"新增" → 表格顶部插入一行（游戏名列为下拉选择器）
+ * 用户从已有游戏列表中选中后 → 自动调 save-row 持久化
+ * 按 ESC 或点其他地方可取消
+ */
+var _pendingAddRowId = null;   // 正在添加的临时行ID
 function addReportRow() {
-    const newRow = {
-        _id: 'new_' + Date.now(),
-        name: '',
-        status: 'pending',
-        statusLabel: '待适配',
-        platform: '',
-        notes: ''
-    };
+    // 如果已有待完成的添加行，先取消
+    if (_pendingAddRowId) {
+        cancelPendingAddRow();
+    }
 
-    // 立即保存到后端
-    authFetch(API_BASE + '/reports/save-row', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRow)
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            if (result.row_id) newRow._id = result.row_id;
+    const tbody = document.getElementById('report-games-tbody');
+    if (!tbody) return;
+
+    const tempId = 'pending_' + Date.now();
+    _pendingAddRowId = tempId;
+
+    // 在表格最前面插入一行，游戏名称列是下拉选择器
+    const tr = document.createElement('tr');
+    tr.id = 'row-' + tempId;
+    tr.className = 'draggable-row pending-add-row';
+    tr.dataset.rowId = tempId;
+
+    tr.innerHTML =
+        '<td class="drag-handle" title="拖拽排序">⋮⋮</td>' +
+        '<td class="text-center"><strong>*</strong></td>' +
+        '<td class="editable-cell" data-field="name">' +
+            '<select id="select-' + tempId + '" class="inline-edit-select new-row-game-select">' +
+                '<option value="">-- 选择游戏 --</option>' +
+            '</select>' +
+        '</td>' +
+        '<td class="editable-cell text-center" style="color:#9ca3af;font-weight:600;">待适配</td>' +
+        '<td class="editable-cell text-center"><span class="text-muted">--</span></td>' +
+        '<td class="cell-wrap"><span class="text-muted"></span></td>' +
+        '<td class="text-center"><button class="report-del-btn" onclick="cancelPendingAddRow()" title="取消新增"><i class="fas fa-times" style="font-size:12px;color:#9ca3af;cursor:pointer;"></i></button></td>';
+
+    // 如果表格为空（显示空状态提示），先清空
+    const emptyState = tbody.querySelector('.empty-state');
+    if (emptyState) {
+        tbody.innerHTML = '';
+    }
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    const selectEl = document.getElementById('select-' + tempId);
+
+    // 加载游戏列表填充下拉选项
+    loadGameListForDropdown().then(gameNames => {
+        if (!selectEl) return; // 已被移除（用户取消）
+        selectEl.innerHTML = '<option value="">-- 选择游戏 --</option>';
+        gameNames.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n;
+            selectEl.appendChild(opt);
+        });
+        selectEl.focus();
+    }).catch(() => {
+        // 加载失败时用本地数据兜底
+        const fallbackGames = allReportGameData.map(g => g.name).filter(Boolean);
+        const uniqueGames = [...new Set(fallbackGames)].sort();
+        selectEl.innerHTML = '<option value="">-- 选择游戏 --</option>';
+        uniqueGames.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n;
+            selectEl.appendChild(opt);
+        });
+    });
+
+    // 选中游戏后立即保存
+    selectEl.addEventListener('change', function() {
+        const selectedName = this.value;
+        if (!selectedName) return; // 还没选
+
+        // 禁用下拉防止重复操作
+        this.disabled = true;
+
+        const newRow = {
+            _id: tempId,
+            name: selectedName,
+            status: 'pending',
+            statusLabel: '待适配',
+            platform: '',
+            notes: ''
+        };
+
+        authFetch(API_BASE + '/reports/save-row', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newRow)
+        })
+        .then(r => r.json())
+        .then(result => {
+            _pendingAddRowId = null;
+            if (result.success) {
+                if (result.row_id) newRow._id = result.row_id;
+                allReportGameData.unshift(newRow);
+                filteredReportGameData = [...allReportGameData];
+                reportCurrentPage = 1;
+                renderReportTable();
+                showToast('已添加：' + selectedName, 'success');
+            } else {
+                showToast(result.error || '添加失败', 'warning');
+                renderReportTable(); // 移除临时行
+            }
+        })
+        .catch(err => {
+            console.error('[reports] 新增保存失败:', err);
+            _pendingAddRowId = null;
+            // 降级：前端显示
             allReportGameData.unshift(newRow);
             filteredReportGameData = [...allReportGameData];
             reportCurrentPage = 1;
             renderReportTable();
-            showToast('已添加新行，请填写内容', 'success');
-        } else {
-            showToast(result.error || '添加失败', 'warning');
-        }
-    })
-    .catch(() => {
-        // 降级：仅前端显示（离线模式）
-        allReportGameData.unshift(newRow);
-        filteredReportGameData = [...allReportGameData];
-        reportCurrentPage = 1;
-        renderReportTable();
-        showToast('已添加（离线模式，刷新后可能丢失）', 'info');
+            showToast('已添加（离线模式）', 'info');
+        });
     });
+
+    // ESC 取消
+    selectEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cancelPendingAddRow();
+    });
+}
+
+/** 取消正在进行的添加行 */
+function cancelPendingAddRow() {
+    if (!_pendingAddRowId) return;
+    const tr = document.getElementById('row-' + _pendingAddRowId);
+    if (tr) tr.remove();
+    _pendingAddRowId = null;
+    // 如果表格空了，重新渲染（会显示空状态）
+    if (document.getElementById('report-games-tbody')?.children.length === 0) {
+        renderReportTable();
+    }
 }
 
 // ==================== 删除当前行（持久化到后端）====================
