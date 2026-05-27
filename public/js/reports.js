@@ -51,6 +51,8 @@ function loadReports() {
         }, 500);
         return;
     }
+    // 初始化字段设置面板（工厂组件：自动创建DOM + 注册逻辑 + 插入到toolbar后面）
+    if (typeof initReportColumnSettings === 'function') initReportColumnSettings();
     loadReportData();
 }
 

@@ -2620,6 +2620,95 @@ function _genericColumnPanel(moduleKey, getVisibleObj, doRender) {
     };
 }
 
+// ==================== 字段设置面板工厂组件 ====================
+/**
+ * 一次性创建完整的字段设置面板（DOM + 逻辑 + 函数注册）
+ * 新增模块只需调用此函数，无需手写 HTML 面板和逐个绑定函数
+ *
+ * @param {Object} config
+ * @param {string} config.moduleKey    - 模块标识，如 'report' 'games' → 生成面板ID: '{key}-column-settings'
+ * @param {string} config.title        - 面板标题，如 '选择要显示的列'
+ * @param {Array}  config.columns      - 字段配置 [{value:'name', label:'游戏名称', defaultChecked:true}, ...]
+ * @param {Function} config.getVisibleObj - 返回当前可见列配置对象的函数 () => visibleColumnsVar
+ * @param {Function} config.doRender    - 应用设置后重新渲染的函数 () => renderXxx()
+ * @param {HTMLElement|string} [config.insertAfter] - 插入位置：DOM元素或选择器。面板将插入到该元素之后。
+ *                                                    默认自动查找当前 tab 下 .toolbar 后面、.table-container 前面
+ * @returns {{panel: Object, el: HTMLElement}} 面板实例和 DOM 元素
+ */
+function createColumnSettingsPanel(config) {
+    var moduleKey = config.moduleKey;
+    var panelId = moduleKey + '-column-settings';
+    var storageKey = moduleKey + 'VisibleColumns';
+
+    // 如果已存在则不重复创建
+    if (document.getElementById(panelId)) {
+        console.warn('[createColumnSettingsPanel] 面板 #' + panelId + ' 已存在，跳过创建');
+        return null;
+    }
+
+    // ===== 1. 生成面板 DOM =====
+    var panel = document.createElement('div');
+    panel.id = panelId;
+    panel.className = 'column-settings-panel';
+    panel.style.display = 'none';
+
+    var checkboxHtml = config.columns.map(function(col) {
+        var checked = col.defaultChecked !== false ? 'checked' : '';
+        return '<div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="' + col.value + '" ' + checked + '><span>' + col.label + '</span></label></div>';
+    }).join('');
+
+    panel.innerHTML =
+        '<div class="settings-header">' +
+            '<h3>' + (config.title || '选择要显示的列') + '</h3>' +
+            '<button class="settings-close-btn" onclick="' + 'close' + capitalize(moduleKey) + 'ColumnSettings()" title="收起">&times;</button>' +
+            '<div class="settings-actions">' +
+                '<button class="tool-btn" onclick="' + 'selectAll' + capitalize(moduleKey) + 'Columns()">全选</button>' +
+                '<button class="tool-btn" onclick="' + 'deselectAll' + capitalize(moduleKey) + 'Columns()">取消全选</button>' +
+                '<button class="tool-btn" onclick="' + 'cancel' + capitalize(moduleKey) + 'ColumnSettings()">取消</button>' +
+                '<button class="tool-btn tool-btn-primary" onclick="' + 'apply' + capitalize(moduleKey) + 'ColumnSettings()">应用</button>' +
+            '</div>' +
+        '</div>' +
+        '<div class="settings-content">' + checkboxHtml + '</div>';
+
+    // ===== 2. 确定插入位置 =====
+    if (config.insertAfter && typeof config.insertAfter === 'object') {
+        config.insertAfter.insertAdjacentElement('afterend', panel);
+    } else if (config.insertAfter && typeof config.insertAfter === 'string') {
+        var target = document.querySelector(config.insertAfter);
+        if (target) target.insertAdjacentElement('afterend', panel);
+        else console.warn('[createColumnSettingsPanel] 找不到插入目标:', config.insertAfter);
+    } else {
+        // 自动查找：在最近的 .toolbar 之后插入
+        // 由于面板通常在 HTML 中紧跟 toolbar 之后，这里不做自动查找
+        // 调用者必须明确指定 insertAfter 或自行管理 DOM 位置
+        console.warn('[createColumnSettingsPanel] 未指定 insertAfter，面板已创建但未插入 DOM。请手动处理或传入 insertAfter 参数。');
+    }
+
+    // ===== 3. 注册通用面板逻辑 =====
+    var panelInstance = _genericColumnPanel(moduleKey, config.getVisibleObj, config.doRender);
+
+    // ===== 4. 挂载全局函数（window.xxx）=====
+    var cap = capitalize(moduleKey);
+    window['toggle' + cap + 'ColumnSettings'] = function() { panelInstance.toggle(); };
+    window['close' + cap + 'ColumnSettings'] = function() { panelInstance.close(); };
+    window['cancel' + cap + 'ColumnSettings'] = function() { panelInstance.cancel(); };
+    window['selectAll' + cap + 'Columns'] = function() { panelInstance.selectAll(); };
+    window['deselectAll' + cap + 'Columns'] = function() { panelInstance.deselectAll(); };
+    window['apply' + cap + 'ColumnSettings'] = function() { panelInstance.apply(); };
+    window['load' + cap + 'ColumnSettings'] = function() { panelInstance.load(); };
+
+    // 暴露给外部引用
+    window[moduleKey + 'ColumnPanel'] = panelInstance;
+
+    return { panel: panelInstance, el: panel };
+}
+
+/** 首字母大写工具函数 */
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+
 // ===== 成员模块 =====
 var _memberPanel = _genericColumnPanel('member',
     function() { return typeof memberVisibleColumns !== 'undefined' ? memberVisibleColumns : null; },
@@ -2684,18 +2773,45 @@ function deselectAllPlanListColumns() { _planListPanel.deselectAll(); }
 function applyPlanListColumnSettings() { _planListPanel.apply(); }
 function loadPlanListColumnSettings() { _planListPanel.load(); }
 
-// ===== 报表模块 =====
-var _reportPanel = _genericColumnPanel('report',
-    function() { return typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null; },
-    function() { if (typeof renderReportTable === 'function') renderReportTable(); }
-);
-function toggleReportColumnSettings() { _reportPanel.toggle(); }
-function closeReportColumnSettings() { _reportPanel.close(); }
-function cancelReportColumnSettings() { _reportPanel.cancel(); }
-function selectAllReportColumns() { _reportPanel.selectAll(); }
-function deselectAllReportColumns() { _reportPanel.deselectAll(); }
-function applyReportColumnSettings() { _reportPanel.apply(); }
-function loadReportColumnSettings() { _reportPanel.load(); }
+// ===== 报表模块（使用 createColumnSettingsPanel 工厂创建）=====
+// 面板 DOM 由工厂在 loadReports() 中动态生成并插入到 toolbar 后面
+// 全局函数（toggleReportColumnSettings 等）由工厂自动挂载到 window
+var _reportPanel = null;  // 工厂创建后赋值
+function loadReportColumnSettings() { if (_reportPanel && _reportPanel.load) _reportPanel.load(); }
+
+/**
+ * 初始化报表字段设置面板（在 loadReports() 中调用一次）
+ * 用法：initReportColumnSettings() — 自动创建DOM + 注册逻辑 + 插入到toolbar后面
+ */
+function initReportColumnSettings() {
+    if (document.getElementById('report-column-settings')) return; // 已初始化
+
+    var result = createColumnSettingsPanel({
+        moduleKey: 'report',
+        title: '选择要显示的列',
+        columns: [
+            { value: 'seq',     label: '序号' },
+            { value: 'name',    label: '游戏名称' },
+            { value: 'status',  label: '适配状态' },
+            { value: 'platform', label: '平台' },
+            { value: 'notes',   label: '备注' },
+            { value: 'action',  label: '操作' }
+        ],
+        getVisibleObj: function() {
+            return typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null;
+        },
+        doRender: function() {
+            if (typeof renderReportTable === 'function') renderReportTable();
+        },
+        insertAfter: '#reports .toolbar'
+    });
+
+    if (result) {
+        _reportPanel = result.panel;
+        // 立即加载 localStorage 持久化设置
+        _reportPanel.load();
+    }
+}
 
 // ==================== 通用表格列排序功能 ====================
 
