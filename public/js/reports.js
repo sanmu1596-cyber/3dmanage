@@ -295,9 +295,9 @@ function renderReportTable() {
             }
         });
 
-        return `<tr data-row-id="${rowId}" class="draggable-row" draggable="true">${html}
+        return `<tr data-row-id="${rowId}" data-id="${rowId}" class="draggable-row" draggable="true">${html}
             <td class="text-center">
-                <button class="report-del-btn" onclick="deleteReportRow('${rowId}')" title="删除此行"><i class="fas fa-trash-alt" style="font-size:12px;color:#ef4444;cursor:pointer;"></i></button>
+                <button class="report-del-btn" onclick="deleteReportRow('${rowId}', this)" title="删除此行"><i class="fas fa-trash-alt" style="font-size:12px;color:#ef4444;cursor:pointer;"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -310,6 +310,13 @@ function renderReportTable() {
     if (typeof initColumnResize === 'function') try { initColumnResize('report-games-table'); } catch(e) {}
     // 行拖拽排序
     initReportRowDrag();
+    // 批量选择/删除（复选框 + 全选 + 批量操作栏）
+    if (typeof initBatchSelect === 'function') {
+        initBatchSelect('report-games-table', {
+            onDelete: batchDeleteReportRows,
+            entityName: '条报表记录'
+        });
+    }
 }
 
 /**
@@ -638,33 +645,105 @@ function cancelPendingAddRow() {
     }
 }
 
-// ==================== 删除当前行（持久化到后端）====================
-function deleteReportRow(rowId) {
-    if (!confirm('确定删除这条记录吗？')) return;
+// ==================== 删除功能（单行 + 批量）====================
 
+/**
+ * 单行删除（带确认弹窗）
+ * @param {string} rowId - 行标识
+ * @param {HTMLElement} btnEl - 触发按钮元素（用于定位行）
+ */
+function deleteReportRow(rowId, btnEl) {
+    // 查找游戏名称用于确认提示
+    var rowData = allReportGameData.find(function(r) { return r._id == rowId; });
+    var gameName = rowData ? rowData.name : '此记录';
+
+    // 使用系统 confirm 或自定义确认
+    if (typeof showConfirm === 'function') {
+        showConfirm('确定删除「' + gameName + '」这条报表记录吗？', function() {
+            _doDeleteReportRow(rowId);
+        });
+    } else if (confirm('确定删除「' + gameName + '」吗？')) {
+        _doDeleteReportRow(rowId);
+    }
+}
+
+/**
+ * 执行单行删除请求（核心逻辑）
+ */
+function _doDeleteReportRow(rowId) {
     authFetch(API_BASE + '/reports/delete-row', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _id: rowId })
     })
-    .then(r => r.json())
-    .then(result => {
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
         if (result.success) {
-            allReportGameData = allReportGameData.filter(r => r._id != rowId);
-            filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
+            allReportGameData = allReportGameData.filter(function(r) { return r._id != rowId; });
+            filteredReportGameData = filteredReportGameData.filter(function(r) { return r._id != rowId; });
             renderReportTable();
             showToast('已删除', 'success');
         } else {
             showToast(result.error || '删除失败', 'warning');
         }
     })
-    .catch(() => {
+    .catch(function() {
         // 降级：仅前端删除
-        allReportGameData = allReportGameData.filter(r => r._id != rowId);
-        filteredReportGameData = filteredReportGameData.filter(r => r._id != rowId);
+        allReportGameData = allReportGameData.filter(function(r) { return r._id != rowId; });
+        filteredReportGameData = filteredReportGameData.filter(function(r) { return r._id != rowId; });
         renderReportTable();
         showToast('已删除（离线模式）', 'info');
     });
+}
+
+/**
+ * 批量删除（由 initBatchSelect 的批量操作栏触发）
+ * @param {string[]} ids - 选中的行ID数组
+ */
+async function batchDeleteReportRows(ids) {
+    if (!ids || ids.length === 0) return;
+
+    var total = ids.length;
+    var successCount = 0;
+    var failCount = 0;
+
+    // 逐条调用后端删除 API
+    var promises = ids.map(function(rowId) {
+        return authFetch(API_BASE + '/reports/delete-row', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ _id: rowId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                successCount++;
+                allReportGameData = allReportGameData.filter(function(r) { return r._id != rowId; });
+                filteredReportGameData = filteredReportGameData.filter(function(r) { return r._id != rowId; });
+            } else {
+                failCount++;
+            }
+        })
+        .catch(function() {
+            failCount++;
+            // 降级：仍然从前端移除
+            allReportGameData = allReportGameData.filter(function(r) { return r._id != rowId; });
+            filteredReportGameData = filteredReportGameData.filter(function(r) { return r._id != rowId; });
+        });
+    });
+
+    await Promise.all(promises);
+
+    // 刷新表格
+    reportCurrentPage = 1;
+    renderReportTable();
+
+    // 结果提示
+    if (failCount === 0) {
+        showToast('成功删除 ' + successCount + ' 条记录', 'success');
+    } else {
+        showToast('已删除 ' + successCount + ' 条（' + failCount + ' 条失败）', 'warning');
+    }
 }
 
 // ==================== 分页控制 ====================
