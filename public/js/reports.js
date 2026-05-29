@@ -51,6 +51,8 @@ function loadReports() {
         }, 500);
         return;
     }
+    // 初始化字段设置面板（工厂组件：自动创建DOM + 注册逻辑 + 插入到toolbar后面）
+    if (typeof initReportColumnSettings === 'function') initReportColumnSettings();
     loadReportData();
 }
 
@@ -570,24 +572,65 @@ function addReportRow() {
     const tempId = 'pending_' + Date.now();
     _pendingAddRowId = tempId;
 
-    // 在表格最前面插入一行，游戏名称列是下拉选择器
+    // ★ 关键：从实际DOM读取当前表头顺序（100%匹配显示的列排列）
+    // 不依赖 getColumnOrder() 内存值，直接读 <th data-field=""> 的出现顺序
+    var colOrder = [];
+    try {
+        var tableEl = document.getElementById('report-games-table');
+        if (tableEl) {
+            var thead = tableEl.previousElementSibling;
+            if (thead) {
+                var headerRow = thead.querySelector('tr');
+                if (headerRow) {
+                    var thList = headerRow.querySelectorAll('th[data-field]');
+                    thList.forEach(function(th) {
+                        colOrder.push(th.dataset.field || '');
+                    });
+                }
+            }
+        }
+    } catch(e) { console.warn('[reports] 读取表头列顺序失败:', e); }
+
+    // 兜底：如果DOM读取失败，用默认顺序
+    if (colOrder.length === 0) {
+        colOrder = ['name', 'status', 'platform', 'notes'];
+    }
+
+    // 按当前列顺序动态构建单元格（避免列拖拽后错位）
+    var cellsHtml = '<td class="drag-handle" title="拖拽排序">⋮⋮</td>' +
+                    '<td class="text-center"><strong>*</strong></td>';
+
+    colOrder.forEach(function(field) {
+        switch(field) {
+            case 'name':
+                cellsHtml += '<td class="editable-cell" data-field="name">' +
+                    '<select id="select-' + tempId + '" class="inline-edit-select new-row-game-select">' +
+                        '<option value="">-- 选择游戏 --</option>' +
+                    '</select>' +
+                '</td>';
+                break;
+            case 'status':
+                cellsHtml += '<td class="editable-cell text-center" style="color:#9ca3af;font-weight:600;">待适配</td>';
+                break;
+            case 'platform':
+                cellsHtml += '<td class="editable-cell text-center"><span class="text-muted">--</span></td>';
+                break;
+            case 'notes':
+                cellsHtml += '<td class="cell-wrap"><span class="text-muted"></span></td>';
+                break;
+            default:
+                cellsHtml += '<td></td>';
+        }
+    });
+
+    cellsHtml += '<td class="text-center"><button class="report-del-btn" onclick="cancelPendingAddRow()" title="取消新增"><i class="fas fa-times" style="font-size:12px;color:#9ca3af;cursor:pointer;"></i></button></td>';
+
+    // 在表格最前面插入一行
     const tr = document.createElement('tr');
     tr.id = 'row-' + tempId;
     tr.className = 'draggable-row pending-add-row';
     tr.dataset.rowId = tempId;
-
-    tr.innerHTML =
-        '<td class="drag-handle" title="拖拽排序">⋮⋮</td>' +
-        '<td class="text-center"><strong>*</strong></td>' +
-        '<td class="editable-cell" data-field="name">' +
-            '<select id="select-' + tempId + '" class="inline-edit-select new-row-game-select">' +
-                '<option value="">-- 选择游戏 --</option>' +
-            '</select>' +
-        '</td>' +
-        '<td class="editable-cell text-center" style="color:#9ca3af;font-weight:600;">待适配</td>' +
-        '<td class="editable-cell text-center"><span class="text-muted">--</span></td>' +
-        '<td class="cell-wrap"><span class="text-muted"></span></td>' +
-        '<td class="text-center"><button class="report-del-btn" onclick="cancelPendingAddRow()" title="取消新增"><i class="fas fa-times" style="font-size:12px;color:#9ca3af;cursor:pointer;"></i></button></td>';
+    tr.innerHTML = cellsHtml;
 
     // 如果表格为空（显示空状态提示），先清空
     const emptyState = tbody.querySelector('.empty-state');
