@@ -572,24 +572,47 @@ function addReportRow() {
     const tempId = 'pending_' + Date.now();
     _pendingAddRowId = tempId;
 
-    // 在表格最前面插入一行，游戏名称列是下拉选择器
+    // 获取当前列顺序（与 renderReportTable 保持一致）
+    var colOrder = ['name', 'status', 'platform', 'notes'];
+    if (typeof getColumnOrder === 'function') {
+        try { colOrder = getColumnOrder('report-games-table'); } catch(e) {}
+    }
+
+    // 按当前列顺序动态构建单元格（避免列拖拽后错位）
+    var cellsHtml = '<td class="drag-handle" title="拖拽排序">⋮⋮</td>' +
+                    '<td class="text-center"><strong>*</strong></td>';
+
+    colOrder.forEach(function(field) {
+        switch(field) {
+            case 'name':
+                cellsHtml += '<td class="editable-cell" data-field="name">' +
+                    '<select id="select-' + tempId + '" class="inline-edit-select new-row-game-select">' +
+                        '<option value="">-- 选择游戏 --</option>' +
+                    '</select>' +
+                '</td>';
+                break;
+            case 'status':
+                cellsHtml += '<td class="editable-cell text-center" style="color:#9ca3af;font-weight:600;">待适配</td>';
+                break;
+            case 'platform':
+                cellsHtml += '<td class="editable-cell text-center"><span class="text-muted">--</span></td>';
+                break;
+            case 'notes':
+                cellsHtml += '<td class="cell-wrap"><span class="text-muted"></span></td>';
+                break;
+            default:
+                cellsHtml += '<td></td>';
+        }
+    });
+
+    cellsHtml += '<td class="text-center"><button class="report-del-btn" onclick="cancelPendingAddRow()" title="取消新增"><i class="fas fa-times" style="font-size:12px;color:#9ca3af;cursor:pointer;"></i></button></td>';
+
+    // 在表格最前面插入一行
     const tr = document.createElement('tr');
     tr.id = 'row-' + tempId;
     tr.className = 'draggable-row pending-add-row';
     tr.dataset.rowId = tempId;
-
-    tr.innerHTML =
-        '<td class="drag-handle" title="拖拽排序">⋮⋮</td>' +
-        '<td class="text-center"><strong>*</strong></td>' +
-        '<td class="editable-cell" data-field="name">' +
-            '<select id="select-' + tempId + '" class="inline-edit-select new-row-game-select">' +
-                '<option value="">-- 选择游戏 --</option>' +
-            '</select>' +
-        '</td>' +
-        '<td class="editable-cell text-center" style="color:#9ca3af;font-weight:600;">待适配</td>' +
-        '<td class="editable-cell text-center"><span class="text-muted">--</span></td>' +
-        '<td class="cell-wrap"><span class="text-muted"></span></td>' +
-        '<td class="text-center"><button class="report-del-btn" onclick="cancelPendingAddRow()" title="取消新增"><i class="fas fa-times" style="font-size:12px;color:#9ca3af;cursor:pointer;"></i></button></td>';
+    tr.innerHTML = cellsHtml;
 
     // 如果表格为空（显示空状态提示），先清空
     const emptyState = tbody.querySelector('.empty-state');
