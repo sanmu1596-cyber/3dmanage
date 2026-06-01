@@ -238,7 +238,8 @@ function renderProgressTable(deviceIndex) {
                 <button class="btn btn-small btn-delete" onclick="deleteProgressItem(${deviceIndex}, ${gameData.id})">删除</button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 
     // 为所有可编辑单元格添加点击事件
     const editableCells = tbody.querySelectorAll('.editable-cell');
