@@ -7,6 +7,13 @@ var App = window.App;
 
 // ==================== 适配进展功能 ====================
 
+// 筛选状态（必须用 var，踩坑 #1）
+var progressSearchTerm = '';
+var progressPlatformFilter = '';
+var progressTypeFilter = '';
+var progressStatusFilter = '';
+var filteredProgressGames = [];  // 当前设备筛选后的数据
+
 // 加载适配进展数据
 async function loadProgressData() {
     try {
@@ -33,6 +40,11 @@ async function loadProgressData() {
 
         // 生成设备tab
         renderDeviceTabs();
+
+        // 填充筛选下拉选项（平台/类型）
+        if (typeof populateProgressFilterDropdowns === 'function') {
+            populateProgressFilterDropdowns();
+        }
 
         console.log('适配进展数据加载完成');
     } catch (error) {
@@ -155,9 +167,42 @@ function renderProgressTable(deviceIndex) {
         return;
     }
 
-    const games = progressData[deviceIndex].games;
+    var games = progressData[deviceIndex].games;
 
-    // 状态映射（动态从字段设置读取）
+    // ★ 应用筛选条件
+    filteredProgressGames = games.filter(function(g) {
+        // 搜索匹配（游戏名称 / 负责人）
+        if (progressSearchTerm) {
+            var term = progressSearchTerm.toLowerCase();
+            var matchSearch = (g.gameName && g.gameName.toLowerCase().includes(term)) ||
+                              (g.ownerName && g.ownerName.toLowerCase().includes(term));
+            if (!matchSearch) return false;
+        }
+        // 平台匹配
+        if (progressPlatformFilter && g.gamePlatform !== progressPlatformFilter) return false;
+        // 类型匹配
+        if (progressTypeFilter && g.gameType !== progressTypeFilter) return false;
+        // 状态匹配
+        if (progressStatusFilter && g.onlineStatus !== progressStatusFilter) return false;
+        return true;
+    });
+
+    // 筛选后无数据
+    if (filteredProgressGames.length === 0 && games.length > 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="empty-state">
+                    <div class="empty-icon">🔍</div>
+                    <div class="empty-text">没有匹配的适配记录</div>
+                    <div class="empty-sub">试试调整筛选条件，或点击「重置」清空筛选</div>
+                </td>
+            </tr>`;
+        updateProgressModuleStats(deviceIndex);
+        return;
+    }
+
+    // 用筛选后的数据渲染
+    var gamesToRender = filteredProgressGames;
     const onlineStatusMap = {};
     getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label);
     // fallback
@@ -167,22 +212,25 @@ function renderProgressTable(deviceIndex) {
     getFieldOptionsByKey('quality').forEach(o => qualityMap[o.value] = o.label);
     if (!qualityMap['normal']) Object.assign(qualityMap, {'normal':'一般','recommended':'推荐'});
 
-    tbody.innerHTML = games.map((gameData, index) => `
+    tbody.innerHTML = gamesToRender.map(function(gameData, index) {
+        // 找到原始数据中的真实索引（用于行内编辑定位）
+        var originalIndex = games.indexOf(gameData);
+        return `
         <tr>
             <td class="text-center"><strong>${index + 1}</strong></td>
             <td>${escapeHtml(gameData.gameName)}</td>
             <td>${escapeHtml(gameData.gamePlatform || '-')}</td>
             <td>${escapeHtml(gameData.gameType || '-')}</td>
-            <td class="editable-cell" data-field="ownerName" data-row-index="${index}" data-device-index="${deviceIndex}">
+            <td class="editable-cell" data-field="ownerName" data-row-index="${originalIndex}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(gameData.ownerName || '-')}</span>
             </td>
-            <td class="editable-cell text-center" data-field="onlineStatus" data-row-index="${index}" data-device-index="${deviceIndex}">
+            <td class="editable-cell text-center" data-field="onlineStatus" data-row-index="${originalIndex}" data-device-index="${deviceIndex}">
                 <span class="cell-value"><span class="status-badge status-${gameData.onlineStatus}">${escapeHtml(onlineStatusMap[gameData.onlineStatus] || '-')}</span></span>
             </td>
-            <td class="editable-cell text-center" data-field="quality" data-row-index="${index}" data-device-index="${deviceIndex}">
+            <td class="editable-cell text-center" data-field="quality" data-row-index="${originalIndex}" data-device-index="${deviceIndex}">
                 <span class="cell-value">${escapeHtml(qualityMap[gameData.quality] || '-')}</span>
             </td>
-            <td class="editable-cell" data-field="issueNotes" data-row-index="${index}" data-device-index="${deviceIndex}" title="单击编辑">
+            <td class="editable-cell" data-field="issueNotes" data-row-index="${originalIndex}" data-device-index="${deviceIndex}" title="单击编辑">
                 <span class="cell-value">${escapeHtml(gameData.issueNotes || '-')}</span>
             </td>
             <td class="text-center">${gameData.updatedAt ? formatDate(gameData.updatedAt) : '-'}</td>
@@ -205,6 +253,102 @@ function renderProgressTable(deviceIndex) {
 
     // 更新适配进展统计
     updateProgressModuleStats(deviceIndex);
+}
+
+// ==================== 适配进展：搜索筛选 ====================
+
+/**
+ * 筛选适配进展数据（由筛选面板的 input/select 触发）
+ */
+function filterProgress() {
+    // 读取当前筛选值
+    progressSearchTerm = (document.getElementById('progress-search-input')?.value || '').trim().toLowerCase();
+    progressPlatformFilter = document.getElementById('progress-platform-filter')?.value || '';
+    progressTypeFilter = document.getElementById('progress-type-filter')?.value || '';
+    progressStatusFilter = document.getElementById('progress-status-filter')?.value || '';
+
+    // 重新渲染当前设备表格
+    if (typeof currentDeviceIndex !== 'undefined' && currentDeviceIndex !== null) {
+        renderProgressTable(currentDeviceIndex);
+    }
+}
+
+/**
+ * 重置所有筛选条件
+ */
+function resetProgressFilters() {
+    var searchInput = document.getElementById('progress-search-input');
+    var platformFilter = document.getElementById('progress-platform-filter');
+    var typeFilter = document.getElementById('progress-type-filter');
+    var statusFilter = document.getElementById('progress-status-filter');
+
+    if (searchInput) searchInput.value = '';
+    if (platformFilter) platformFilter.value = '';
+    if (typeFilter) typeFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
+
+    progressSearchTerm = '';
+    progressPlatformFilter = '';
+    progressTypeFilter = '';
+    progressStatusFilter = '';
+
+    // 重新渲染当前设备表格
+    if (typeof currentDeviceIndex !== 'undefined' && currentDeviceIndex !== null) {
+        renderProgressTable(currentDeviceIndex);
+    }
+}
+
+/**
+ * 填充平台/类型下拉选项（从已加载的游戏数据中提取唯一值）
+ * 在 loadProgressData 完成后调用
+ */
+function populateProgressFilterDropdowns() {
+    // 平台下拉
+    var platformSelect = document.getElementById('progress-platform-filter');
+    if (platformSelect) {
+        // 收集所有唯一平台（从 allGamesForProgress 或 progressData 中提取）
+        var platforms = new Set();
+        if (typeof allGamesForProgress !== 'undefined' && allGamesForProgress) {
+            allGamesForProgress.forEach(function(g) { if (g.platform) platforms.add(g.platform); });
+        } else {
+            progressData.forEach(function(d) { d.games.forEach(function(g) { if (g.gamePlatform && g.gamePlatform !== '-') platforms.add(g.gamePlatform); }); });
+        }
+        // 保留"全部"option，追加动态选项
+        var currentVal = platformSelect.value;
+        platformSelect.innerHTML = '<option value="">全部</option>';
+        platforms.forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            platformSelect.appendChild(opt);
+        });
+        // 恢复选中值
+        if (currentVal && Array.from(platformSelect.options).some(function(o) { return o.value === currentVal; })) {
+            platformSelect.value = currentVal;
+        }
+    }
+
+    // 类型下拉
+    var typeSelect = document.getElementById('progress-type-filter');
+    if (typeSelect) {
+        var types = new Set();
+        if (typeof allGamesForProgress !== 'undefined' && allGamesForProgress) {
+            allGamesForProgress.forEach(function(g) { if (g.game_type) types.add(g.game_type); });
+        } else {
+            progressData.forEach(function(d) { d.games.forEach(function(g) { if (g.gameType && g.gameType !== '-') types.add(g.gameType); }); });
+        }
+        var currentVal2 = typeSelect.value;
+        typeSelect.innerHTML = '<option value="">全部</option>';
+        types.forEach(function(t) {
+            var opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            typeSelect.appendChild(opt);
+        });
+        if (currentVal2 && Array.from(typeSelect.options).some(function(o) { return o.value === currentVal2; })) {
+            typeSelect.value = currentVal2;
+        }
+    }
 }
 
 // 显示编辑下拉框

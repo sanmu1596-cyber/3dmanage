@@ -651,6 +651,40 @@
                             <button class="tool-btn" onclick="openBatchAddGameToProgress()"><span class="tool-icon">📋</span>批量添加</button>
                         </div>
                     </div>
+
+                    <!-- 筛选面板（常驻，对齐游戏列表） -->
+                    <div id="progress-filter-panel" class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="progress-search-input" placeholder="游戏名称或负责人..." class="filter-input" onkeyup="filterProgress()">
+                            </div>
+                            <div class="filter-group">
+                                <label>平台</label>
+                                <select id="progress-platform-filter" class="filter-select" onchange="filterProgress()">
+                                    <option value="">全部</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="progress-type-filter" class="filter-select" onchange="filterProgress()">
+                                    <option value="">全部</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="progress-status-filter" class="filter-select" onchange="filterProgress()">
+                                    <option value="">全部</option>
+                                    <option value="pending">待上线</option>
+                                    <option value="in_progress">适配中</option>
+                                    <option value="paused">暂停适配</option>
+                                    <option value="online">已上线</option>
+                                </select>
+                            </div>
+                            <button class="tool-btn" onclick="resetProgressFilters()">重置</button>
+                        </div>
+                    </div>
+
                     <!-- 设备Tab页 -->
                     <div class="device-tabs">
                         <div id="device-tab-container" class="device-tab-container"></div>
@@ -2345,6 +2379,27 @@
                                 <tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- 报表字段设置面板 -->
+                    <div id="report-column-settings" class="column-settings-panel" style="display:none;">
+                        <div class="settings-header">
+                            <h3>选择要显示的列</h3>
+                            <button class="settings-close-btn" onclick="closeReportColumnSettings()" title="收起">×</button>
+                            <div class="settings-actions">
+                                <button class="tool-btn" onclick="selectAllReportColumns()">全选</button>
+                                <button class="tool-btn" onclick="deselectAllReportColumns()">取消全选</button>
+                                <button class="tool-btn" onclick="cancelReportColumnSettings()">取消</button>
+                                <button class="tool-btn tool-btn-primary" onclick="applyReportColumnSettings()">应用</button>
+                            </div>
+                        </div>
+                        <div class="settings-content checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" value="seq" checked><span>序号</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="name" checked><span>游戏名称</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="status" checked><span>适配状态</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="platform" checked><span>平台</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="action" checked><span>操作</span></label>
+                        </div>
                     </div>
                 </section>
 
