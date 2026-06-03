@@ -65,6 +65,9 @@ async function loadDashboard() {
         
         // 加载最近活动
         loadRecentActivity();
+
+        // 加载近期关注事项
+        if (typeof loadFocusItems === 'function') loadFocusItems();
     } catch (error) {
         console.error('加载 Dashboard 数据失败:', error);
         // 网络异常时也自动重试

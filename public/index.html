@@ -236,6 +236,82 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- ==================== 近期关注事项（故事墙） ==================== -->
+                    <div id="focus-items-section">
+                        <div class="focus-header">
+                            <div class="focus-title-row">
+                                <h3 class="focus-title">📌 近期关注事项</h3>
+                                <button class="tool-btn tool-btn-primary focus-add-btn" onclick="openFocusItemEditor()">
+                                    <span class="tool-icon">＋</span>新增大事
+                                </button>
+                            </div>
+                            <div class="focus-toolbar">
+                                <div class="focus-filter-group">
+                                    <button class="focus-filter-btn active" data-status="" onclick="filterFocusItems('')">全部</button>
+                                    <button class="focus-filter-btn" data-status="new" onclick="filterFocusItems('new')">新建</button>
+                                    <button class="focus-filter-btn" data-status="in_progress" onclick="filterFocusItems('in_progress')">进行中</button>
+                                    <button class="focus-filter-btn" data-status="done" onclick="filterFocusItems('done')">已结束</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 故事墙容器（拖拽排序） -->
+                        <div id="focus-items-board" class="focus-board"></div>
+
+                        <!-- 空状态 -->
+                        <div id="focus-empty-state" class="empty-state" style="display:none;">
+                            <div class="empty-icon">📌</div>
+                            <div class="empty-text">暂无关注事项</div>
+                            <div class="empty-sub">点击上方「＋ 新增大事」添加第一条关注事项</div>
+                        </div>
+
+                        <!-- 编辑器弹窗 -->
+                        <div id="focus-editor-modal" class="modal-overlay" style="display:none;" onclick="closeFocusEditor(event)">
+                            <div class="modal-box modal-lg focus-editor-box" onclick="event.stopPropagation()">
+                                <div class="modal-header">
+                                    <h4 id="focus-editor-title">新增大事</h4>
+                                    <button class="modal-close" onclick="closeFocusEditor()">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" id="focus-edit-id" value="">
+                                    <div class="form-group">
+                                        <label>模块</label>
+                                        <select id="focus-edit-module" class="form-control">
+                                            <option value="游戏">🎮 游戏</option>
+                                            <option value="交织">🔗 交织</option>
+                                            <option value="客户端">📱 客户端</option>
+                                            <option value="硬件">🖥 硬件</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>内容</label>
+                                        <div id="focus-edit-content" class="focus-rich-editor"
+                                     contenteditable="true" data-placeholder="输入关注事项内容...（支持粘贴截图）"></div>
+                                        <div class="editor-toolbar">
+                                            <span class="toolbar-hint">💡 单击编辑 | Ctrl+V 粘贴图片</span>
+                                            <button class="tool-btn btn-sm" onclick="insertImageToEditor()" title="插入图片">🖼 插图</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group form-inline-2col">
+                                        <div>
+                                            <label>状态</label>
+                                            <select id="focus-edit-status" class="form-control">
+                                                <option value="new">🆕 新建</option>
+                                                <option value="in_progress">🔄 进行中</option>
+                                                <option value="done">✅ 结束</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <input type="file" id="focus-image-input" accept="image/*" style="display:none" onchange="handleFocusImageUpload(this)">
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-default" onclick="closeFocusEditor()">取消</button>
+                                    <button class="btn btn-primary" onclick="saveFocusItem()">保存</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- ========== 游戏列表 ========== -->
@@ -3156,6 +3232,7 @@
     <script src="js/issues-versions.js?v=20260509"></script>
     <script src="js/social.js?v=20260508"></script>
     <script src="js/reports.js?v=20260525"></script>
+    <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
 </body>

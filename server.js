@@ -2001,6 +2001,155 @@ notificationsRouter.delete('/:id', (req, res) => {
   });
 });
 
+// ==================== 近期关注事项（大事）API ====================
+
+// 建表：大事
+db.run(`CREATE TABLE IF NOT EXISTS focus_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  module TEXT NOT NULL DEFAULT '游戏',
+  content TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'new',
+  sort_order INTEGER DEFAULT 0,
+  created_by TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+// 建表：评论
+db.run(`CREATE TABLE IF NOT EXISTS focus_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  images TEXT DEFAULT '[]',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (item_id) REFERENCES focus_items(id) ON DELETE CASCADE
+)`);
+
+// 索引
+db.run('CREATE INDEX IF NOT EXISTS idx_focus_items_status ON focus_items(status)');
+db.run('CREATE INDEX IF NOT EXISTS idx_focus_comments_item ON focus_comments(item_id)');
+
+const focusItemsRouter = express.Router();
+focusItemsRouter.use(auth.verifyToken);
+
+// GET /api/focus-items — 列表（含评论数）
+focusItemsRouter.get('/', (req, res) => {
+  const sql = `SELECT fi.*,
+    (SELECT COUNT(*) FROM focus_comments fc WHERE fc.item_id = fi.id) as comment_count
+    FROM focus_items fi ORDER BY fi.sort_order ASC, fi.id DESC`;
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows || [] });
+  });
+});
+
+// POST /api/focus-items — 新建大事
+focusItemsRouter.post('/', (req, res) => {
+  const { module, content, status } = req.body;
+  if (!module || !content) {
+    return res.status(400).json({ error: '模块和内容不能为空' });
+  }
+  // 获取最大 sort_order
+  db.get('SELECT COALESCE(MAX(sort_order), -1) as max_order FROM focus_items', [], (err, row) => {
+    const nextOrder = row ? row.max_order + 1 : 0;
+    const sql = `INSERT INTO focus_items (module, content, status, sort_order, created_by)
+                 VALUES (?, ?, ?, ?, ?)`;
+    const author = req.user?.real_name || req.user?.username || '';
+    db.run(sql, [module || '游戏', content, status || 'new', nextOrder, author], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, id: this.lastID });
+    });
+  });
+});
+
+// PUT /api/focus-items/:id — 更新大事
+focusItemsRouter.put('/:id', (req, res) => {
+  const { id } = req.params;
+  const { module, content, status } = req.body;
+  const sets = [];
+  const params = [];
+
+  if (module !== undefined) { sets.push('module = ?'); params.push(module); }
+  if (content !== undefined) { sets.push('content = ?'); params.push(content); }
+  if (status !== undefined) { sets.push('status = ?'); params.push(status); }
+
+  if (sets.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+
+  sets.push("updated_at = datetime('now','localtime')");
+  params.push(id);
+
+  const sql = `UPDATE focus_items SET ${sets.join(', ')} WHERE id = ?`;
+  db.run(sql, params, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, changes: this.changes });
+  });
+});
+
+// DELETE /api/focus-items/:id — 删除大事（级联删除评论）
+focusItemsRouter.delete('/:id', (req, res) => {
+  db.run('DELETE FROM focus_items WHERE id = ?', [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// PUT /api/focus-items/reorder — 拖拽排序（批量更新 sort_order）
+focusItemsRouter.put('/reorder', (req, res) => {
+  const { order } = req.body; // [{id: 5}, {id: 3}, {id: 1}]
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order 必须是数组' });
+
+  let completed = 0;
+  order.forEach((item, index) => {
+    db.run('UPDATE focus_items SET sort_order = ? WHERE id = ?', [index, item.id], (err) => {
+      if (err) console.error('Reorder error:', err);
+      completed++;
+      if (completed === order.length) {
+        res.json({ success: true });
+      }
+    });
+  });
+
+  if (order.length === 0) res.json({ success: true });
+});
+
+// GET /api/focus-items/:id/comments — 某条大事的评论列表
+focusItemsRouter.get('/:id/comments', (req, res) => {
+  const sql = `SELECT * FROM focus_comments WHERE item_id = ? ORDER BY id ASC`;
+  db.all(sql, [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // 解析 images JSON
+    const comments = (rows || []).map(r => ({
+      ...r,
+      imageList: r.images && r.images !== '[]' ? JSON.parse(r.images) : []
+    }));
+    res.json({ success: true, data: comments });
+  });
+});
+
+// POST /api/focus-items/:id/comments — 新增评论
+focusItemsRouter.post('/:id/comments', (req, res) => {
+  const { content, images } = req.body;
+  if (!content) return res.status(400).json({ error: '评论内容不能为空' });
+
+  const author = req.user?.real_name || req.user?.username || '';
+  const imagesJson = Array.isArray(images) ? JSON.stringify(images) : '[]';
+  const sql = `INSERT INTO focus_comments (item_id, author, content, images) VALUES (?, ?, ?, ?)`;
+
+  db.run(sql, [req.params.id, author, content, imagesJson], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+// DELETE /api/focus-comments/:id — 删除评论
+focusItemsRouter.delete('/comments/:commentId', (req, res) => {
+  db.run('DELETE FROM focus_comments WHERE id = ?', [req.params.commentId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 // 创建通知的辅助函数
 function createNotification(userId, type, title, content, relatedType = null, relatedId = null) {
   db.run(
@@ -2413,6 +2562,7 @@ app.use('/api/game-versions', gameVersionsRouter);
 app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
+app.use('/api/focus-items', focusItemsRouter);
 
 // ==================== 汇报报表 API ====================
 const reportsRouter = express.Router();
