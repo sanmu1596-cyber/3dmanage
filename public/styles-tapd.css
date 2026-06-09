@@ -1135,14 +1135,21 @@ body.col-resizing * {
 }
 
 /* ========== 表头拖拽排序 - TAPD风格 ========== */
-/* 可拖拽表头样式 */
+/* 可拖拽表头样式 — 默认指针（单击=排序），长按才出现抓取光标 */
 .data-table th[data-field] {
-    cursor: grab;
+    cursor: pointer;
     user-select: none;
 }
 
-.data-table th[data-field]:active {
-    cursor: grabbing;
+/* 长按过程中显示抓手光标 */
+.data-table th[data-field].press-hint {
+    cursor: grab;
+}
+
+/* 正在拖拽时 */
+.data-table th[data-field]:active,
+.data-table th.dragging-source {
+    cursor: grabbing !important;
 }
 
 /* 拖拽中的表头 */
@@ -1541,6 +1548,8 @@ tr:hover .action-icon-btn:hover {
 .editable-cell.editing {
     background: inherit !important;
     padding: 0 !important;
+    position: relative !important;
+    z-index: 10 !important;
 }
 
 .inline-edit-input,

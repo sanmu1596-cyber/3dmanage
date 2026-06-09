@@ -471,17 +471,16 @@ function startGameTextEdit(td, gameId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
+    // 记录原始尺寸和HTML（用于还原）
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    const originalHtml = td.innerHTML;
+
+    // 设置为相对定位，让内部绝对定位的编辑框可以溢出单元格
+    td.style.position = 'relative';
+    td.style.minWidth = Math.max(rect.width, 180) + 'px';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalValue = game ? (game[field] || '') : '';
-    const originalHtml = td.innerHTML;
 
     // 游戏账号用 textarea（多行），简介用 input
     let input;
@@ -489,12 +488,15 @@ function startGameTextEdit(td, gameId, field) {
         input = document.createElement('textarea');
         input.className = 'inline-edit-textarea';
         input.value = originalValue;
-        input.rows = 2;
+        input.rows = 3;
+        input.style.minWidth = '260px';
+        input.style.minHeight = '60px';
     } else {
         input = document.createElement('input');
         input.type = 'text';
         input.className = 'inline-edit-input';
         input.value = originalValue;
+        input.style.minWidth = Math.max(rect.width * 1.5, 180) + 'px';
     }
 
     td.innerHTML = '';
@@ -516,7 +518,7 @@ function startGameTextEdit(td, gameId, field) {
         if (newValue === originalValue) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
             return;
         }
         try {
@@ -543,7 +545,7 @@ function startGameTextEdit(td, gameId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
     };
 
     input.addEventListener('blur', save);
@@ -553,7 +555,7 @@ function startGameTextEdit(td, gameId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
         }
     });
 }
@@ -563,19 +565,17 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
+    // 记录原始HTML，不锁定宽度让select可以展开
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    td.style.position = 'relative';
+    td.style.minWidth = Math.max(rect.width, 140) + 'px';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalHtml = td.innerHTML;
 
     const select = document.createElement('select');
     select.className = 'inline-edit-select';
+    select.style.minWidth = Math.max(rect.width * 1.3, 140) + 'px';
 
     // 空选项
     const emptyOpt = document.createElement('option');
@@ -643,7 +643,7 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
     };
 
     select.addEventListener('change', save);
@@ -653,7 +653,7 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
         }
     });
 }
@@ -3039,10 +3039,8 @@ function initTableSort(tableId) {
         th.style.userSelect = 'none';
         th.style.position = 'relative';
 
-        // 保留表头拖拽的grab光标（不覆盖games-table的cursor:grab）
-        if (tableId !== 'games-table' || !th.dataset.field) {
-            th.style.cursor = 'pointer';
-        }
+        // 统一使用 pointer 光标（单击=排序，长按=拖拽）
+        th.style.cursor = 'pointer';
 
         // 添加排序箭头占位
         if (!th.querySelector('.sort-arrow')) {
