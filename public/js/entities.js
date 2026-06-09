@@ -372,16 +372,16 @@ function renderGamesPage() {
                 
                 switch (field) {
                     case 'name':
-                        rowHtml += `<td class="cell-game-name">${highlightSearch(game.name, 'games-table')}</td>`;
+                        rowHtml += `<td class="cell-game-name editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'name')" title="双击编辑">${highlightSearch(game.name, 'games-table')}</td>`;
                         break;
                     case 'english_name':
-                        rowHtml += `<td class="cell-game-name">${highlightSearch(game.english_name || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="cell-game-name editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'english_name')" title="双击编辑">${highlightSearch(game.english_name || '-', 'games-table')}</td>`;
                         break;
                     case 'platform':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
                         break;
                     case 'game_id':
-                        rowHtml += `<td>${highlightSearch(game.game_id || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'game_id')" title="双击编辑">${highlightSearch(game.game_id || '-', 'games-table')}</td>`;
                         break;
                     case 'game_type':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${highlightSearch(game.game_type || '-', 'games-table')}</td>`;
@@ -390,25 +390,25 @@ function renderGamesPage() {
                         rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${highlightSearch(game.description || '-', 'games-table')}</td>`;
                         break;
                     case 'developer':
-                        rowHtml += `<td>${highlightSearch(game.developer || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'developer')" title="双击编辑">${highlightSearch(game.developer || '-', 'games-table')}</td>`;
                         break;
                     case 'operator':
-                        rowHtml += `<td>${highlightSearch(game.operator || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'operator')" title="双击编辑">${highlightSearch(game.operator || '-', 'games-table')}</td>`;
                         break;
                     case 'release_date':
-                        rowHtml += `<td>${escapeHtml(game.release_date || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'release_date')" title="双击编辑">${escapeHtml(game.release_date || '-')}</td>`;
                         break;
                     case 'config_path':
-                        rowHtml += `<td>${escapeHtml(game.config_path || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'config_path')" title="双击编辑">${escapeHtml(game.config_path || '-')}</td>`;
                         break;
                     case 'adapter_progress':
-                        rowHtml += `<td>${escapeHtml(game.adapter_progress || '0%')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'adapter_progress')" title="双击编辑">${escapeHtml(game.adapter_progress || '0%')}</td>`;
                         break;
                     case 'owner':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
                         break;
                     case 'online_status':
-                        rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'online_status', 'online_status')" title="点击选择">${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
                         break;
                     case 'quality':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
@@ -631,10 +631,8 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
                     const memberName = result.owner_name || '-';
                     if (game) game.owner_name = memberName;
                     td.textContent = memberName;
-                } else if (optionSource === 'quality') {
-                    td.textContent = getFieldOptionLabel('quality', newValue) || '-';
                 } else {
-                    td.textContent = newValue || '-';
+                    td.textContent = getFieldOptionLabel(optionSource, newValue) || newValue || '-';
                 }
             } else {
                 td.innerHTML = originalHtml;

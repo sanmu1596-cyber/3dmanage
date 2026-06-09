@@ -1525,6 +1525,18 @@ tr:hover .action-icon-btn:hover {
 .editable-cell:hover {
     background: var(--primary-light) !important;
 }
+/* hover时右上角显示编辑图标 */
+.editable-cell:hover::after {
+    content: '✏️';
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+}
 
 .editable-cell.editing {
     background: inherit !important;
@@ -5388,6 +5400,9 @@ tr:hover .action-icon-btn:hover {
 /* 深色模式 - 可编辑单元格悬停 */
 [data-theme="dark"] .editable-cell:hover {
     background: rgba(24, 144, 255, 0.08) !important;
+}
+[data-theme="dark"] .editable-cell:hover::after {
+    opacity: 0.5;
 }
 
 /* 游戏问题模块样式 */
