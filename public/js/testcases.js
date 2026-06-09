@@ -1623,9 +1623,11 @@ function renderDetailContent(type, data) {
 // 渲染游戏详情
 function renderGameDetail(game) {
     const statusMap = {
-        online: { text: '已上线', class: 'status-online' },
-        adapting: { text: '适配中', class: 'status-in_progress' },
-        pending: { text: '待上线', class: 'status-pending' }
+        completed: { text: '已完成', class: 'status-online' },
+        developing: { text: '开发中', class: 'status-in_progress' },
+        undeveloped: { text: '未开发', class: 'status-pending' },
+        anticheat: { text: '反外挂', class: 'status-paused' },
+        not_applicable: { text: '不适用', class: '' }
     };
     const qualityMap = {
         high: { text: '高', class: 'priority-high' },
@@ -1655,7 +1657,7 @@ function renderGameDetail(game) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">适配状态</div>
-            ${detailField('上线状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
+            ${detailField('hook开发状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
             ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`, true)}
             ${detailField('适配进度', game.adapter_progress ? game.adapter_progress + '%' : '-')}
             ${detailField('负责人', game.owner_name || '-')}

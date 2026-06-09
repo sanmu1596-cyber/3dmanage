@@ -82,7 +82,7 @@ async function loadAdaptationRecords() {
                 gameType: r.game_type || '-',
                 adapterProgress: r.adapter_progress || 0,
                 ownerName: r.owner_name || '-',
-                onlineStatus: r.online_status || 'pending',
+                onlineStatus: r.online_status || 'undeveloped',
                 quality: r.quality || 'normal',
                 issueNotes: r.issue_notes || '',
                 updatedAt: r.updated_at || null
@@ -206,7 +206,7 @@ function renderProgressTable(deviceIndex) {
     const onlineStatusMap = {};
     getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label);
     // fallback
-    if (!onlineStatusMap['pending']) Object.assign(onlineStatusMap, {'pending':'待上线','in_progress':'适配中','paused':'暂停适配','online':'已上线'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已完成','developing':'开发中','undeveloped':'未开发','anticheat':'反外挂','not_applicable':'不适用'});
 
     const qualityMap = {};
     getFieldOptionsByKey('quality').forEach(o => qualityMap[o.value] = o.label);
@@ -442,7 +442,7 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     } else if (field === 'onlineStatus') {
         // 上线状态（从字段设置动态获取）
         let statuses = getFieldOptionsByKey('online_status').map(o => ({ value: o.value, text: o.label }));
-        if (statuses.length === 0) statuses = [{value:'pending',text:'待上线'},{value:'in_progress',text:'适配中'},{value:'paused',text:'暂停适配'},{value:'online',text:'已上线'}];
+        if (statuses.length === 0) statuses = [{value:'completed',text:'已完成'},{value:'developing',text:'开发中'},{value:'undeveloped',text:'未开发'},{value:'anticheat',text:'反外挂'},{value:'not_applicable',text:'不适用'}];
         statuses.forEach(status => {
             const option = document.createElement('option');
             option.value = status.value;
@@ -900,7 +900,7 @@ async function confirmAddGamesToProgress() {
         game_id: game.id,
         adapter_progress: 0,
         owner_name: '-',
-        online_status: 'pending',
+        online_status: 'undeveloped',
         quality: 'normal'
     }));
 
@@ -928,7 +928,7 @@ async function confirmAddGamesToProgress() {
                 gameType: r.game_type || '-',
                 adapterProgress: r.adapter_progress || 0,
                 ownerName: r.owner_name || '-',
-                onlineStatus: r.online_status || 'pending',
+                onlineStatus: r.online_status || 'undeveloped',
                 quality: r.quality || 'normal'
             }));
 
@@ -2799,7 +2799,7 @@ function refreshAllSelectsFromFieldOptions() {
     // 游戏管理 - 适配状态
     populateSelectFromFieldOptions('game-adaptation-status', 'adaptation_status', 'pending');
     // 游戏管理 - 上线状态
-    populateSelectFromFieldOptions('game-online-status', 'online_status', 'pending');
+    populateSelectFromFieldOptions('game-online-status', 'online_status', 'undeveloped');
     // 游戏管理 - 品质
     populateSelectFromFieldOptions('game-quality', 'quality', 'normal');
     // 游戏管理 - 存储位置

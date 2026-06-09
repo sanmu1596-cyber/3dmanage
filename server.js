@@ -742,8 +742,8 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
           ['adaptation_status', '适配状态', '游戏管理', JSON.stringify([
             {value:'pending',label:'待适配'},{value:'in_progress',label:'适配中'},{value:'completed',label:'已完成'},{value:'failed',label:'失败'}
           ]), 6],
-          ['online_status', '上线状态', '游戏管理', JSON.stringify([
-            {value:'pending',label:'待上线'},{value:'in_progress',label:'适配中'},{value:'paused',label:'暂停适配'},{value:'online',label:'已上线'}
+          ['online_status', 'hook开发状态', '游戏管理', JSON.stringify([
+            {value:'completed',label:'已完成'},{value:'developing',label:'开发中'},{value:'undeveloped',label:'未开发'},{value:'anticheat',label:'反外挂'},{value:'not_applicable',label:'不适用'}
           ]), 7],
           ['quality', '品质', '游戏管理', JSON.stringify([
             {value:'normal',label:'一般'},{value:'recommended',label:'推荐'}
