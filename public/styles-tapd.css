@@ -1556,7 +1556,8 @@ tr:hover .action-icon-btn:hover {
 .inline-edit-textarea,
 .inline-edit-select,
 .edit-select {
-    width: 100% !important;
+    /* 不再强制 width:100%，由 JS 控制尺寸以支持放大效果 */
+    min-width: 120px;
     box-sizing: border-box !important;
     padding: 6px 10px !important;
     margin: 0 !important;
@@ -1571,7 +1572,8 @@ tr:hover .action-icon-btn:hover {
 
 .inline-edit-textarea {
     resize: none;
-    min-height: 32px;
+    min-height: 60px;
+    line-height: 1.5;
 }
 
 .inline-edit-select,
