@@ -1550,6 +1550,25 @@ tr:hover .action-icon-btn:hover {
     display: none !important;
 }
 
+/* ★★★ 占位符：编辑态时撑住 td 的原几何尺寸，避免列重排 */
+.inline-edit-placeholder {
+    visibility: hidden !important;
+    display: block !important;
+    pointer-events: none;
+    /* 保留原内容 white-space 习惯 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 编辑态本身：让 td 作为定位锚点，但不改变其尺寸 */
+.editable-cell.editing {
+    background: inherit !important;
+    padding: 0 !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
 /* ========== 行内编辑样式 ========== */
 .editable-cell {
     cursor: pointer;
@@ -1570,13 +1589,6 @@ tr:hover .action-icon-btn:hover {
     opacity: 0.6;
     pointer-events: none;
     z-index: 1;
-}
-
-.editable-cell.editing {
-    background: inherit !important;
-    padding: 0 !important;
-    position: relative !important;
-    z-index: 10 !important;
 }
 
 /* ★ 浮层式编辑框：absolute 定位浮在单元格上方，不撑大表格列 */

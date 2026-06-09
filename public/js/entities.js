@@ -503,8 +503,16 @@ function startGameTextEdit(td, gameId, field) {
         input.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth * 1.5, 200)}px;height:${originalHeight}px;z-index:100;`;
     }
 
+    // ★★★ 关键修复：保留原内容作为不可见占位符，撑住td的几何尺寸
+    // 否则 input 是 absolute 不占空间 → td 塌缩 → 整张表 reflow → 视觉抖动
+    const placeholder = document.createElement('span');
+    placeholder.className = 'inline-edit-placeholder';
+    placeholder.style.cssText = 'visibility:hidden;display:block;';
+    placeholder.innerHTML = originalHtml;
+
     td.innerHTML = '';
-    td.appendChild(input);
+    td.appendChild(placeholder);  // 占位符保持原宽高
+    td.appendChild(input);         // 浮层编辑框
     input.focus();
     // 光标定位到句尾，不全选
     if (input.tagName === 'TEXTAREA') {
@@ -614,7 +622,14 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
         });
     }
 
+    // ★★★ 关键修复：保留原内容作为不可见占位符，撑住td的几何尺寸
+    const placeholder = document.createElement('span');
+    placeholder.className = 'inline-edit-placeholder';
+    placeholder.style.cssText = 'visibility:hidden;display:block;';
+    placeholder.innerHTML = originalHtml;
+
     td.innerHTML = '';
+    td.appendChild(placeholder);
     td.appendChild(select);
     select.focus();
 
