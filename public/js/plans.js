@@ -3104,30 +3104,43 @@ function resetColumnLock(tableOrContainer) {
 }
 
 // 用 MutationObserver 自动监测表格变化，补全 resize 手柄（防抖合并）
-// 当 tbody 内容变化时，需重置列宽锁定再重新初始化
+// ★ 关键修复：只在"数据完全刷新"（首行变化）时才重置列宽锁定
+// 双击编辑、复选框注入等局部变化不应该解锁列宽，否则会触发 fixed→auto→fixed 抖动
 let _resizeTimer = null;
 const _resizeObserver = new MutationObserver((mutations) => {
     clearTimeout(_resizeTimer);
-    // 检查是否有 tbody 子节点变化（数据刷新），需重置锁定
+    // ★ 检查是否真的是"整表数据刷新"——必须是 tbody 直接子节点（tr）发生 add/remove
+    // 排除：编辑态(.editing添加/移除)、单元格内部变化、batch-td注入等
+    let isFullDataRefresh = false;
     for (const m of mutations) {
-        if (m.target.tagName === 'TBODY' || (m.target.closest && m.target.closest('tbody'))) {
-            const table = m.target.closest('.data-table');
-            if (table && table.dataset.colLocked) {
-                delete table.dataset.colLocked;
-                table.style.tableLayout = '';
-                table.style.width = '';
-                table.querySelectorAll('thead th').forEach(th => {
-                    if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
-                        th.style.width = '';
-                        th.style.minWidth = '';
-                    }
-                });
-                table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+        if (m.target.tagName === 'TBODY' && (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
+            // 进一步确认：被加/删的是 TR，且数量足以认为是整表刷新
+            const addedTrs = Array.from(m.addedNodes).filter(n => n.nodeName === 'TR');
+            const removedTrs = Array.from(m.removedNodes).filter(n => n.nodeName === 'TR');
+            // 只有添加/移除多个TR才认为是整表刷新（单行编辑/删除不解锁）
+            if (addedTrs.length >= 2 || removedTrs.length >= 2) {
+                isFullDataRefresh = true;
+                const table = m.target.closest('.data-table');
+                if (table && table.dataset.colLocked) {
+                    delete table.dataset.colLocked;
+                    table.style.tableLayout = '';
+                    table.style.width = '';
+                    table.querySelectorAll('thead th').forEach(th => {
+                        if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
+                            th.style.width = '';
+                            th.style.minWidth = '';
+                        }
+                    });
+                    table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+                }
+                break;
             }
-            break;
         }
     }
-    _resizeTimer = setTimeout(initColumnResize, 80);
+    // 只有数据真刷新时才重新锁定，编辑态变化不触发
+    if (isFullDataRefresh) {
+        _resizeTimer = setTimeout(initColumnResize, 80);
+    }
 });
 
 // 在 DOM 加载完成后启动 observer
