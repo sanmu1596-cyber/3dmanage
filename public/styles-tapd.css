@@ -1523,6 +1523,33 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
+/* ========== 批量选择列样式（静态化，消除布局抖动） ========== */
+/* 表头 batch-th 和数据行 batch-td 都固定36px宽，不受可见列变化影响 */
+.batch-th,
+.batch-td {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    text-align: center !important;
+    padding: 4px 2px !important;
+    overflow: hidden;
+    text-overflow: clip;
+}
+.batch-th .row-checkbox-all,
+.batch-td .row-checkbox {
+    cursor: pointer;
+    margin: 0;
+    vertical-align: middle;
+}
+/* 避免 batch-th 触发列拖拽/排序的视觉效果 */
+.batch-th.no-sort {
+    cursor: default !important;
+}
+.batch-th.no-sort .sort-arrow,
+.batch-th.no-sort .sort-indicator {
+    display: none !important;
+}
+
 /* ========== 行内编辑样式 ========== */
 .editable-cell {
     cursor: pointer;
