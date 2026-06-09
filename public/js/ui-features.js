@@ -509,10 +509,10 @@ const batchReloadMap = {
     adaptations: loadProgressData
 };
 
-// 注入 checkbox 到表格（仅插入行级td，表头.batch-th已在HTML中静态写死）
-// ★ 改造说明：原来通过MutationObserver+80ms防抖异步插入th+td，
-// 会导致表格首次渲染从N列变N+1列，引发列宽重排+视觉抖动。
-// 现在表头静态写死，只在render后同步注入td，杜绝任何异步重排。
+// 注入 checkbox 到表格（兜底：仅当render未输出batch-td时同步补全；正常情况render直接产出，此处不执行任何插入）
+// ★ 改造说明：
+// 旧方案：HTML thead 不含 batch-th + render 不输出 batch-td → MutationObserver 异步插入 th + td (80ms 延迟) → 列错位抖动
+// 新方案：1) HTML thead 静态写死 .batch-th  2) render函数直接输出 .batch-td  3) 本函数仅作为兜底
 function injectBatchCheckboxes(tableId) {
     const resource = tableToBatchResource[tableId];
     if (!resource) return;
@@ -520,13 +520,13 @@ function injectBatchCheckboxes(tableId) {
     const table = document.getElementById(tableId);
     if (!table) return;
 
-    // 给每一行添加 checkbox（如果还没有的话）
+    // 给每一行添加 checkbox（兜底：render没输出batch-td时才补）
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
         if (row.querySelector('.empty-state')) return; // 跳过空状态行
-        if (row.querySelector('.row-checkbox')) return; // 已有则跳过（防止重复）
+        if (row.querySelector('.batch-td') || row.querySelector('.row-checkbox')) return; // 已有则跳过
 
-        // 优先从 row.dataset.id 取（推荐）
+        // 优先从 row.dataset.id 取
         let rowId = row.dataset.id ? parseInt(row.dataset.id) : null;
 
         // 兜底：从操作列的按钮中提取 ID
@@ -541,7 +541,6 @@ function injectBatchCheckboxes(tableId) {
 
         const td = document.createElement('td');
         td.className = 'batch-td';
-        td.style.cssText = 'width:36px;min-width:36px;max-width:36px;overflow:hidden;text-overflow:clip;padding:4px 2px;text-align:center;';
         td.innerHTML = `<input type="checkbox" class="row-checkbox" data-id="${rowId}" data-resource="${resource}" onchange="batchToggleRow(this)">`;
         row.insertBefore(td, row.firstChild);
     });

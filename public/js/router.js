@@ -313,7 +313,9 @@ function renderMembersTable(data) {
             ['name', 'wechat_id', 'role', 'duty', 'status'];
 
         tbody.innerHTML = data.map((member, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐，避免后续异步注入引发列抖动）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${member.id}" data-resource="members" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 // 跳过隐藏列
@@ -457,8 +459,10 @@ function renderDevicesTable(data) {
         tbody.setAttribute('data-visible-cols', visibleCount);
 
         tbody.innerHTML = data.map((device, index) => {
-            // 第一列：拖拽手柄（替代序号）
-            let rowHtml = `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${device.id}" data-resource="devices" onchange="batchToggleRow(this)"></td>`;
+            // 第二列：拖拽手柄（替代序号）
+            rowHtml += `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
 
             // 动态渲染各列（支持隐藏）
             colOrder.forEach(field => {

@@ -364,7 +364,9 @@ function renderGamesPage() {
     if (gamesToShow.length > 0) {
         tbody.innerHTML = gamesToShow.map((game, index) => {
             const globalIndex = pageSize === -1 ? index + 1 : (currentPage - 1) * pageSize + index + 1;
-            let rowHtml = `<td class="text-center"><strong>${globalIndex}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐，render时同步输出，避免后续MutationObserver异步插入引发列错位抖动）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${game.id}" data-resource="games" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${globalIndex}</strong></td>`;
 
             // 根据columnOrder顺序生成单元格
             getColumnOrder('games-table').forEach(field => {
@@ -1149,7 +1151,9 @@ function renderTestsTable(data) {
             ['name', 'game_name', 'device_name', 'tester_name', 'test_date', 'status', 'priority', 'bugs_count'];
 
         tbody.innerHTML = data.map((test, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${test.id}" data-resource="tests" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 if (typeof testVisibleColumns !== 'undefined' && !testVisibleColumns[field]) return;
@@ -1237,7 +1241,9 @@ function renderBugsTable(data) {
             ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
 
         tbody.innerHTML = data.map((bug, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${bug.id}" data-resource="bugs" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 if (typeof bugVisibleColumns !== 'undefined' && !bugVisibleColumns[field]) return;
