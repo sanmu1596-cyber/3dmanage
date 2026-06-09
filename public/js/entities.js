@@ -529,12 +529,11 @@ window._dumpSnaps = function() {
     return window._tableSnaps;
 };
 
-// ========== 游戏列表行内编辑（带自动采样） ==========
+// ========== 游戏列表行内编辑 ==========
 
 // 双击文本编辑（游戏简介、游戏账号）
 function startGameTextEdit(td, gameId, field) {
     if (td.classList.contains('editing')) return;
-    if (typeof _tableSnap === 'function') _tableSnap('双击前-' + field);
     td.classList.add('editing');
 
     // ★ 关键：保留单元格原宽度，编辑框用 absolute 浮在单元格上方，不影响表格列布局
@@ -583,13 +582,6 @@ function startGameTextEdit(td, gameId, field) {
         input.selectionStart = input.selectionEnd = input.value.length;
     } else {
         input.setSelectionRange(input.value.length, input.value.length);
-    }
-
-    // 🐛 DEBUG: 编辑态注入完成后立即采样，并在下一帧再采样一次（捕获重排）
-    if (typeof _tableSnap === 'function') {
-        _tableSnap('双击后-注入完成-' + field);
-        requestAnimationFrame(() => _tableSnap('双击后-下一帧-' + field));
-        setTimeout(() => _tableSnap('双击后-100ms-' + field), 100);
     }
 
     let saved = false;
@@ -1983,16 +1975,17 @@ function startMemberInlineEdit(td, memberId, field, inputType) {
 
     const currentValue = td.textContent.trim();
     const displayValue = currentValue === '-' ? '' : currentValue;
+    // ★ 保留原 innerHTML，作为不可见占位符撑住td尺寸（消除编辑抖动）
+    const originalHtml = td.innerHTML;
 
     td.classList.add('editing');
 
-    // 锁定单元格宽高，防止编辑态撑开引起抖动
+    // ★ 关键修复：不再设置 td.style.width/maxWidth（避免触发列宽重排）
+    // 改为 position:relative + 不可见占位符 + absolute 浮层编辑框
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
+    td.style.position = 'relative';
 
     // 角色：下拉选择（从字段选项获取）
     if (field === 'role') {
@@ -2118,11 +2111,8 @@ async function saveMemberInlineEdit(td, memberId, field, newValue) {
                 td.textContent = trimmed || '-';
             }
 
-            // 解除宽高锁定
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            // ★ 清除 td 的 position（不再有内联width/maxWidth/height了）
+            td.style.position = '';
 
             showToast('已保存', 'success');
         } else {
@@ -2148,10 +2138,7 @@ function cancelMemberInlineEdit(td, memberId, field, originalValue) {
     } else {
         td.textContent = originalValue || '-';
     }
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    td.style.position = '';
 }
 
 /**
@@ -2165,10 +2152,7 @@ function cancelMemberInlineEditRestore(td, memberId, field) {
     } else {
         td.textContent = member ? (member[field] || '-') : '-';
     }
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    td.style.position = '';
 }
 
 // 编辑成员

@@ -37,29 +37,60 @@ function updateThemeIcon(theme) {
 document.addEventListener('DOMContentLoaded', initTheme);
 
 // ========== Toast 通知 ==========
-function showToast(message, type = 'info', duration = 3000) {
+// ========== Toast 通知 — TAPD 风格（顶部居中淡入淡出） ==========
+function showToast(message, type = 'info', duration = 2400) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.style.cssText = 'position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+        // ★ 顶部居中容器
+        container.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:10000;display:flex;flex-direction:column;gap:10px;pointer-events:none;align-items:center;';
         document.body.appendChild(container);
     }
-    const colors = {
-        success: { bg: 'rgba(46,158,90,0.95)', icon: '✅' },
-        danger:  { bg: 'rgba(212,64,64,0.95)', icon: '❌' },
-        warning: { bg: 'rgba(212,136,15,0.95)', icon: '⚠️' },
-        info:    { bg: 'rgba(47,127,187,0.95)', icon: 'ℹ️' }
+    // TAPD 风格颜色 — 柔和饱和度
+    const styles = {
+        success: { color: '#52c41a', icon: '✓' },
+        danger:  { color: '#ff4d4f', icon: '✕' },
+        warning: { color: '#faad14', icon: '!' },
+        info:    { color: '#1677ff', icon: 'i' }
     };
-    const c = colors[type] || colors.info;
+    const s = styles[type] || styles.info;
     const toast = document.createElement('div');
-    toast.style.cssText = `background:${c.bg};color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px;pointer-events:auto;animation:slideInRight 0.3s ease;max-width:360px;`;
-    toast.innerHTML = `<span>${c.icon}</span><span>${escapeHtml(message)}</span>`;
+    toast.className = 'tapd-toast';
+    // 卡片样式：白底 + 彩色左边线 + 柔和阴影
+    toast.style.cssText = `
+        background:#ffffff;
+        color:#1f2329;
+        padding:12px 20px 12px 16px;
+        border-radius:8px;
+        border-left:4px solid ${s.color};
+        font-size:13px;
+        line-height:1.5;
+        box-shadow:0 6px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
+        display:flex;
+        align-items:center;
+        gap:10px;
+        pointer-events:auto;
+        max-width:480px;
+        min-width:200px;
+        opacity:0;
+        transform:translateY(-20px);
+        transition:opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+    toast.innerHTML = `
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${s.color};color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">${s.icon}</span>
+        <span style="flex:1;word-break:break-word;">${escapeHtml(message)}</span>
+    `;
     container.appendChild(toast);
+    // 淡入
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+    // 淡出
     setTimeout(() => {
-        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         toast.style.opacity = '0';
-        toast.style.transform = 'translateX(20px)';
+        toast.style.transform = 'translateY(-12px)';
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }

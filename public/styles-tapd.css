@@ -1076,19 +1076,26 @@ body {
     z-index: 10;
 }
 
-/* TAPD 风格表头 - 半透明 + 深色文字 */
+/* TAPD 风格表头 - 不透明背景（粘性定位需要不透明，否则下方行内容会透出） */
 .data-table th {
     padding: 12px 14px;
     text-align: left;
     font-family: var(--font-title);
     font-weight: 600;
     color: var(--text-secondary);
-    background: rgba(245, 245, 245, 0.7);
-    backdrop-filter: blur(4px);
+    background: #f5f5f5;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
     font-size: 13px;
     position: relative;
+    /* ★ 粘性表头需要每个 th 都明确粘住顶部 */
+}
+
+/* ★ 粘性表头：滚动时表头始终可见 */
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 11;
 }
 
 .data-table th:last-child {
@@ -1443,15 +1450,29 @@ body.col-resizing * {
     background: transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.2s;
-    opacity: 0.4; /* 默认更淡，强调操作区域 */
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+    opacity: 0; /* ★ 默认完全隐藏，行hover时才淡入 */
+    pointer-events: none;
 }
 
-/* P1.2优化：行悬停时操作按钮更加明显 */
+/* ★ TAPD 风格：行 hover 时操作按钮淡入显示 */
 tr:hover .action-icon-btn {
-    opacity: 0.9; /* 悬停时几乎可见 */
-    background: var(--bg-elevated);
-    transform: scale(1.05); /* 轻微放大 */
+    opacity: 0.85;
+    pointer-events: auto;
+}
+
+/* hover 单个按钮时高亮 */
+tr:hover .action-icon-btn:hover {
+    opacity: 1 !important;
+    background: var(--primary-light) !important;
+    transform: scale(1.08);
+}
+
+/* 选中行始终显示按钮 */
+.data-table tbody tr.selected .action-icon-btn,
+.data-table tbody tr.row-selected .action-icon-btn {
+    opacity: 0.85 !important;
+    pointer-events: auto;
 }
 
 tr:hover .action-icon-btn:hover {
@@ -1521,6 +1542,13 @@ tr:hover .action-icon-btn:hover {
 
 .btn-delete:hover {
     background: #ffebee;
+}
+
+/* ========== TAPD Toast 暗色模式适配 ========== */
+[data-theme="dark"] .tapd-toast {
+    background: #1f2329 !important;
+    color: #e8eaed !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06) !important;
 }
 
 /* ========== 批量选择列样式（静态化，消除布局抖动） ========== */
