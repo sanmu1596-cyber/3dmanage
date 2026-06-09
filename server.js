@@ -2898,6 +2898,35 @@ setInterval(() => {
   });
 }, 60 * 60 * 1000);
 
+// ========== 数据迁移：hook开发状态旧值 → 新值 ==========
+// 将遗留的旧值(pending/online/pending_dev等)统一迁移为developing
+const hookStatusMigrations = [
+    { old: 'pending',      new: 'developing', label: '待上线→开发中' },
+    { old: 'pending_dev',  new: 'developing', label: 'pending_dev→开发中' },
+    { old: 'online',       new: 'developing', label: '已上线→开发中' },
+];
+try {
+    let totalMigrated = 0;
+    for (const m of hookStatusMigrations) {
+        const result = db.prepare("UPDATE games SET online_status = ? WHERE online_status = ?").run(m.new, m.old);
+        if (result.changes > 0) {
+            console.log(`[数据迁移] ${m.label}: ${result.changes}条`);
+            totalMigrated += result.changes;
+        }
+    }
+    // 空值/NULL
+    const emptyResult = db.prepare("UPDATE games SET online_status = 'developing' WHERE online_status = '' OR online_status IS NULL").run();
+    if (emptyResult.changes > 0) {
+        console.log(`[数据迁移] 空/NULL→开发中: ${emptyResult.changes}条`);
+        totalMigrated += emptyResult.changes;
+    }
+    if (totalMigrated > 0) {
+        console.log(`[数据迁移] hook开发状态共迁移 ${totalMigrated} 条记录`);
+    }
+} catch(e) {
+    console.error('[数据迁移] hook开发状态迁移失败:', e.message);
+}
+
 // 启动服务器 (监听所有网络接口，支持外网访问)
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
