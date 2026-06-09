@@ -471,13 +471,14 @@ function startGameTextEdit(td, gameId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 记录原始尺寸和HTML（用于还原）
+    // ★ 关键：保留单元格原宽度，编辑框用 absolute 浮在单元格上方，不影响表格列布局
     const rect = td.getBoundingClientRect();
     const originalHtml = td.innerHTML;
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
 
-    // 设置为相对定位，让内部绝对定位的编辑框可以溢出单元格
+    // 不改变 td 的宽度！只设置 position:relative 让 input 可以 absolute 定位
     td.style.position = 'relative';
-    td.style.minWidth = Math.max(rect.width, 180) + 'px';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalValue = game ? (game[field] || '') : '';
@@ -486,17 +487,18 @@ function startGameTextEdit(td, gameId, field) {
     let input;
     if (field === 'game_account') {
         input = document.createElement('textarea');
-        input.className = 'inline-edit-textarea';
+        input.className = 'inline-edit-textarea inline-edit-overlay';
         input.value = originalValue;
         input.rows = 3;
-        input.style.minWidth = '260px';
-        input.style.minHeight = '60px';
+        // ★ absolute 定位浮在单元格上方，不影响表格列宽
+        input.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth, 280)}px;min-height:${Math.max(originalHeight, 70)}px;z-index:100;`;
     } else {
         input = document.createElement('input');
         input.type = 'text';
-        input.className = 'inline-edit-input';
+        input.className = 'inline-edit-input inline-edit-overlay';
         input.value = originalValue;
-        input.style.minWidth = Math.max(rect.width * 1.5, 180) + 'px';
+        // ★ absolute 定位，宽度可以超出单元格不挤压表格
+        input.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth * 1.5, 200)}px;height:${originalHeight}px;z-index:100;`;
     }
 
     td.innerHTML = '';
@@ -565,17 +567,21 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 记录原始HTML，不锁定宽度让select可以展开
+    // ★ 关键：保留原宽度，select 用 absolute 浮在单元格上方，不影响表格列布局
     const rect = td.getBoundingClientRect();
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
+
+    // 不改变 td 的宽度！只设置 position:relative 让 select 可以 absolute 定位
     td.style.position = 'relative';
-    td.style.minWidth = Math.max(rect.width, 140) + 'px';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalHtml = td.innerHTML;
 
     const select = document.createElement('select');
-    select.className = 'inline-edit-select';
-    select.style.minWidth = Math.max(rect.width * 1.3, 140) + 'px';
+    select.className = 'inline-edit-select inline-edit-overlay';
+    // ★ absolute 定位浮在单元格上方
+    select.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth * 1.3, 160)}px;height:${originalHeight}px;z-index:100;`;
 
     // 空选项
     const emptyOpt = document.createElement('option');

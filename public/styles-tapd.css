@@ -1579,6 +1579,23 @@ tr:hover .action-icon-btn:hover {
     z-index: 10 !important;
 }
 
+/* ★ 浮层式编辑框：absolute 定位浮在单元格上方，不撑大表格列 */
+.inline-edit-overlay {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: #fff !important;
+    border: 2px solid var(--primary) !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+}
+[data-theme="dark"] .inline-edit-overlay {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
 .inline-edit-input,
 .inline-edit-textarea,
 .inline-edit-select,
