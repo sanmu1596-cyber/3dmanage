@@ -3039,29 +3039,49 @@ function initTableSort(tableId) {
         th.style.userSelect = 'none';
         th.style.position = 'relative';
 
-        // 统一使用 pointer 光标（单击=排序，长按=拖拽）
-        th.style.cursor = 'pointer';
+        // ★ th本身不设pointer光标（空白区域不响应排序）
+        th.style.cursor = 'default';
 
-        // 添加排序箭头占位
-        if (!th.querySelector('.sort-arrow')) {
+        // ★ 将表头文字包裹在 sort-label span 中，只有这个区域可点击排序
+        if (!th.querySelector('.sort-label')) {
+            const label = document.createElement('span');
+            label.className = 'sort-label';
+
+            // 收集所有文本子节点（排除已有的 sort-arrow）
+            Array.from(th.childNodes).forEach(node => {
+                if (node.nodeType === 3 || (node.nodeType === 1 && !node.classList.contains('sort-arrow'))) {
+                    label.appendChild(node.cloneNode(true));
+                }
+            });
+
+            // 清空th，重新组装：文字标签 + 箭头
+            const oldArrow = th.querySelector('.sort-arrow');
+            th.innerHTML = '';
+            th.appendChild(label);
+
+            // 排序箭头放在 label 内部右侧
             const arrow = document.createElement('span');
             arrow.className = 'sort-arrow';
             arrow.innerHTML = ' <span class="sort-indicator"></span>';
-            th.appendChild(arrow);
+            label.appendChild(arrow);
         }
 
         // 更新当前排序状态显示
         updateSortIndicator(th, tableId);
 
-        th.addEventListener('click', () => {
-            // 如果刚完成长按拖拽，跳过排序（防止竞争）
-            if (_isHeaderLongPress) {
-                _isHeaderLongPress = false;
-                return;
-            }
-            const field = th.getAttribute('data-field');
-            handleSortClick(tableId, field);
-        });
+        // ★ 点击事件只绑定到 sort-label，不在整个 th 上
+        const sortLabel = th.querySelector('.sort-label');
+        if (sortLabel) {
+            sortLabel.addEventListener('click', () => {
+                // 如果刚完成长按拖拽，跳过排序（防止竞争）
+                if (_isHeaderLongPress) {
+                    _isHeaderLongPress = false;
+                    return;
+                }
+                const field = th.getAttribute('data-field');
+                handleSortClick(tableId, field);
+            });
+        }
     });
 }
 

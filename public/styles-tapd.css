@@ -5725,6 +5725,15 @@ tr:hover .action-icon-btn:hover {
 }
 
 /* ========== 表格列排序样式 ========== */
+
+/* ★ 排序文字标签：只有这个区域可点击排序 */
+.sort-label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .sort-arrow {
     display: inline-flex;
     align-items: center;
@@ -5739,30 +5748,27 @@ tr:hover .action-icon-btn:hover {
     font-size: 10px;
     line-height: 1;
     transition: color 0.15s ease, opacity 0.15s ease;
+    opacity: 0;
 }
 
-th.sort-asc .sort-indicator {
-    color: var(--primary);
-    opacity: 1 !important;
-}
-
+th.sort-asc .sort-indicator,
 th.sort-desc .sort-indicator {
     color: var(--primary);
     opacity: 1 !important;
 }
 
-th[data-field]:hover .sort-indicator {
+/* ★ 鼠标悬停在文字上时显示排序箭头（空白区域不触发） */
+.sort-label:hover .sort-indicator {
     opacity: 0.7 !important;
 }
 
-/* 排序表头悬停效果 */
-th[data-field] {
-    transition: background-color 0.15s ease;
-}
-th[data-field]:hover {
+/* 排序表头悬停效果 — 仅文字区域 */
+.sort-label:hover {
     background: var(--bg-hover, rgba(0,0,0,0.04));
+    border-radius: 4px;
+    padding: 0 2px;
 }
-[data-theme="dark"] th[data-field]:hover {
+[data-theme="dark"] .sort-label:hover {
     background: var(--bg-hover, rgba(255,255,255,0.06));
 }
 
