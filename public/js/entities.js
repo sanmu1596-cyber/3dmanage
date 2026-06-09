@@ -466,11 +466,75 @@ function renderGamesPage() {
     // 不再在此调用 initBatchSelect，避免重复插入复选框列
 }
 
-// ========== 游戏列表行内编辑 ==========
+// 🐛 DEBUG: 表格状态采样器（用于排查列表抖动）
+window._tableSnap = function(label) {
+    try {
+        const tbody = document.getElementById('games-table');
+        const tbl = tbody?.closest('table');
+        if (!tbl) return null;
+        const ths = tbl.querySelectorAll('thead th');
+        const firstRow = tbody.querySelector('tr');
+        const tds = firstRow?.children || [];
+        const snap = {
+            label: label || 'snap',
+            time: Date.now(),
+            tableScrollWidth: tbl.scrollWidth,
+            tableClientWidth: tbl.clientWidth,
+            tableLayout: getComputedStyle(tbl).tableLayout,
+            theadColCount: ths.length,
+            tbodyFirstRowColCount: tds.length,
+            theadWidths: Array.from(ths).map(th => ({ field: th.dataset.field || th.className || '-', w: th.offsetWidth })),
+            tbodyFirstRowWidths: Array.from(tds).map(td => ({ cls: td.className || '-', w: td.offsetWidth }))
+        };
+        if (!window._tableSnaps) window._tableSnaps = [];
+        window._tableSnaps.push(snap);
+        console.log(`📸 [${label}] tableW=${snap.tableScrollWidth}px thead=${snap.theadColCount}列 tbody=${snap.tbodyFirstRowColCount}列 layout=${snap.tableLayout}`);
+        return snap;
+    } catch(e) { console.error('snap error:', e); }
+};
+
+// 自动捕获：每500ms采样一次表格状态，连续记录前后变化
+window._startTableMonitor = function() {
+    if (window._tableMonitorTimer) {
+        clearInterval(window._tableMonitorTimer);
+        console.log('🔴 已停止旧监控');
+    }
+    window._tableSnaps = [];
+    let lastWidth = -1;
+    let counter = 0;
+    window._tableMonitorTimer = setInterval(() => {
+        const tbody = document.getElementById('games-table');
+        const tbl = tbody?.closest('table');
+        if (!tbl) return;
+        const w = tbl.scrollWidth;
+        // 只在宽度变化时记录，避免太多无用日志
+        if (w !== lastWidth) {
+            window._tableSnap(`auto#${++counter}`);
+            lastWidth = w;
+        }
+    }, 100);
+    console.log('🟢 表格监控已启动 (每100ms采样)，调用 _stopTableMonitor() 停止，_dumpSnaps() 查看记录');
+};
+window._stopTableMonitor = function() {
+    clearInterval(window._tableMonitorTimer);
+    console.log('🔴 监控已停止，共记录', (window._tableSnaps||[]).length, '个变化点');
+};
+window._dumpSnaps = function() {
+    console.log('=== 所有采样 ===');
+    (window._tableSnaps||[]).forEach((s, i) => {
+        console.log(`#${i} [${s.label}] @${new Date(s.time).toISOString().slice(11,23)} tableW=${s.tableScrollWidth} thead=${s.theadColCount} tbody=${s.tbodyFirstRowColCount} layout=${s.tableLayout}`);
+        console.log('  thead:', s.theadWidths.map(x => `${x.field}=${x.w}`).join(' | '));
+        console.log('  tbody:', s.tbodyFirstRowWidths.map(x => `${x.cls}=${x.w}`).join(' | '));
+    });
+    return window._tableSnaps;
+};
+
+// ========== 游戏列表行内编辑（带自动采样） ==========
 
 // 双击文本编辑（游戏简介、游戏账号）
 function startGameTextEdit(td, gameId, field) {
     if (td.classList.contains('editing')) return;
+    if (typeof _tableSnap === 'function') _tableSnap('双击前-' + field);
     td.classList.add('editing');
 
     // ★ 关键：保留单元格原宽度，编辑框用 absolute 浮在单元格上方，不影响表格列布局
@@ -519,6 +583,13 @@ function startGameTextEdit(td, gameId, field) {
         input.selectionStart = input.selectionEnd = input.value.length;
     } else {
         input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    // 🐛 DEBUG: 编辑态注入完成后立即采样，并在下一帧再采样一次（捕获重排）
+    if (typeof _tableSnap === 'function') {
+        _tableSnap('双击后-注入完成-' + field);
+        requestAnimationFrame(() => _tableSnap('双击后-下一帧-' + field));
+        setTimeout(() => _tableSnap('双击后-100ms-' + field), 100);
     }
 
     let saved = false;
