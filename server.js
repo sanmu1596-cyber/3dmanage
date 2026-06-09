@@ -2899,11 +2899,12 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 // ========== 数据迁移：hook开发状态旧值 → 新值 ==========
-// 将遗留的旧值(pending/online/pending_dev等)统一迁移为developing
+// 1. 迁移 games 表中的遗留值
 const hookStatusMigrations = [
     { old: 'pending',      new: 'developing', label: '待上线→开发中' },
     { old: 'pending_dev',  new: 'developing', label: 'pending_dev→开发中' },
     { old: 'online',       new: 'developing', label: '已上线→开发中' },
+    { old: 'fixing',       new: 'developing', label: '待修复→开发中' },
 ];
 try {
     let totalMigrated = 0;
@@ -2921,10 +2922,30 @@ try {
         totalMigrated += emptyResult.changes;
     }
     if (totalMigrated > 0) {
-        console.log(`[数据迁移] hook开发状态共迁移 ${totalMigrated} 条记录`);
+        console.log(`[数据迁移] hook开发状态(值)共迁移 ${totalMigrated} 条记录`);
     }
 } catch(e) {
-    console.error('[数据迁移] hook开发状态迁移失败:', e.message);
+    console.error('[数据迁移] hook开发状态值迁移失败:', e.message);
+}
+
+// 2. 更新 field_options 表中的下拉选项（旧选项→新5项）
+try {
+    const newOptions = JSON.stringify([
+        {value:'completed',label:'已完成'},
+        {value:'developing',label:'开发中'},
+        {value:'undeveloped',label:'未开发'},
+        {value:'anticheat',label:'反外挂'},
+        {value:'not_applicable',label:'不适用'}
+    ]);
+    const row = db.prepare("SELECT options FROM field_options WHERE field_key = 'online_status'").get();
+    if (row && row.options !== newOptions) {
+        const result = db.prepare("UPDATE field_options SET options = ? WHERE field_key = 'online_status'").run(newOptions);
+        if (result.changes > 0) {
+            console.log(`[数据迁移] hook开发状态(下拉选项)已更新为新的5项`);
+        }
+    }
+} catch(e) {
+    console.error('[数据迁移] hook开发状态选项迁移失败:', e.message);
 }
 
 // 启动服务器 (监听所有网络接口，支持外网访问)
