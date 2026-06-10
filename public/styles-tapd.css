@@ -1102,7 +1102,7 @@ body {
     border-right: none;
 }
 
-/* 列宽拖拽手柄 - 常驻可见 */
+/* 列宽拖拽手柄 - hover表头时才显示，更聚焦 */
 .col-resize-handle {
     position: absolute;
     right: -1px;
@@ -1111,13 +1111,22 @@ body {
     width: 3px;
     cursor: col-resize;
     z-index: 20;
-    background: var(--border-light, #e5e6eb);
+    background: transparent;
     border-radius: 2px;
-    transition: background 0.15s, width 0.1s;
+    transition: background 0.15s, opacity 0.15s, width 0.1s;
+    opacity: 0;
 }
 
+/* hover 表头时显示 handle，方便用户发现 */
+.data-table thead th:hover .col-resize-handle {
+    opacity: 1;
+    background: var(--border, #d4d8dc);
+}
+
+/* hover handle 自身 - 主色高亮 */
 .col-resize-handle:hover {
-    background: var(--primary);
+    opacity: 1 !important;
+    background: var(--primary) !important;
     width: 4px;
     right: -1.5px;
     top: 2px;
@@ -1125,7 +1134,8 @@ body {
 }
 
 .col-resize-handle.resizing {
-    background: var(--primary);
+    opacity: 1 !important;
+    background: var(--primary) !important;
     width: 4px;
     right: -1.5px;
     top: 0;

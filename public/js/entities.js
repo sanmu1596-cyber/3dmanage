@@ -448,6 +448,11 @@ function renderGamesPage() {
     applyCellTooltips('games-table');
     // P0: 初始化表头排序
     initTableSort('games-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') {
+        // 用 rAF 等本帧渲染完成再锁定，确保拿到正确列宽
+        requestAnimationFrame(() => initColumnResize());
+    }
     // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入（injectBatchCheckboxes）
     // 不再在此调用 initBatchSelect，避免重复插入复选框列
 }
@@ -1209,6 +1214,8 @@ function renderTestsTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('tests-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('tests-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('tests-table') :
@@ -1299,6 +1306,8 @@ function renderBugsTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('bugs-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('bugs-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('bugs-table') :

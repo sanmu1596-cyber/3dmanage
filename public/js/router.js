@@ -307,6 +307,8 @@ function renderMembersTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('members-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('members-table');
+    // ★ 列宽锁定+resize手柄
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('members-table') :
@@ -439,6 +441,8 @@ function renderDevicesTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('devices-table');
+    // ★ 列宽锁定+resize手柄
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     // 设备表默认列顺序（与表头th的data-field一一对应）
     const defaultDeviceColOrder = ['manufacturer', 'device_type', 'name', 'requirements',

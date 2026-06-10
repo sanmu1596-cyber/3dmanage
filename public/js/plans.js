@@ -3108,7 +3108,6 @@ function resetColumnLock(tableOrContainer) {
 // 双击编辑、复选框注入等局部变化不应该解锁列宽，否则会触发 fixed→auto→fixed 抖动
 let _resizeTimer = null;
 const _resizeObserver = new MutationObserver((mutations) => {
-    clearTimeout(_resizeTimer);
     // ★ 检查是否真的是"整表数据刷新"——必须是 tbody 直接子节点（tr）发生 add/remove
     // 排除：编辑态(.editing添加/移除)、单元格内部变化、batch-td注入等
     let isFullDataRefresh = false;
@@ -3139,13 +3138,14 @@ const _resizeObserver = new MutationObserver((mutations) => {
     }
     // 只有数据真刷新时才重新锁定，编辑态变化不触发
     if (isFullDataRefresh) {
+        clearTimeout(_resizeTimer);
         _resizeTimer = setTimeout(initColumnResize, 80);
     }
 });
 
 // 在 DOM 加载完成后启动 observer
 document.addEventListener('DOMContentLoaded', () => {
-    // 初始化一次
+    // 初始化一次（兜底）
     setTimeout(initColumnResize, 300);
 
     // 监测所有 table-container 区域的子树变化
