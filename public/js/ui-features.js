@@ -130,11 +130,23 @@ document.addEventListener('keydown', function(e) {
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(e.key)) {
         return;
     }
-    
+
     const overlay = document.getElementById('global-search-overlay');
     const isSearchOpen = overlay && overlay.style.display !== 'none';
-    const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-    const isInModal = document.activeElement.closest('.modal[style*="block"], .modal.show');
+    // ★ 关键修复：检测是否在编辑环境
+    // 1) 原生表单控件 INPUT/TEXTAREA/SELECT
+    // 2) contenteditable 富文本（如游戏问题/大事的内容编辑器）
+    // 3) 处于任意打开的弹窗内（包括 .modal / .modal-overlay / 自定义弹窗）
+    const activeEl = document.activeElement;
+    const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl?.tagName)
+        || activeEl?.isContentEditable
+        || !!activeEl?.closest('[contenteditable="true"], .rich-paste-editor, .focus-rich-editor');
+    // 检查是否有任何打开的弹窗（包括 .modal-overlay 自定义弹窗）
+    const hasOpenModal = !!Array.from(document.querySelectorAll('.modal, .modal-overlay')).find(m => {
+        const ds = m.style.display;
+        return ds === 'flex' || ds === 'block' || m.classList.contains('show');
+    });
+    const isInModal = !!activeEl?.closest('.modal, .modal-overlay, .modal-box') || hasOpenModal;
 
     // Ctrl+K / Cmd+K: 全局搜索
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
