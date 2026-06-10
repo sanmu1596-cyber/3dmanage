@@ -74,14 +74,17 @@ function renderGameIssuesPage_OLD() {
     document.getElementById('content').innerHTML = html;
 }
 
-function showGameIssueModal(issueId) {
+// ★★★ 重要修复：以下旧版函数与 issues-versions.js 中的新版同名函数冲突
+// 由于 modules-extra.js 在 issues-versions.js 之后加载，会覆盖新版函数
+// 用 _OLD 后缀重命名，让新版函数生效。
+function showGameIssueModal_OLD(issueId) {
     const isEdit = !!issueId;
     const data = isEdit ? gameIssuesData.find(r => r.id === issueId) : {};
     const statusOpts = ['待处理','处理中','已解决','已关闭'];
     const typeOpts = ['Bug','优化','新功能','美术','音效','其他'];
     const prioOpts = ['P0-紧急','P1-高','P2-中','P3-低'];
     let html = '<div class="modal show" id="gi-modal"><div class="modal-content">' +
-        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑问题':'新建问题') + '</span><span class="modal-close" onclick="closeGameIssueModal()">\u00d7</span></div>' +
+        '<div class="modal-header"><span class="modal-title">' + (isEdit?'编辑问题':'新建问题') + '</span><span class="modal-close" onclick="closeGameIssueModal_OLD()">\u00d7</span></div>' +
         '<div class="modal-body">' +
         '<input type="hidden" id="gi-id" value="' + (data.id||'') + '">' +
         '<label>游戏名 *</label><input type="text" id="gi-game-name" value="' + escapeHtml(data.game_name||'') + '" placeholder="输入游戏名称">' +
@@ -93,14 +96,14 @@ function showGameIssueModal(issueId) {
         '<label>备注</label><textarea id="gi-remarks" rows="2">' + escapeHtml(data.remarks||'') + '</textarea>' +
         '</div>' +
         '<div class="modal-footer">' +
-        '<button class="btn btn-primary" onclick="saveGameIssue()">保存</button>' +
-        '<button class="btn" onclick="closeGameIssueModal()">取消</button>' +
+        '<button class="btn btn-primary" onclick="saveGameIssue_OLD()">保存</button>' +
+        '<button class="btn" onclick="closeGameIssueModal_OLD()">取消</button>' +
         '</div></div></div>';
     document.getElementById('content').insertAdjacentHTML('beforeend', html);
 }
-function closeGameIssueModal() { const m = document.getElementById('gi-modal'); if (m) m.remove(); }
+function closeGameIssueModal_OLD() { const m = document.getElementById('gi-modal'); if (m) m.remove(); }
 
-async function saveGameIssue() {
+async function saveGameIssue_OLD() {
     const id = document.getElementById('gi-id').value;
     const body = {
         game_name: document.getElementById('gi-game-name').value.trim(),
@@ -115,17 +118,20 @@ async function saveGameIssue() {
     try {
         if (id) { await authFetch('/api/game-issues/' + id, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); }
         else { await authFetch('/api/game-issues', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); }
-        showToast('保存成功', 'success'); closeGameIssueModal(); loadGameIssues();
+        showToast('保存成功', 'success'); closeGameIssueModal_OLD(); loadGameIssues();
     } catch(e) { showToast('保存失败: ' + e.message, 'error'); }
 }
-function editGameIssue(id) { showGameIssueModal(id); }
-async function deleteGameIssue(id) {
+// ★ 不再覆盖新版 editGameIssue / deleteGameIssue / showGameIssueDetail（旧实现已废弃）
+// 旧版若需要可调用 *_OLD 版本
+function editGameIssue_OLD(id) { showGameIssueModal_OLD(id); }
+async function deleteGameIssue_OLD(id) {
     if (!confirm('确定删除？')) return;
     try { await authFetch('/api/game-issues/' + id, { method: 'DELETE' }); showToast('删除成功', 'success'); loadGameIssues(); }
     catch(e) { showToast('删除失败: ' + e.message, 'error'); }
 }
 
-function showGameIssueDetail(id) {
+// ★ 旧版 showGameIssueDetail 已废弃 — 请使用新版的 issues-versions.js 中的 showGameIssueDetail
+function showGameIssueDetail_OLD(id) {
     const data = gameIssuesData.find(r => r.id === id); if (!data) return;
     let html = '<div class="modal show" id="gi-detail-modal"><div class="modal-content" style="max-width:600px">' +
         '<div class="modal-header"><span class="modal-title">问题详情 #' + data.id + '</span><span class="modal-close" onclick="document.getElementById(\'gi-detail-modal\').remove()">\u00d7</span></div>' +

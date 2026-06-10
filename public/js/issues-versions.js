@@ -356,7 +356,7 @@ function renderGameIssuesTable(data) {
     tbody.innerHTML = data.map((item, idx) => `
         <tr data-id="${item.id}">
             <td>${idx + 1}</td>
-            <td>${escapeHtml(item.game_name || '-')}</td>
+            <td><a class="game-name-link" onclick="showGameIssueDetail(${item.id})" style="color:var(--primary,#1677ff);cursor:pointer;text-decoration:none;font-weight:500;">${escapeHtml(item.game_name || '-')}</a></td>
             <td>${getIssueTypeBadge(item.issue_type)}</td>
             <td class="desc-cell rich-cell" title="${escapeHtml((item.issue_desc || '').replace(/<[^>]+>/g, ' '))}">${item.issue_desc || '-'}</td>
             <td>${escapeHtml(item.owner || '-')}</td>
@@ -364,6 +364,7 @@ function renderGameIssuesTable(data) {
             <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
             <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
             <td>
+                <button class="action-btn" onclick="showGameIssueDetail(${item.id})" title="详情">👁️</button>
                 <button class="action-btn" onclick="editGameIssue(${item.id})" title="编辑">✏️</button>
                 <button class="action-btn action-btn-danger" onclick="deleteGameIssue(${item.id})" title="删除">🗑️</button>
             </td>
@@ -565,9 +566,13 @@ async function editGameIssue(id) {
     await openGameIssueModal(id);
 
     document.getElementById('gi-id').value = item.id;
-    // ★ 通过 initSearchableSelect 设置游戏名（同步更新 input 显示和 hidden 值）
+    // ★ 通过 SearchableSelect 设置游戏名（同步更新 input 显示和 hidden 值）
     const gameNames = (allGamesForProgress || []).map(g => g.name || g.game_name || '').filter(Boolean);
-    initSearchableSelect('gi-game-name', gameNames, item.game_name || '');
+    if (window.SearchableSelect) {
+        SearchableSelect.init('gi-game-name', gameNames, item.game_name || '');
+    } else if (typeof initSearchableSelect === 'function') {
+        initSearchableSelect('gi-game-name', gameNames, item.game_name || '');
+    }
     document.getElementById('gi-issue-type').value = item.issue_type || '';
     document.getElementById('gi-owner').value = item.owner || '';
     document.getElementById('gi-status').value = item.status || '待处理';
@@ -577,6 +582,188 @@ async function editGameIssue(id) {
     const hidden = document.getElementById('gi-issue-desc');
     if (hidden) hidden.value = item.issue_desc || '';
     document.getElementById('gi-remarks').value = item.remarks || '';
+}
+
+// ========== 游戏问题详情面板（点击游戏名/详情按钮触发）==========
+async function showGameIssueDetail(id) {
+    const item = (allGameIssuesData || []).find(i => i.id === id);
+    if (!item) {
+        showToast('未找到该问题数据', 'warning');
+        return;
+    }
+    // 先确保游戏列表和成员列表已加载（用于编辑下拉）
+    if (!allGamesForProgress || allGamesForProgress.length === 0) {
+        try {
+            const r = await authFetch(`${API_BASE}/games`);
+            const j = await r.json();
+            allGamesForProgress = j.data || [];
+        } catch (e) {}
+    }
+    if (!allMembersData || allMembersData.length === 0) {
+        try {
+            const r = await authFetch(`${API_BASE}/members`);
+            const j = await r.json();
+            allMembersData = j.data || j || [];
+        } catch (e) {}
+    }
+
+    // 移除旧的详情弹窗（避免叠加）
+    document.getElementById('gi-detail-modal')?.remove();
+
+    const issueTypes = ['画面问题', '性能问题', '适配问题', '崩溃闪退', '其他'];
+    const statusOpts = ['待处理', '处理中', '已解决', '已关闭'];
+    const ownerOpts = (allMembersData || []).map(m => m.name);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'gi-detail-modal';
+    overlay.className = 'modal';
+    overlay.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1100;align-items:center;justify-content:center;';
+
+    overlay.innerHTML = `
+        <div class="modal-overlay" onclick="if(event.target===this)closeGameIssueDetail()" style="position:absolute;inset:0;"></div>
+        <div class="modal-container modal-game-issue" style="position:relative;z-index:2;display:flex;flex-direction:column;background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+            <div class="modal-content" style="display:flex;flex-direction:column;max-height:85vh;">
+                <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border,#eee);display:flex;align-items:center;justify-content:space-between;">
+                    <h3 style="margin:0;font-size:16px;">问题详情 #${item.id} <span style="color:var(--text-tertiary,#999);font-weight:normal;font-size:13px;margin-left:8px;">${escapeHtml(item.game_name || '')}</span></h3>
+                    <button class="modal-close modal-close-plain" onclick="closeGameIssueDetail()" title="关闭">✕</button>
+                </div>
+                <div class="modal-body gi-detail-body" style="padding:20px;overflow-y:auto;">
+                    <!-- 元数据栏 -->
+                    <div class="gi-detail-meta" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px 24px;margin-bottom:18px;">
+                        <div class="gi-detail-row">
+                            <label>游戏名称</label>
+                            <div class="gi-detail-value">${escapeHtml(item.game_name || '-')}</div>
+                        </div>
+                        <div class="gi-detail-row">
+                            <label>问题类型</label>
+                            <select id="gid-issue-type" class="gi-inline-select" data-field="issue_type" data-id="${item.id}">
+                                <option value="">选择类型</option>
+                                ${issueTypes.map(t => `<option value="${t}"${item.issue_type===t?' selected':''}>${t}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="gi-detail-row">
+                            <label>负责人</label>
+                            <select id="gid-owner" class="gi-inline-select" data-field="owner" data-id="${item.id}">
+                                <option value="">未分配</option>
+                                ${ownerOpts.map(n => `<option value="${escapeHtml(n)}"${item.owner===n?' selected':''}>${escapeHtml(n)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="gi-detail-row">
+                            <label>状态</label>
+                            <select id="gid-status" class="gi-inline-select" data-field="status" data-id="${item.id}">
+                                ${statusOpts.map(s => `<option value="${s}"${item.status===s?' selected':''}>${s}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="gi-detail-row">
+                            <label>创建时间</label>
+                            <div class="gi-detail-value">${item.created_at ? formatDate(item.created_at) : '-'}</div>
+                        </div>
+                        <div class="gi-detail-row">
+                            <label>更新时间</label>
+                            <div class="gi-detail-value">${item.updated_at ? formatDate(item.updated_at) : '-'}</div>
+                        </div>
+                    </div>
+
+                    <!-- 问题描述（可编辑富文本） -->
+                    <div class="gi-detail-section" style="margin-bottom:16px;">
+                        <label style="display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:6px;">
+                            <span>问题描述 <span style="color:var(--text-tertiary,#999);font-weight:normal;font-size:12px;margin-left:6px;">(支持粘贴/拖拽 图片视频)</span></span>
+                            <button class="btn btn-sm" onclick="saveGameIssueDetailField(${item.id}, 'issue_desc')" style="padding:4px 12px;font-size:12px;">保存描述</button>
+                        </label>
+                        <div id="gid-issue-desc-editor" class="rich-paste-editor" contenteditable="true" data-placeholder="点击编辑问题描述...">${item.issue_desc || ''}</div>
+                    </div>
+
+                    <!-- 备注（可编辑） -->
+                    <div class="gi-detail-section">
+                        <label style="display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:6px;">
+                            <span>备注</span>
+                            <button class="btn btn-sm" onclick="saveGameIssueDetailField(${item.id}, 'remarks')" style="padding:4px 12px;font-size:12px;">保存备注</button>
+                        </label>
+                        <textarea id="gid-remarks" rows="3" style="width:100%;padding:8px;border:1px solid var(--border,#d4d8dc);border-radius:6px;font-size:14px;line-height:1.5;resize:vertical;">${escapeHtml(item.remarks || '')}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border,#eee);display:flex;justify-content:flex-end;gap:8px;">
+                    <button class="btn" onclick="closeGameIssueDetail()">关闭</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 绑定富文本编辑器粘贴/拖拽
+    const descEditor = document.getElementById('gid-issue-desc-editor');
+    if (descEditor && typeof bindRichPasteEditor === 'function') {
+        bindRichPasteEditor(descEditor, null);
+    }
+
+    // 三个内联 select 的 change 自动保存
+    overlay.querySelectorAll('.gi-inline-select').forEach(sel => {
+        sel.addEventListener('change', async () => {
+            const field = sel.dataset.field;
+            const newValue = sel.value;
+            await saveGameIssueDetailField(item.id, field, newValue);
+        });
+    });
+
+    // 绑定图片/视频点击放大预览
+    descEditor?.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            window.open(e.target.src, '_blank');
+        }
+    });
+}
+
+function closeGameIssueDetail() {
+    document.getElementById('gi-detail-modal')?.remove();
+}
+
+// 保存详情面板单个字段
+async function saveGameIssueDetailField(id, field, value) {
+    if (value === undefined) {
+        // 从 DOM 取
+        if (field === 'issue_desc') {
+            const ed = document.getElementById('gid-issue-desc-editor');
+            value = ed ? ed.innerHTML.trim() : '';
+        } else if (field === 'remarks') {
+            const ta = document.getElementById('gid-remarks');
+            value = ta ? ta.value : '';
+        } else {
+            const sel = document.getElementById('gid-' + field.replace('_', '-'));
+            value = sel ? sel.value : '';
+        }
+    }
+    try {
+        // 用完整 PUT（后端不支持 PATCH 单字段，需重组完整 body）
+        const item = allGameIssuesData.find(i => i.id === id);
+        if (!item) return;
+        const body = {
+            game_name: item.game_name,
+            issue_type: field === 'issue_type' ? value : item.issue_type,
+            priority: item.priority || '',
+            issue_desc: field === 'issue_desc' ? value : item.issue_desc,
+            owner: field === 'owner' ? value : item.owner,
+            status: field === 'status' ? value : item.status,
+            remarks: field === 'remarks' ? value : item.remarks
+        };
+        const resp = await authFetch(`${API_BASE}/game-issues/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const result = await resp.json();
+        if (result.success || resp.ok) {
+            // 更新本地缓存
+            item[field] = value;
+            showToast('已保存', 'success');
+            // 刷新列表
+            renderGameIssuesTable(allGameIssuesData);
+        } else {
+            showToast(result.error || '保存失败', 'danger');
+        }
+    } catch (e) {
+        console.error('保存字段失败:', e);
+        showToast('保存失败', 'danger');
+    }
 }
 
 async function submitGameIssueForm(event) {

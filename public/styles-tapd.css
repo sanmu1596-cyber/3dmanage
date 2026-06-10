@@ -1559,6 +1559,78 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
+/* ========== 游戏问题详情弹窗 ========== */
+.gi-detail-body label {
+    display: block;
+    color: var(--text-secondary, #666);
+    font-size: 13px;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.gi-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.gi-detail-row .gi-detail-value {
+    padding: 7px 10px;
+    background: rgba(0,0,0,0.03);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-primary, #1f2329);
+    min-height: 32px;
+    box-sizing: border-box;
+}
+.gi-inline-select {
+    padding: 7px 10px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 13px;
+    color: var(--text-primary, #1f2329);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.gi-inline-select:focus {
+    outline: none;
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+}
+.gi-detail-section .rich-paste-editor {
+    min-height: 120px;
+}
+.gi-detail-section .rich-paste-editor img {
+    cursor: zoom-in;
+}
+[data-theme="dark"] .gi-detail-row .gi-detail-value {
+    background: rgba(255,255,255,0.05);
+    color: #e8eaed;
+}
+[data-theme="dark"] .gi-inline-select {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+.btn.btn-sm {
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border, #d4d8dc);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn.btn-sm:hover {
+    background: var(--primary, #1677ff);
+    color: #fff;
+    border-color: var(--primary, #1677ff);
+}
+/* 列表中游戏名称链接 */
+.game-name-link:hover {
+    text-decoration: underline !important;
+    color: var(--primary-hover, #4096ff) !important;
+}
+
 /* ========== 可搜索下拉框（searchable select）— 学习 TAPD ========== */
 .searchable-select {
     position: relative;
