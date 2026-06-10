@@ -1646,6 +1646,38 @@ tr:hover .action-icon-btn:hover {
     color: var(--text-tertiary, #999);
     font-size: 13px;
 }
+/* 副标题（item.sub） */
+.searchable-select-option .ssel-sub {
+    color: var(--text-tertiary, #999);
+    font-size: 12px;
+    margin-left: 8px;
+}
+/* 清空按钮 */
+.searchable-select-clear {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 50%;
+    color: var(--text-tertiary, #999);
+    font-size: 11px;
+    cursor: pointer;
+    background: rgba(0,0,0,0.05);
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.searchable-select:hover .searchable-select-clear,
+.searchable-select.open .searchable-select-clear {
+    opacity: 1;
+}
+.searchable-select-clear:hover {
+    background: rgba(0,0,0,0.12);
+    color: var(--text-primary, #1f2329);
+}
 [data-theme="dark"] .searchable-select-input {
     background: var(--bg-input, #1c2330);
     color: #e8eaed;
