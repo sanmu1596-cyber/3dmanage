@@ -408,22 +408,22 @@ function insertImgToEditor(src) {
 
 function previewFocusImage(src, e) {
     if (e) e.stopPropagation();
-
-    // 移除已有预览
+    // ★ 优先使用通用 MediaViewer 组件（支持缩放/旋转/键盘导航/下载）
+    if (window.MediaViewer) {
+        MediaViewer.show(src);
+        return;
+    }
+    // 兜底：旧实现（仅当 MediaViewer 未加载时）
     closeImagePreview();
-
     var overlay = document.createElement('div');
     overlay.className = 'focus-image-preview-overlay';
     overlay.onclick = closeImagePreview;
     overlay.onkeydown = function(evt) { if (evt.key === 'Escape') closeImagePreview(); };
-
     var img = document.createElement('img');
     img.src = src;
-
     overlay.appendChild(img);
     document.body.appendChild(overlay);
     _focusImagePreview = overlay;
-
     setTimeout(function() { overlay.focus(); }, 50);
 }
 

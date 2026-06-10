@@ -1559,6 +1559,153 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
+/* ========== MediaViewer 图片/视频查看器 ========== */
+.media-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+.media-viewer .mv-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(2px);
+    cursor: zoom-out;
+}
+.media-viewer .mv-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+}
+.media-viewer .mv-canvas {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 90vw;
+    max-height: 85vh;
+}
+.media-viewer .mv-img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+    cursor: zoom-in;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.media-viewer .mv-video {
+    max-width: 90vw;
+    max-height: 85vh;
+    border-radius: 4px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+    background: #000;
+}
+.media-viewer .mv-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.15s;
+    backdrop-filter: blur(8px);
+    z-index: 2;
+}
+.media-viewer .mv-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: translateY(-50%) scale(1.06);
+}
+.media-viewer .mv-btn-prev { left: 24px; }
+.media-viewer .mv-btn-next { right: 24px; }
+.media-viewer .mv-toolbar {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    backdrop-filter: blur(10px);
+    z-index: 2;
+}
+.media-viewer .mv-tool {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+}
+.media-viewer .mv-tool:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+.media-viewer .mv-zoom-info {
+    color: #fff;
+    font-size: 13px;
+    min-width: 48px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.media-viewer .mv-counter {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 13px;
+    margin: 0 6px 0 12px;
+    font-variant-numeric: tabular-nums;
+}
+.media-viewer .mv-close {
+    margin-left: 4px;
+}
+@media (max-width: 640px) {
+    .media-viewer .mv-btn { width: 40px; height: 40px; font-size: 24px; }
+    .media-viewer .mv-btn-prev { left: 12px; }
+    .media-viewer .mv-btn-next { right: 12px; }
+    .media-viewer .mv-toolbar { bottom: 16px; padding: 6px 10px; }
+    .media-viewer .mv-tool { width: 30px; height: 30px; font-size: 14px; }
+}
+/* 富文本中的图片：鼠标提示可点击放大 */
+.rich-paste-editor img,
+.gi-detail-section .rich-paste-editor img,
+.focus-rich-editor img,
+.rich-cell img {
+    cursor: zoom-in;
+    transition: opacity 0.15s;
+}
+.rich-paste-editor img:hover,
+.gi-detail-section .rich-paste-editor img:hover,
+.focus-rich-editor img:hover {
+    opacity: 0.92;
+}
+
 /* ========== 游戏问题详情弹窗 ========== */
 .gi-detail-body label {
     display: block;

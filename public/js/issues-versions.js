@@ -705,12 +705,10 @@ async function showGameIssueDetail(id) {
         });
     });
 
-    // 绑定图片/视频点击放大预览
-    descEditor?.addEventListener('click', (e) => {
-        if (e.target.tagName === 'IMG') {
-            window.open(e.target.src, '_blank');
-        }
-    });
+    // ★ 绑定 MediaViewer：点击图片/视频唤起内置查看器（缩放/旋转/键盘导航/下载）
+    if (window.MediaViewer && descEditor) {
+        MediaViewer.bind(descEditor, 'img, video');
+    }
 }
 
 function closeGameIssueDetail() {
