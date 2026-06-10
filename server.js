@@ -514,7 +514,13 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'),
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
-  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine'];
+  // ★ 与游戏列表所有可编辑字段保持一致（昨天新增了 online_status 等9个可双击编辑的字段，必须同步白名单）
+  const allowedFields = [
+    'name', 'english_name', 'platform', 'game_id', 'game_type',
+    'description', 'developer', 'operator', 'release_date', 'config_path',
+    'adapter_progress', 'owner_id', 'online_status', 'quality',
+    'game_account', 'storage_location', 'game_engine'
+  ];
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {

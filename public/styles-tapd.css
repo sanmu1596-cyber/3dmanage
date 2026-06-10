@@ -361,8 +361,9 @@ body {
 /* ========== 右侧内容区域 ========== */
 .content-area {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* ★ 改为 hidden + min-height:0，让内部 .table-container 成为唯一滚动容器（sticky 生效） */
+    overflow: hidden;
+    min-height: 0;
     background: transparent;
     display: flex;
     flex-direction: column;
@@ -373,7 +374,9 @@ body {
     display: none;
     flex: 1;
     flex-direction: column;
-    overflow: visible;
+    /* ★ 改为 hidden，让内部 .table-container 成为唯一滚动容器，确保 sticky 表头生效 */
+    overflow: hidden;
+    min-height: 0;
     padding: 16px;
     background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(2px);
@@ -1010,6 +1013,8 @@ body {
 .table-container {
     flex: 1;
     overflow: auto;
+    /* ★ 关键：必须设置最小高度为0，否则 flex 容器内 overflow 不会触发滚动条 → sticky 失效 */
+    min-height: 0;
     position: relative;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(8px);
