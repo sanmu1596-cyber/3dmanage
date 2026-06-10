@@ -119,13 +119,14 @@ function showConfirm(message, onConfirm, onCancel) {
 }
 
 // 游戏分页状态
-let currentPage = 1;
-let pageSize = 20;
-let allGamesData = [];
-let filteredGamesData = []; // 筛选后的数据
+// ★ 必须用 var，让其挂载到 window，方便其他 JS 文件做 typeof / window.xxx 判空
+var currentPage = 1;
+var pageSize = 20;
+var allGamesData = [];
+var filteredGamesData = []; // 筛选后的数据
 
 // 游戏账号数据映射
-let gameAccountsMap = {};
+var gameAccountsMap = {};
 
 // 加载游戏账号数据
 function loadGameAccounts() {
@@ -155,7 +156,8 @@ function getGameAccount(gameName) {
 }
 
 // 游戏列表显示列配置
-let visibleColumns = {
+// ★ 必须用 var：跨文件引用 window.visibleColumns 时 let 不挂 window
+var visibleColumns = {
     name: true,
     english_name: true,
     platform: true,
@@ -237,13 +239,14 @@ var planListVisibleColumns = {
 };
 
 // 适配进展状态
-let allDevicesData = [];
-let allGamesForProgress = [];
-let allMembersData = []; // 存储成员数据,用于适配进展中的负责人
-let allTestsData = [];   // P0: 存储测试数据,支持前端筛选
-let allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
-let currentDeviceId = null;
-let progressData = []; // 存储各设备的游戏适配数据
+// ★ 必须用 var：跨文件 window.xxx 引用要求挂在 window 对象上
+var allDevicesData = [];
+var allGamesForProgress = [];
+var allMembersData = []; // 存储成员数据,用于适配进展中的负责人
+var allTestsData = [];   // P0: 存储测试数据,支持前端筛选
+var allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
+var currentDeviceId = null;
+var progressData = []; // 存储各设备的游戏适配数据
 
 // ==================== 数据刷新指示器 ====================
 

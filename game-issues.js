@@ -44,6 +44,27 @@ router.put('/:id', auth.checkPermission('bugs', 'edit'), (req, res) => {
   });
 });
 
+// ★ 单字段行内更新（详情面板自动保存用）— PATCH 只更新传入的字段
+router.patch('/:id', auth.checkPermission('bugs', 'edit'), (req, res) => {
+  const allowedFields = ['game_name', 'issue_type', 'priority', 'issue_desc', 'owner', 'status', 'remarks'];
+  const updates = [];
+  const values = [];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowedFields.includes(key)) {
+      updates.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+  values.push(req.params.id);
+  const sql = `UPDATE game_issues SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+  db.run(sql, values, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: '游戏问题不存在' });
+    res.json({ success: true });
+  });
+});
+
 // 删除游戏问题
 router.delete('/:id', auth.checkPermission('bugs', 'delete'), (req, res) => {
   db.run('DELETE FROM game_issues WHERE id=?', [req.params.id], function(err) {

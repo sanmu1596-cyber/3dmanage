@@ -717,7 +717,7 @@ function closeGameIssueDetail() {
     document.getElementById('gi-detail-modal')?.remove();
 }
 
-// 保存详情面板单个字段
+// 保存详情面板单个字段（用 PATCH 接口，只传单字段，避免覆盖其他字段）
 async function saveGameIssueDetailField(id, field, value) {
     if (value === undefined) {
         // 从 DOM 取
@@ -733,22 +733,13 @@ async function saveGameIssueDetailField(id, field, value) {
         }
     }
     try {
-        // 用完整 PUT（后端不支持 PATCH 单字段，需重组完整 body）
         const item = allGameIssuesData.find(i => i.id === id);
         if (!item) return;
-        const body = {
-            game_name: item.game_name,
-            issue_type: field === 'issue_type' ? value : item.issue_type,
-            priority: item.priority || '',
-            issue_desc: field === 'issue_desc' ? value : item.issue_desc,
-            owner: field === 'owner' ? value : item.owner,
-            status: field === 'status' ? value : item.status,
-            remarks: field === 'remarks' ? value : item.remarks
-        };
+        // ★ 使用 PATCH 接口，只传单字段，更安全
         const resp = await authFetch(`${API_BASE}/game-issues/${id}`, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify({ [field]: value })
         });
         const result = await resp.json();
         if (result.success || resp.ok) {
