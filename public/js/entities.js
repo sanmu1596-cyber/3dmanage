@@ -127,18 +127,16 @@ function startInlineEdit(td, deviceId, field, inputType) {
 
     const currentValue = td.textContent.trim();
     const displayValue = currentValue === '-' ? '' : currentValue;
+    // ★ 保留原 innerHTML 作为不可见占位符撑住td尺寸
+    const originalHtml = td.innerHTML;
 
     td.classList.add('editing');
     // P1.1: 记录当前编辑的td，用于外部点击判断
     _inlineEditCurrentTd = td;
 
-    // 锁定单元格宽高，防止编辑态撑开引起抖动
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 关键修复：不再设置 td.style.width/maxWidth/height（避免列宽重排）
+    // 改用 position:relative + 占位符 + absolute 浮层
+    td.style.position = 'relative';
 
     // 保管者：下拉选择（从成员列表获取）
     if (field === 'keeper') {
@@ -239,30 +237,21 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
             if (device) device[field] = body[field];
             // 只恢复当前单元格显示（不整表重渲染，避免抖动）
             td.textContent = trimmed || '-';
-            // 解除宽高锁定
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            // ★ 清除 position（不再有 width/maxWidth/height 内联样式）
+            td.style.position = '';
             // 异步刷新关联模块缓存（适配进展中的设备信息可能变化）
             if (['keeper', 'notes', 'requirements', 'quantity'].includes(field)) {
                 window._progressDataStale = true; // 标记适配进展数据需刷新
             }
         } else {
             td.textContent = trimmed || '-';
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            td.style.position = '';
             showToast('保存失败', 'danger');
         }
     } catch (error) {
         console.error('行内编辑保存失败:', error);
         td.textContent = trimmed || '-';
-        td.style.width = '';
-        td.style.minWidth = '';
-        td.style.maxWidth = '';
-        td.style.height = '';
+        td.style.position = '';
         showToast('保存失败', 'danger');
     }
 }
@@ -272,11 +261,8 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
  */
 function cancelInlineEdit(td, originalValue) {
     td.classList.remove('editing');
-    // 解除宽高锁定
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    // ★ 清除 position
+    td.style.position = '';
     td.textContent = originalValue;
 }
 

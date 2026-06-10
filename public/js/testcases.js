@@ -172,12 +172,8 @@ function startTcTextEdit(td, tcId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高，避免列宽重排
+    td.style.position = 'relative';
 
     const tc = allTestCasesData.find(t => t.id === tcId);
     const originalValue = tc ? (tc[field] || '') : '';
@@ -217,7 +213,7 @@ function startTcTextEdit(td, tcId, field) {
         if (newValue === originalValue) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
             return;
         }
         try {
@@ -244,7 +240,7 @@ function startTcTextEdit(td, tcId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     input.addEventListener('blur', save);
@@ -255,7 +251,7 @@ function startTcTextEdit(td, tcId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
         }
     });
 }
@@ -267,12 +263,8 @@ function startTcDropdownEdit(td, tcId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高，避免列宽重排
+    td.style.position = 'relative';
 
     const tc = allTestCasesData.find(t => t.id === tcId);
     const originalHtml = td.innerHTML;
@@ -329,7 +321,7 @@ function startTcDropdownEdit(td, tcId, field) {
         if (newValue === currentVal) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
             return;
         }
 
@@ -371,7 +363,7 @@ function startTcDropdownEdit(td, tcId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     select.addEventListener('change', save);
@@ -380,7 +372,7 @@ function startTcDropdownEdit(td, tcId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
         }
     });
 }

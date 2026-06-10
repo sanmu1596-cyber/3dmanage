@@ -335,13 +335,8 @@ function startReportDropdownEdit(td, rowId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高（避免列宽重排），改用 position:relative + 占位符 + absolute 浮层
+    td.style.position = 'relative';
 
     const rowData = allReportGameData.find(r => r._id == rowId);
     const originalHtml = td.innerHTML;
@@ -444,7 +439,7 @@ function startReportDropdownEdit(td, rowId, field) {
             showToast('网络异常，保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     select.addEventListener('change', save);
@@ -466,13 +461,8 @@ function startReportNotesEdit(td, rowId) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高（避免列宽重排），改用 position:relative + 占位符 + absolute 浮层
+    td.style.position = 'relative';
 
     const rowData = allReportGameData.find(r => r._id == rowId);
     const originalValue = rowData ? (rowData.notes || '') : '';
@@ -523,7 +513,7 @@ function startReportNotesEdit(td, rowId) {
             showToast('网络异常，保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     input.addEventListener('blur', save);
@@ -537,7 +527,7 @@ function startReportNotesEdit(td, rowId) {
 function finishEditing(td, originalHtml) {
     td.classList.remove('editing');
     td.innerHTML = originalHtml;
-    td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    td.style.position = '';
 }
 
 /** 刷新单个单元格的显示内容（保存成功后调用） */
@@ -546,7 +536,7 @@ function refreshReportCell(td, rowId, field) {
     if (!rowData) return;
 
     td.classList.remove('editing');
-    td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+    td.style.position = '';
 
     if (field === 'name') {
         td.textContent = rowData.name || '';
