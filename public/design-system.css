@@ -348,18 +348,28 @@ select option {
 .modal {
     box-sizing: border-box;
 }
-.modal-overlay {
+/* ★ 注意：项目里 .modal-overlay 既是新弹窗(.modal>.modal-overlay)又是大事/旧弹窗根容器(.modal-overlay 本身)
+   为避免冲突，这里只在 .modal 内部生效 */
+.modal > .modal-overlay {
     background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(2px);
 }
-.modal-container,
-.modal-content {
+/* ★ 仅 .modal-container（新结构）应用 flex 列布局
+   .modal-content 是旧弹窗的根（外层 .modal），不能强制 flex/overflow:hidden
+   否则会破坏旧弹窗 margin:auto 居中和长内容滚动 */
+.modal-container {
     background: var(--bg-card, #fff);
     border-radius: var(--ds-radius-xl);
     box-shadow: var(--ds-shadow-lg);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+/* 旧弹窗 .modal-content：保留原有滚动行为，仅统一外观 */
+.modal-content {
+    background: var(--bg-card, #fff);
+    border-radius: var(--ds-radius-xl);
+    box-shadow: var(--ds-shadow-lg);
 }
 .modal-header {
     padding: var(--space-4) var(--space-5);
@@ -380,8 +390,11 @@ select option {
 .modal-body {
     padding: var(--space-5);
     overflow-y: auto;
-    flex: 1;
+    /* ★ 仅在 .modal-container 内的 modal-body 才用 flex 撑高，旧弹窗用默认布局 */
     min-height: 0;
+}
+.modal-container > .modal-content > .modal-body {
+    flex: 1;
 }
 .modal-footer,
 .form-actions {
