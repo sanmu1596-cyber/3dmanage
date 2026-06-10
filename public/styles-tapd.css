@@ -1785,7 +1785,7 @@ tr:hover .action-icon-btn:hover {
 }
 .searchable-select-input {
     width: 100%;
-    padding: 7px 32px 7px 12px;
+    padding: 0 32px 0 12px;
     border: 1px solid var(--border, #d4d8dc);
     border-radius: 6px;
     background: #fff;
@@ -1796,7 +1796,7 @@ tr:hover .action-icon-btn:hover {
     outline: none;
     box-sizing: border-box;
     height: 36px;
-    line-height: 1.4;
+    line-height: 34px; /* ★ 等于 height-2px(border)，确保文字垂直居中且不被裁切 */
 }
 .searchable-select-input:focus,
 .searchable-select.open .searchable-select-input {

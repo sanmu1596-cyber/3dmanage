@@ -234,7 +234,9 @@ textarea,
     height: var(--ctrl-h-md);
     padding: 0 var(--space-3);
     font-size: var(--fs-md);
-    line-height: var(--lh-tight);
+    /* ★ 关键修复：line-height 必须等于 height（去掉 padding），否则文字会被垂直裁切
+       1.25 在 36px 高 + 14px 字号下不够，下行字符（如 角/责）的下半部分会被切 */
+    line-height: calc(var(--ctrl-h-md) - 2px);
     font-family: inherit;
     color: var(--text-primary, #1f2329);
     background: var(--bg-input, #fff);
@@ -244,17 +246,38 @@ textarea,
                 box-shadow var(--duration-base) ease;
     box-sizing: border-box;
     width: 100%;
+    /* 避免 placeholder/option 文字被裁 */
+    vertical-align: middle;
+}
+/* select 必须用 normal line-height，自带原生居中行为，否则浏览器渲染会异常 */
+select.compact-select,
+select.form-control,
+select {
+    line-height: normal;
+    /* 留出右侧箭头空间 */
+    padding-right: 28px;
 }
 textarea {
     height: auto;
-    min-height: 80px;
-    padding: var(--space-2) var(--space-3);
+    min-height: 88px;
+    padding: var(--space-3);
     line-height: var(--lh-normal);
     resize: vertical;
 }
+/* 小尺寸控件（搜索框/筛选下拉）保持紧凑但不能裁字 */
+.filter-input,
+.compact-select {
+    height: 32px;
+    line-height: 30px;
+    padding: 0 10px;
+    font-size: var(--fs-sm);
+}
+select.compact-select {
+    line-height: normal;
+    padding-right: 26px;
+}
 select {
-    /* 还原浏览器原生下拉箭头并适配 padding */
-    padding-right: 32px;
+    /* 还原浏览器原生下拉箭头 */
     background-position: right 10px center;
     background-repeat: no-repeat;
     cursor: pointer;
@@ -291,12 +314,20 @@ textarea[disabled] {
     margin-bottom: var(--space-2);
     font-size: var(--fs-sm);
     font-weight: 500;
+    line-height: 1.4;        /* 给 label 充足行高 */
     color: var(--text-secondary, #616161);
 }
 .form-group .required,
 .form-group .form-required {
     color: var(--danger, #f44336);
     margin-left: 2px;
+}
+
+/* ★ 修复 select 内 option 文字裁切：option 在某些浏览器会继承父级 line-height
+   显式设置 normal，确保所有下拉菜单文字完整 */
+select option {
+    line-height: normal;
+    padding: 4px 8px;
 }
 
 /* form-row：水平排列字段 */
