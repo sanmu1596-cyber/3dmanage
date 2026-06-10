@@ -1559,6 +1559,114 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
+/* ========== 可搜索下拉框（searchable select）— 学习 TAPD ========== */
+.searchable-select {
+    position: relative;
+    width: 100%;
+}
+.searchable-select-input {
+    width: 100%;
+    padding: 7px 32px 7px 12px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    color: var(--text-primary, #1f2329);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+    box-sizing: border-box;
+    height: 36px;
+    line-height: 1.4;
+}
+.searchable-select-input:focus,
+.searchable-select.open .searchable-select-input {
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+    cursor: text;
+}
+.searchable-select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary, #999);
+    font-size: 12px;
+    pointer-events: none;
+    transition: transform 0.18s;
+}
+.searchable-select.open .searchable-select-arrow {
+    transform: translateY(-50%) rotate(180deg);
+}
+.searchable-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    z-index: 100;
+    display: none;
+    padding: 4px 0;
+}
+.searchable-select.open .searchable-select-dropdown {
+    display: block;
+}
+.searchable-select-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary, #1f2329);
+    transition: background 0.12s;
+    display: block;
+    word-break: break-word;
+}
+.searchable-select-option:hover,
+.searchable-select-option.highlighted {
+    background: rgba(22,119,255,0.08);
+}
+.searchable-select-option.selected {
+    background: rgba(22,119,255,0.12);
+    color: var(--primary, #1677ff);
+    font-weight: 500;
+}
+.searchable-select-option mark {
+    background: #fff3a8;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+}
+.searchable-select-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-tertiary, #999);
+    font-size: 13px;
+}
+[data-theme="dark"] .searchable-select-input {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+[data-theme="dark"] .searchable-select-dropdown {
+    background: var(--bg-elevated, #1c2330);
+    border-color: var(--border, #2a3140);
+}
+[data-theme="dark"] .searchable-select-option {
+    color: #e8eaed;
+}
+[data-theme="dark"] .searchable-select-option:hover,
+[data-theme="dark"] .searchable-select-option.highlighted {
+    background: rgba(22,119,255,0.18);
+}
+[data-theme="dark"] .searchable-select-option mark {
+    background: #5a4500;
+    color: #ffe072;
+}
+
 /* ========== 游戏问题弹窗：居中、占视口约1/4-1/3 ========== */
 .modal-container.modal-game-issue {
     width: 50vw;

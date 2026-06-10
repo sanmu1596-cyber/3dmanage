@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260610d">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260610e">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -1775,9 +1775,13 @@
                                 <div class="form-row">
                                     <div class="form-group" style="flex:2">
                                         <label>游戏名称 <span class="required">*</span></label>
-                                        <select id="gi-game-name" required>
-                                            <option value="">选择游戏</option>
-                                        </select>
+                                        <!-- ★ 可搜索下拉（filterable select）：input + 隐藏值 + 浮层 -->
+                                        <div class="searchable-select" id="gi-game-name-wrap">
+                                            <input type="text" class="searchable-select-input" id="gi-game-name-input" placeholder="输入游戏名快速定位..." autocomplete="off">
+                                            <span class="searchable-select-arrow">▾</span>
+                                            <div class="searchable-select-dropdown" id="gi-game-name-dropdown"></div>
+                                            <input type="hidden" id="gi-game-name" required>
+                                        </div>
                                     </div>
                                     <div class="form-group" style="flex:1">
                                         <label>问题类型</label>
@@ -3208,20 +3212,20 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260610d"></script>
-    <script src="js/auth.js?v=20260610d"></script>
-    <script src="js/crud-module.js?v=20260610d"></script>
-    <script src="js/router.js?v=20260610d"></script>
-    <script src="js/entities.js?v=20260610d"></script>
-    <script src="js/plans.js?v=20260610d"></script>
-    <script src="js/dashboard.js?v=20260610d"></script>
-    <script src="js/ui-features.js?v=20260610d"></script>
-    <script src="js/admin.js?v=20260610d"></script>
-    <script src="js/requirements.js?v=20260610d"></script>
-    <script src="js/testcases.js?v=20260610d"></script>
-    <script src="js/issues-versions.js?v=20260610d"></script>
-    <script src="js/social.js?v=20260610d"></script>
-    <script src="js/reports.js?v=20260610d"></script>
+    <script src="js/core.js?v=20260610e"></script>
+    <script src="js/auth.js?v=20260610e"></script>
+    <script src="js/crud-module.js?v=20260610e"></script>
+    <script src="js/router.js?v=20260610e"></script>
+    <script src="js/entities.js?v=20260610e"></script>
+    <script src="js/plans.js?v=20260610e"></script>
+    <script src="js/dashboard.js?v=20260610e"></script>
+    <script src="js/ui-features.js?v=20260610e"></script>
+    <script src="js/admin.js?v=20260610e"></script>
+    <script src="js/requirements.js?v=20260610e"></script>
+    <script src="js/testcases.js?v=20260610e"></script>
+    <script src="js/issues-versions.js?v=20260610e"></script>
+    <script src="js/social.js?v=20260610e"></script>
+    <script src="js/reports.js?v=20260610e"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>
