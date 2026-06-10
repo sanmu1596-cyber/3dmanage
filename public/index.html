@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260610c">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260610d">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -994,12 +994,6 @@
                                 <option value="崩溃闪退">崩溃闪退</option>
                                 <option value="其他">其他</option>
                             </select>
-                            <select id="gi-priority-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -1009,7 +1003,6 @@
                                     <th style="width:50px">序号</th>
                                     <th style="width:120px">游戏名称</th>
                                     <th style="width:90px">问题类型</th>
-                                    <th style="width:70px">优先级</th>
                                     <th style="width:300px">问题描述</th>
                                     <th style="width:80px">负责人</th>
                                     <th style="width:80px">状态</th>
@@ -1771,11 +1764,11 @@
                 <!-- ========== 游戏问题弹窗 ========== -->
                 <div class="modal" id="game-issue-modal">
                     <div class="modal-overlay" onclick="if(event.target===this)closeModal('game-issue-modal')"></div>
-                    <div class="modal-container" style="max-width:600px">
+                    <div class="modal-container modal-game-issue">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h3 id="game-issue-modal-title">新增游戏问题</h3>
-                                <button class="modal-close" onclick="closeModal('game-issue-modal')">✕</button>
+                                <button class="modal-close modal-close-plain" onclick="closeModal('game-issue-modal')" title="关闭">✕</button>
                             </div>
                             <form id="game-issue-form" onsubmit="submitGameIssueForm(event)">
                                 <input type="hidden" id="gi-id">
@@ -1800,15 +1793,6 @@
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group" style="flex:1">
-                                        <label>优先级</label>
-                                        <select id="gi-priority">
-                                            <option value="">选择优先级</option>
-                                            <option value="高">高</option>
-                                            <option value="中">中</option>
-                                            <option value="低">低</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="flex:1">
                                         <label>负责人 <span class="required">*</span></label>
                                         <select id="gi-owner" required>
                                             <option value="">选择负责人</option>
@@ -1825,8 +1809,9 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label>问题描述 <span class="required">*</span></label>
-                                    <textarea id="gi-issue-desc" rows="3" required placeholder="详细描述问题现象..."></textarea>
+                                    <label>问题描述 <span class="required">*</span> <span style="color:var(--text-tertiary);font-weight:normal;font-size:12px;">（支持粘贴/拖拽 图片和视频）</span></label>
+                                    <div id="gi-issue-desc-editor" class="rich-paste-editor" contenteditable="true" data-placeholder="详细描述问题现象，可直接 Ctrl+V 粘贴图片或拖拽视频..."></div>
+                                    <input type="hidden" id="gi-issue-desc">
                                 </div>
                                 <div class="form-group">
                                     <label>备注</label>
@@ -3223,20 +3208,20 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260610c"></script>
-    <script src="js/auth.js?v=20260610c"></script>
-    <script src="js/crud-module.js?v=20260610c"></script>
-    <script src="js/router.js?v=20260610c"></script>
-    <script src="js/entities.js?v=20260610c"></script>
-    <script src="js/plans.js?v=20260610c"></script>
-    <script src="js/dashboard.js?v=20260610c"></script>
-    <script src="js/ui-features.js?v=20260610c"></script>
-    <script src="js/admin.js?v=20260610c"></script>
-    <script src="js/requirements.js?v=20260610c"></script>
-    <script src="js/testcases.js?v=20260610c"></script>
-    <script src="js/issues-versions.js?v=20260610c"></script>
-    <script src="js/social.js?v=20260610c"></script>
-    <script src="js/reports.js?v=20260610c"></script>
+    <script src="js/core.js?v=20260610d"></script>
+    <script src="js/auth.js?v=20260610d"></script>
+    <script src="js/crud-module.js?v=20260610d"></script>
+    <script src="js/router.js?v=20260610d"></script>
+    <script src="js/entities.js?v=20260610d"></script>
+    <script src="js/plans.js?v=20260610d"></script>
+    <script src="js/dashboard.js?v=20260610d"></script>
+    <script src="js/ui-features.js?v=20260610d"></script>
+    <script src="js/admin.js?v=20260610d"></script>
+    <script src="js/requirements.js?v=20260610d"></script>
+    <script src="js/testcases.js?v=20260610d"></script>
+    <script src="js/issues-versions.js?v=20260610d"></script>
+    <script src="js/social.js?v=20260610d"></script>
+    <script src="js/reports.js?v=20260610d"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260427"></script>

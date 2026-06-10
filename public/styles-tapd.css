@@ -1559,7 +1559,98 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
-/* ========== TAPD Toast 暗色模式适配 ========== */
+/* ========== 游戏问题弹窗：居中、占视口约1/4-1/3 ========== */
+.modal-container.modal-game-issue {
+    width: 50vw;
+    min-width: 560px;
+    max-width: 900px;
+    max-height: 85vh;
+    margin: auto;
+}
+.modal-container.modal-game-issue .modal-content {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 无底色关闭按钮（覆盖默认 .modal-close 的灰色圆背景） */
+.modal-close.modal-close-plain {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-tertiary, #999);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close.modal-close-plain:hover {
+    background: rgba(0,0,0,0.06) !important;
+    color: var(--text-primary, #1f2329);
+}
+[data-theme="dark"] .modal-close.modal-close-plain:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: #e8eaed;
+}
+
+/* 富文本粘贴编辑器 */
+.rich-paste-editor {
+    min-height: 140px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #1f2329);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+}
+.rich-paste-editor:focus {
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+}
+.rich-paste-editor.drag-over {
+    border-color: var(--primary, #1677ff);
+    background: rgba(22,119,255,0.04);
+}
+/* 占位符：empty 状态显示 data-placeholder */
+.rich-paste-editor:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-tertiary, #b3b9c2);
+    pointer-events: none;
+}
+.rich-paste-editor img,
+.rich-paste-editor video {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 6px 0;
+    display: block;
+}
+[data-theme="dark"] .rich-paste-editor {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+
+/* 表格中富文本单元格：图片视频缩小预览 */
+.data-table td.rich-cell img,
+.data-table td.rich-cell video {
+    max-width: 80px;
+    max-height: 50px;
+    margin: 2px 4px 2px 0;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+
 [data-theme="dark"] .tapd-toast {
     background: #1f2329 !important;
     color: #e8eaed !important;

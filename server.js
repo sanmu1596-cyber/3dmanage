@@ -23,7 +23,7 @@ app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
 app.use(cookieParser()); // 解析Cookie（用于开发者密钥验证）
 
-app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.json({ limit: '30mb' })); // 30MB 上限：支持游戏问题/评论里的 base64 图片视频
 // 静态文件：开发阶段禁用缓存，确保每次加载最新；生产环境可改回 maxAge: '1d'
 app.use(express.static('public', {
   maxAge: 0,

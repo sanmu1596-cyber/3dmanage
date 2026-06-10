@@ -358,8 +358,7 @@ function renderGameIssuesTable(data) {
             <td>${idx + 1}</td>
             <td>${escapeHtml(item.game_name || '-')}</td>
             <td>${getIssueTypeBadge(item.issue_type)}</td>
-            <td>${getPriorityBadge(item.priority)}</td>
-            <td class="desc-cell" title="${escapeHtml(item.issue_desc || '')}">${escapeHtml(item.issue_desc || '-')}</td>
+            <td class="desc-cell rich-cell" title="${escapeHtml((item.issue_desc || '').replace(/<[^>]+>/g, ' '))}">${item.issue_desc || '-'}</td>
             <td>${escapeHtml(item.owner || '-')}</td>
             <td>${getGameIssueStatusBadge(item.status)}</td>
             <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
@@ -443,7 +442,18 @@ async function openGameIssueModal(id = null) {
     document.getElementById('gi-id').value = '';
     document.getElementById('game-issue-form').reset();
     document.getElementById('game-issue-modal-title').textContent = id ? '编辑游戏问题' : '新增游戏问题';
-    
+
+    // 清空富文本编辑器
+    const editor = document.getElementById('gi-issue-desc-editor');
+    if (editor) editor.innerHTML = '';
+    const hidden = document.getElementById('gi-issue-desc');
+    if (hidden) hidden.value = '';
+    // 绑定富文本粘贴/拖拽（一次绑定即可）
+    if (editor && !editor.dataset.bound) {
+        editor.dataset.bound = '1';
+        bindRichPasteEditor(editor, hidden);
+    }
+
     // 确保游戏和成员数据已加载
     if (!allGamesForProgress || allGamesForProgress.length === 0) {
         try {
@@ -459,7 +469,7 @@ async function openGameIssueModal(id = null) {
             allMembersData = membersResult.data || membersResult || [];
         } catch (e) { console.error('加载成员数据失败:', e); }
     }
-    
+
     // 填充游戏下拉框
     const gameSelect = document.getElementById('gi-game-name');
     gameSelect.innerHTML = '<option value="">选择游戏</option>';
@@ -469,7 +479,7 @@ async function openGameIssueModal(id = null) {
             gameSelect.innerHTML += `<option value="${escapeHtml(gameName)}">${escapeHtml(gameName)}</option>`;
         });
     }
-    
+
     // 填充负责人下拉框
     const ownerSelect = document.getElementById('gi-owner');
     ownerSelect.innerHTML = '<option value="">选择负责人</option>';
@@ -478,40 +488,122 @@ async function openGameIssueModal(id = null) {
             ownerSelect.innerHTML += `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`;
         });
     }
-    
+
     openModal('game-issue-modal');
+}
+
+// 通用富文本粘贴/拖拽编辑器绑定（支持图片+视频）
+function bindRichPasteEditor(editor, hiddenInput) {
+    // 同步内容到隐藏域
+    const sync = () => { if (hiddenInput) hiddenInput.value = editor.innerHTML; };
+
+    // 处理粘贴：图片以 base64 嵌入，视频以 base64 嵌入
+    editor.addEventListener('paste', async (e) => {
+        const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (!file) continue;
+                e.preventDefault();
+                await insertMediaToEditor(editor, file);
+                sync();
+                return;
+            }
+        }
+        // 文本粘贴：清除格式只保留纯文本
+        e.preventDefault();
+        const text = (e.clipboardData || e.originalEvent?.clipboardData)?.getData('text/plain') || '';
+        document.execCommand('insertText', false, text);
+        sync();
+    });
+
+    // 拖拽
+    editor.addEventListener('dragover', (e) => { e.preventDefault(); editor.classList.add('drag-over'); });
+    editor.addEventListener('dragleave', () => editor.classList.remove('drag-over'));
+    editor.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        editor.classList.remove('drag-over');
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+        for (const f of files) await insertMediaToEditor(editor, f);
+        sync();
+    });
+
+    editor.addEventListener('input', sync);
+    editor.addEventListener('blur', sync);
+}
+
+// 把图片/视频文件插入到编辑器（base64）
+async function insertMediaToEditor(editor, file) {
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+        showToast('仅支持图片和视频文件', 'warning');
+        return;
+    }
+    // 大小限制：图片 5MB，视频 20MB
+    const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+        showToast(`文件超过限制（${isVideo ? '视频20MB' : '图片5MB'}）`, 'warning');
+        return;
+    }
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            const html = isImage
+                ? `<img src="${dataUrl}" style="max-width:100%;border-radius:6px;display:block;margin:6px 0;" />`
+                : `<video src="${dataUrl}" controls style="max-width:100%;border-radius:6px;display:block;margin:6px 0;"></video>`;
+            // 在光标处插入
+            editor.focus();
+            document.execCommand('insertHTML', false, html);
+            resolve();
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 async function editGameIssue(id) {
     const item = allGameIssuesData.find(i => i.id === id);
     if (!item) return;
-    
+
     await openGameIssueModal(id);
-    
+
     document.getElementById('gi-id').value = item.id;
     document.getElementById('gi-game-name').value = item.game_name || '';
     document.getElementById('gi-issue-type').value = item.issue_type || '';
-    document.getElementById('gi-priority').value = item.priority || '';
     document.getElementById('gi-owner').value = item.owner || '';
     document.getElementById('gi-status').value = item.status || '待处理';
-    document.getElementById('gi-issue-desc').value = item.issue_desc || '';
+    // 富文本回填
+    const editor = document.getElementById('gi-issue-desc-editor');
+    if (editor) editor.innerHTML = item.issue_desc || '';
+    const hidden = document.getElementById('gi-issue-desc');
+    if (hidden) hidden.value = item.issue_desc || '';
     document.getElementById('gi-remarks').value = item.remarks || '';
 }
 
 async function submitGameIssueForm(event) {
     event.preventDefault();
-    
+
     const id = document.getElementById('gi-id').value;
+    // 优先从富文本编辑器读
+    const editor = document.getElementById('gi-issue-desc-editor');
+    const issueDesc = editor ? editor.innerHTML.trim() : (document.getElementById('gi-issue-desc')?.value || '');
+    if (!issueDesc || editor && !editor.textContent.trim() && !editor.querySelector('img,video')) {
+        showToast('请输入问题描述', 'warning');
+        editor?.focus();
+        return;
+    }
     const data = {
         game_name: document.getElementById('gi-game-name').value,
         issue_type: document.getElementById('gi-issue-type').value,
-        priority: document.getElementById('gi-priority').value,
         owner: document.getElementById('gi-owner').value,
         status: document.getElementById('gi-status').value,
-        issue_desc: document.getElementById('gi-issue-desc').value,
+        issue_desc: issueDesc,
         remarks: document.getElementById('gi-remarks').value
     };
-    
+
     try {
         const url = id ? `${API_BASE}/game-issues/${id}` : `${API_BASE}/game-issues`;
         const method = id ? 'PUT' : 'POST';
