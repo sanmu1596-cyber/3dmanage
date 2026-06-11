@@ -728,3 +728,128 @@ td.empty-table,
     background: var(--bg-th-dark, #21262d);
     color: var(--text-secondary, #b3b9c2);
 }
+
+/* ============================================================
+   14) 统一确认弹窗 / 提示弹窗（配合 components/ui-dialog.js，替代原生 confirm）
+   ============================================================ */
+.ui-dialog-modal {
+    align-items: center;
+    justify-content: center;
+}
+.ui-dialog-content {
+    width: 92%;
+    max-width: 420px;
+    margin: auto;
+    border-radius: var(--ds-radius-xl);
+    overflow: hidden;
+    animation: slideIn 0.2s var(--ease-out, ease);
+}
+.ui-dialog-body {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-5) var(--space-4);
+}
+.ui-dialog-icon {
+    font-size: 28px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+.ui-dialog-texts { flex: 1; min-width: 0; }
+.ui-dialog-title {
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--text-primary, #1f2329);
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+.ui-dialog-message {
+    font-size: var(--fs-md);
+    color: var(--text-secondary, #616161);
+    line-height: 1.6;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+.ui-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5) var(--space-5);
+}
+
+/* ============================================================
+   15) 全局加载遮罩（配合 UIDialog.showLoading）
+   ============================================================ */
+.ui-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 11000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(1px);
+    opacity: 0;
+    transition: opacity var(--duration-base, 0.18s) ease;
+}
+.ui-loading-overlay.show { opacity: 1; }
+.ui-loading-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-5) 28px;
+    background: var(--bg-card, #fff);
+    border-radius: var(--ds-radius-lg);
+    box-shadow: var(--ds-shadow-lg);
+    min-width: 120px;
+}
+.ui-loading-spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--border-light, #e5e6eb);
+    border-top-color: var(--primary, #1677ff);
+    border-radius: 50%;
+    animation: uiSpin 0.7s linear infinite;
+}
+@keyframes uiSpin { to { transform: rotate(360deg); } }
+.ui-loading-text {
+    font-size: var(--fs-sm);
+    color: var(--text-secondary, #616161);
+}
+[data-theme="dark"] .ui-loading-box { background: var(--bg-card, #1c2330); }
+[data-theme="dark"] .ui-loading-spinner { border-color: rgba(255,255,255,0.12); border-top-color: var(--primary, #1677ff); }
+
+/* ============================================================
+   16) 表单校验提示统一（对齐 design tokens，配合 core.js validateField）
+   ============================================================ */
+.field-error-msg {
+    color: var(--danger, #f44336);
+    font-size: var(--fs-xs);
+    line-height: 1.4;
+    margin-top: 4px;
+    display: block;
+}
+.field-invalid,
+.field-invalid:focus {
+    border-color: var(--danger, #f44336) !important;
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.15) !important;
+}
+
+/* 表格内联加载态（统一，替代散落的 fa-spinner） */
+.table-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-light, #999);
+    font-size: var(--fs-md);
+}
+.table-loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    vertical-align: -3px;
+    border: 2px solid var(--border-light, #e5e6eb);
+    border-top-color: var(--primary, #1677ff);
+    border-radius: 50%;
+    animation: uiSpin 0.7s linear infinite;
+}

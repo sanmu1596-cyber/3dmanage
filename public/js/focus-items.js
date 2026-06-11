@@ -208,7 +208,8 @@ function editFocusItem(id) {
 function deleteFocusItem(id) {
     var item = focusItemsData.find(function(i) { return i.id == id; });
     var name = item ? (item.content || '').substring(0, 30) : '此事项';
-    if (confirm('确定删除「' + name + '...」吗？')) {
+    uiConfirm('确定删除「' + name + '...」吗？', { danger: true, okText: '删除' }).then(function(ok) {
+        if (!ok) return;
         authFetch(API_BASE + '/focus-items/' + id, {
             method: 'DELETE'
         }).then(function(r) { return r.json(); }).then(function(result) {
@@ -217,7 +218,7 @@ function deleteFocusItem(id) {
                 showToast('已删除', 'success');
             }
         });
-    }
+    });
 }
 
 // ==================== 评论功能 ====================
@@ -335,15 +336,17 @@ function submitComment(itemId, textareaEl) {
 }
 
 function deleteComment(commentId, itemId) {
-    if (!confirm('确定删除此条评论吗？')) return;
-    authFetch(API_BASE + '/focus-comments/' + commentId, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            if (result.success) {
-                loadComments(itemId);
-                loadFocusItems();
-            }
-        });
+    uiConfirm('确定删除此条评论吗？', { danger: true, okText: '删除' }).then(function(ok) {
+        if (!ok) return;
+        authFetch(API_BASE + '/focus-comments/' + commentId, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    loadComments(itemId);
+                    loadFocusItems();
+                }
+            });
+    });
 }
 
 // ==================== 富文本编辑：图片处理 ====================

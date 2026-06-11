@@ -63,7 +63,7 @@ function refreshReports() {
 
 function showReportLoading() {
     const tbody = document.getElementById('report-games-table');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-loading"><span class="table-loading-spinner"></span>加载中...</td></tr>';
 }
 
 function setReportError(msg) {
@@ -647,14 +647,10 @@ function deleteReportRow(rowId, btnEl) {
     var rowData = allReportGameData.find(function(r) { return r._id == rowId; });
     var gameName = rowData ? rowData.name : '此记录';
 
-    // 使用系统 confirm 或自定义确认
-    if (typeof showConfirm === 'function') {
-        showConfirm('确定删除「' + gameName + '」这条报表记录吗？', function() {
-            _doDeleteReportRow(rowId);
-        });
-    } else if (confirm('确定删除「' + gameName + '」吗？')) {
-        _doDeleteReportRow(rowId);
-    }
+    // 统一确认弹窗
+    uiConfirm('确定删除「' + gameName + '」这条报表记录吗？', { danger: true, okText: '删除' }).then(function(ok) {
+        if (ok) _doDeleteReportRow(rowId);
+    });
 }
 
 /**

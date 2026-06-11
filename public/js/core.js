@@ -36,6 +36,23 @@ function updateThemeIcon(theme) {
 // 页面加载时初始化主题
 document.addEventListener('DOMContentLoaded', initTheme);
 
+// ========== 统一确认弹窗 helper ==========
+// 优先用 UIDialog.confirm（统一弹窗），未加载时回退原生 confirm，保证健壮
+// 用法：if (await uiConfirm('确定删除？', { danger:true, okText:'删除' })) {...}
+async function uiConfirm(message, opts = {}) {
+    if (window.UIDialog && typeof UIDialog.confirm === 'function') {
+        return await UIDialog.confirm(Object.assign({ message }, opts));
+    }
+    return window.confirm(message);
+}
+// 统一提示弹窗（替代 alert）
+async function uiAlert(message, opts = {}) {
+    if (window.UIDialog && typeof UIDialog.alert === 'function') {
+        return await UIDialog.alert(Object.assign({ message }, opts));
+    }
+    window.alert(message);
+}
+
 // ========== Toast 通知 ==========
 // ========== Toast 通知 — TAPD 风格（顶部居中淡入淡出） ==========
 function showToast(message, type = 'info', duration = 2400) {
@@ -96,26 +113,25 @@ function showToast(message, type = 'info', duration = 2400) {
 }
 
 // ========== 自定义确认弹窗 ==========
-function showConfirm(message, onConfirm, onCancel) {
-    // 创建遮罩和弹窗
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--bg-input);border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);animation:slideIn 0.2s ease;';
-    box.innerHTML = `
-        <div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:20px;white-space:pre-line;">${escapeHtml(message)}</div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;">
-            <button class="btn btn-secondary confirm-cancel-btn" style="padding:6px 20px;cursor:pointer;">取消</button>
-            <button class="tool-btn tool-btn-primary confirm-ok-btn" style="padding:6px 20px;cursor:pointer;">确定</button>
-        </div>
-    `;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    const close = () => { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 200); };
-    box.querySelector('.confirm-cancel-btn').onclick = () => { close(); if (onCancel) onCancel(); };
-    box.querySelector('.confirm-ok-btn').onclick = () => { close(); if (onConfirm) onConfirm(); };
-    overlay.onclick = (e) => { if (e.target === overlay) { close(); if (onCancel) onCancel(); } };
+// ★ 统一到 UIDialog（替代原来散落的内联弹窗实现）
+// 双模式兼容：
+//   - 回调式：showConfirm(msg, onConfirm, onCancel)
+//   - Promise式：await showConfirm(msg) / await showConfirm(msg, '标题')
+function showConfirm(message, arg2, onCancel) {
+    // 判断第二参是回调还是标题
+    const isCallback = typeof arg2 === 'function';
+    const title = (!isCallback && typeof arg2 === 'string') ? arg2 : '确认操作';
+    const opts = { message, title };
+    const p = (window.UIDialog && typeof UIDialog.confirm === 'function')
+        ? UIDialog.confirm(opts)
+        : Promise.resolve(window.confirm(message));
+    if (isCallback) {
+        // 回调式：保持旧用法兼容
+        p.then(ok => { if (ok) { if (arg2) arg2(); } else { if (onCancel) onCancel(); } });
+        return;
+    }
+    // Promise式：返回 boolean
+    return p;
 }
 
 // 游戏分页状态

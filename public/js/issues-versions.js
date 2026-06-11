@@ -819,7 +819,7 @@ if (typeof window.SearchableSelect === 'undefined' && typeof initSearchableSelec
 }
 
 async function deleteGameIssue(id) {
-    if (!confirm('确定要删除这条游戏问题吗？')) return;
+    if (!(await uiConfirm('确定要删除这条游戏问题吗？', { danger: true, okText: '删除' }))) return;
     try {
         const resp = await authFetch(`${API_BASE}/game-issues/${id}`, { method: 'DELETE' });
         const result = await resp.json();
@@ -1258,7 +1258,7 @@ async function submitGameVersionForm(event) {
 }
 
 async function deleteGameVersion(id) {
-    if (!confirm('确定要删除这个版本吗？')) return;
+    if (!(await uiConfirm('确定要删除这个版本吗？', { danger: true, okText: '删除' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/game-versions/${id}`, { method: 'DELETE' });
         const result = await response.json();
@@ -1275,7 +1275,7 @@ async function deleteGameVersion(id) {
 }
 
 async function releaseGameVersion(id, versionNumber) {
-    if (!confirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`)) return;
+    if (!(await uiConfirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`, { okText: '发布' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/game-versions/${id}`, {
             method: 'PUT',
@@ -1479,7 +1479,7 @@ async function submitInterlaceIssueForm(event) {
 }
 
 async function deleteInterlaceIssue(id) {
-    if (!confirm('确定要删除这条问题记录吗？')) return;
+    if (!(await uiConfirm('确定要删除这条问题记录吗？', { danger: true, okText: '删除' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/interlace-issues/${id}`, { method: 'DELETE' });
         const result = await response.json();
@@ -1655,7 +1655,7 @@ async function submitInterlaceVersionForm(event) {
 }
 
 async function deleteInterlaceVersion(id) {
-    if (!confirm('确定要删除这个版本吗？')) return;
+    if (!(await uiConfirm('确定要删除这个版本吗？', { danger: true, okText: '删除' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/interlace-versions/${id}`, { method: 'DELETE' });
         const result = await response.json();
@@ -1672,7 +1672,7 @@ async function deleteInterlaceVersion(id) {
 }
 
 async function releaseInterlaceVersion(id, versionNumber) {
-    if (!confirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`)) return;
+    if (!(await uiConfirm(`确定要将版本 ${versionNumber} 标记为已发布吗？`, { okText: '发布' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/interlace-versions/${id}`, {
             method: 'PUT',
@@ -1888,7 +1888,7 @@ async function submitClientIssueForm(event) {
 }
 
 async function deleteClientIssue(id) {
-    if (!confirm('确定要删除这条问题记录吗？')) return;
+    if (!(await uiConfirm('确定要删除这条问题记录吗？', { danger: true, okText: '删除' }))) return;
     try {
         const response = await authFetch(`${API_BASE}/client-issues/${id}`, { method: 'DELETE' });
         const result = await response.json();
