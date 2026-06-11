@@ -226,16 +226,12 @@ input[type="datetime-local"],
 input[type="time"],
 input[type="url"],
 input[type="tel"],
-select,
-textarea,
-.form-control,
-.filter-input,
-.compact-select {
+.form-control:not(select),
+.filter-input:not(select) {
     height: var(--ctrl-h-md);
     padding: 0 var(--space-3);
     font-size: var(--fs-md);
-    /* ★ 关键修复：line-height 必须等于 height（去掉 padding），否则文字会被垂直裁切
-       1.25 在 36px 高 + 14px 字号下不够，下行字符（如 角/责）的下半部分会被切 */
+    /* input 是单行文本，line-height 等于内框高度即可垂直居中 */
     line-height: calc(var(--ctrl-h-md) - 2px);
     font-family: inherit;
     color: var(--text-primary, #1f2329);
@@ -246,41 +242,66 @@ textarea,
                 box-shadow var(--duration-base) ease;
     box-sizing: border-box;
     width: 100%;
-    /* 避免 placeholder/option 文字被裁 */
     vertical-align: middle;
 }
-/* select 必须用 normal line-height，自带原生居中行为，否则浏览器渲染会异常 */
-select.compact-select,
+
+/* ★★★ select 单独处理（关键修复）★★★
+   原因：select 内的文字（尤其 emoji + 中文混排）行盒高度大于纯中文，
+   若用固定 height + line-height，浏览器会把内容垂直居中到一个偏上的基线，
+   导致 emoji/中文的下半部分被 height 边界裁掉（只显示上半截）。
+   解决：不设 height，改用 min-height + 上下 padding，让浏览器按真实内容自适应，
+   并用 line-height: normal 让原生渲染决定行高。 */
+select,
 select.form-control,
-select {
-    line-height: normal;
-    /* 留出右侧箭头空间 */
-    padding-right: 28px;
+select.compact-select {
+    min-height: var(--ctrl-h-md);
+    height: auto;                 /* ← 关键：不锁死高度 */
+    padding: 6px 30px 6px var(--space-3);  /* 上下 6px 给字符充足垂直空间 */
+    font-size: var(--fs-md);
+    line-height: normal;          /* ← 关键：原生行高，不裁切 */
+    font-family: inherit;
+    color: var(--text-primary, #1f2329);
+    background: var(--bg-input, #fff);
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: var(--ds-radius-md);
+    transition: border-color var(--duration-fast) ease,
+                box-shadow var(--duration-base) ease;
+    box-sizing: border-box;
+    width: 100%;
+    cursor: pointer;
+    /* 还原浏览器原生下拉箭头 */
+    background-position: right 10px center;
+    background-repeat: no-repeat;
 }
-textarea {
+textarea,
+textarea.form-control {
     height: auto;
     min-height: 88px;
     padding: var(--space-3);
+    font-size: var(--fs-md);
     line-height: var(--lh-normal);
+    font-family: inherit;
+    color: var(--text-primary, #1f2329);
+    background: var(--bg-input, #fff);
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: var(--ds-radius-md);
+    box-sizing: border-box;
+    width: 100%;
     resize: vertical;
 }
 /* 小尺寸控件（搜索框/筛选下拉）保持紧凑但不能裁字 */
-.filter-input,
-.compact-select {
+input.filter-input {
     height: 32px;
     line-height: 30px;
     padding: 0 10px;
     font-size: var(--fs-sm);
 }
 select.compact-select {
+    min-height: 32px;
+    height: auto;
     line-height: normal;
-    padding-right: 26px;
-}
-select {
-    /* 还原浏览器原生下拉箭头 */
-    background-position: right 10px center;
-    background-repeat: no-repeat;
-    cursor: pointer;
+    padding: 4px 26px 4px 10px;
+    font-size: var(--fs-sm);
 }
 input:focus,
 select:focus,
