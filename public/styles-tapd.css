@@ -2399,6 +2399,69 @@ tr:hover .action-icon-btn:hover {
     to { transform: translateY(0); opacity: 1; }
 }
 
+/* ============================================================
+   ★ 弹窗结构统一兼容层（2026-06-11 大神）
+   项目历史遗留 3 种弹窗结构，统一收敛到"游戏列表"基准视觉：
+   - 基准A：.modal > .modal-content（margin:5% auto 居中，.modal 自带蒙版）
+   - 变体C：.modal > .modal-overlay + .modal-container > .modal-content
+     （游戏问题/交织问题/客户端问题等新弹窗）
+   下面让变体C 表现与基准A 完全一致：消除双蒙版 + 居中
+   ============================================================ */
+
+/* 1) 当 .modal 内含 .modal-container 时，用 flex 居中（替代 margin:auto） */
+.modal:has(.modal-container) {
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+}
+.modal:has(.modal-container)[style*="block"],
+.modal:has(.modal-container)[style*="flex"] {
+    display: flex !important;
+}
+
+/* 2) 消除内层 .modal-overlay 的第二层蒙版（.modal 已自带蒙版）
+   只保留它作为点击关闭的透明热区 */
+.modal > .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: transparent !important;   /* ← 关键：去掉第二层灰色蒙版 */
+    backdrop-filter: none !important;
+    z-index: 0;
+}
+
+/* 3) .modal-container 居中浮在蒙版上方，对齐基准A 的尺寸 */
+.modal > .modal-container {
+    position: relative;
+    z-index: 1;
+    margin: 5vh auto;          /* 顶部留白，水平居中（flex 已居中，这里做垂直留白） */
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.2s;
+}
+/* 游戏问题弹窗保持其自定义宽度 */
+.modal > .modal-container.modal-game-issue {
+    max-width: 720px;
+}
+/* 变体C 内的 .modal-content：去掉自己的 margin/蒙版相关，由 container 接管 */
+.modal > .modal-container > .modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.modal > .modal-container > .modal-content > form,
+.modal > .modal-container > .modal-content > .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;

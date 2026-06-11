@@ -303,6 +303,22 @@ select.compact-select {
     padding: 4px 26px 4px 10px;
     font-size: var(--fs-sm);
 }
+/* ★ 工具栏内的筛选下拉/输入框：不撑满整行，按内容自适应宽度
+   （与"游戏列表"基准工具栏视觉一致，修复游戏问题/交织/客户端筛选框
+     被 design-system select{width:100%} 撑成整行的问题） */
+.toolbar .compact-select,
+.toolbar select.compact-select,
+.toolbar-left .compact-select,
+.toolbar-right .compact-select {
+    width: auto;
+    min-width: 120px;
+    max-width: 200px;
+}
+.toolbar .filter-input,
+.toolbar-left .filter-input {
+    width: auto;
+    min-width: 180px;
+}
 input:focus,
 select:focus,
 textarea:focus,
@@ -364,16 +380,17 @@ select option {
 }
 
 /* ============================================================
-   3) 弹窗统一
+   3) 弹窗统一（视觉收敛到"游戏列表"基准）
+   ★ 蒙版只由外层 .modal 提供，内层 .modal-overlay 必须透明
+     否则出现双蒙版（用户反馈过）
    ============================================================ */
 .modal {
     box-sizing: border-box;
 }
-/* ★ 注意：项目里 .modal-overlay 既是新弹窗(.modal>.modal-overlay)又是大事/旧弹窗根容器(.modal-overlay 本身)
-   为避免冲突，这里只在 .modal 内部生效 */
+/* 内层 .modal-overlay 仅作点击关闭热区，不再叠加灰色背景 */
 .modal > .modal-overlay {
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
+    background: transparent;
+    backdrop-filter: none;
 }
 /* ★ 仅 .modal-container（新结构）应用 flex 列布局
    .modal-content 是旧弹窗的根（外层 .modal），不能强制 flex/overflow:hidden
