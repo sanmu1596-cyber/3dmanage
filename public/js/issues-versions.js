@@ -364,9 +364,9 @@ function renderGameIssuesTable(data) {
             <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
             <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
             <td>
-                <button class="action-btn" onclick="showGameIssueDetail(${item.id})" title="详情">👁️</button>
-                <button class="action-btn" onclick="editGameIssue(${item.id})" title="编辑">✏️</button>
-                <button class="action-btn action-btn-danger" onclick="deleteGameIssue(${item.id})" title="删除">🗑️</button>
+                <button class="btn btn-small btn-link" onclick="showGameIssueDetail(${item.id})">详情</button>
+                <button class="btn btn-small btn-edit" onclick="editGameIssue(${item.id})">编辑</button>
+                <button class="btn btn-small btn-delete" onclick="deleteGameIssue(${item.id})">删除</button>
             </td>
         </tr>
     `).join('');
@@ -1328,8 +1328,8 @@ function renderInterlaceIssuesTable(data) {
             <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
             <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
             <td>
-                <button class="action-btn" onclick="editInterlaceIssue(${item.id})" title="编辑">✏️</button>
-                <button class="action-btn action-btn-danger" onclick="deleteInterlaceIssue(${item.id})" title="删除">🗑️</button>
+                <button class="btn btn-small btn-edit" onclick="editInterlaceIssue(${item.id})">编辑</button>
+                <button class="btn btn-small btn-delete" onclick="deleteInterlaceIssue(${item.id})">删除</button>
             </td>
         </tr>
     `).join('');
@@ -1721,8 +1721,8 @@ function renderClientIssuesTable(data) {
             <td class="remarks-cell" title="${escapeHtml(item.remarks || '')}">${escapeHtml(item.remarks || '-')}</td>
             <td>${item.created_at ? formatDate(item.created_at) : '-'}</td>
             <td>
-                <button class="action-btn" onclick="editClientIssue(${item.id})" title="编辑">✏️</button>
-                <button class="action-btn action-btn-danger" onclick="deleteClientIssue(${item.id})" title="删除">🗑️</button>
+                <button class="btn btn-small btn-edit" onclick="editClientIssue(${item.id})">编辑</button>
+                <button class="btn btn-small btn-delete" onclick="deleteClientIssue(${item.id})">删除</button>
             </td>
         </tr>
     `).join('');

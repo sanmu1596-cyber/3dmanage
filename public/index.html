@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260611b">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260611d">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260611b">
+    <link rel="stylesheet" href="design-system.css?v=20260611d">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -92,7 +92,7 @@
                     <div class="sidebar-section-title">交织模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="interlace-issues" onclick="switchTab('interlace-issues')">
-                            <span class="sidebar-icon">🔗</span>问题列表
+                            <span class="sidebar-icon">⚠️</span>交织问题
                         </a>
                         <a class="sidebar-item" data-tab="interlace-versions" onclick="switchTab('interlace-versions')">
                             <span class="sidebar-icon">📦</span>版本管理
@@ -104,7 +104,7 @@
                     <div class="sidebar-section-title">客户端模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="client-issues" onclick="switchTab('client-issues')">
-                            <span class="sidebar-icon">🖥️</span>问题跟踪
+                            <span class="sidebar-icon">⚠️</span>客户端问题
                         </a>
                         <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
                             <span class="sidebar-icon">📦</span>版本管理
@@ -978,24 +978,37 @@
                 <section id="game-issues" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openGameIssueModal()"><span class="tool-icon">＋</span>新增游戏问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="gi-search" class="filter-input" placeholder="搜索游戏/问题描述..." style="width:200px" oninput="filterGameIssues()">
-                            <select id="gi-status-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="gi-type-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部类型</option>
-                                <option value="画面问题">画面问题</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="适配问题">适配问题</option>
-                                <option value="崩溃闪退">崩溃闪退</option>
-                                <option value="其他">其他</option>
-                            </select>
+                            <button class="tool-btn tool-btn-primary" onclick="openGameIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="gi-search" class="filter-input" placeholder="搜索游戏/问题描述..." oninput="filterGameIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="gi-status-filter" class="filter-select" onchange="filterGameIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="gi-type-filter" class="filter-select" onchange="filterGameIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="画面问题">画面问题</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="适配问题">适配问题</option>
+                                    <option value="崩溃闪退">崩溃闪退</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2142,29 +2155,45 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openInterlaceIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="interlace-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterInterlaceIssues()">
-                            <select id="interlace-issue-status-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="interlace-issue-type-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部类型</option>
-                                <option value="交织闪烁">交织闪烁</option>
-                                <option value="深度异常">深度异常</option>
-                                <option value="画面错位">画面错位</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="interlace-issue-priority-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="interlace-issue-search" class="filter-input" placeholder="搜索问题描述..." oninput="filterInterlaceIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="interlace-issue-status-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="interlace-issue-type-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="交织闪烁">交织闪烁</option>
+                                    <option value="深度异常">深度异常</option>
+                                    <option value="画面错位">画面错位</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>优先级</label>
+                                <select id="interlace-issue-priority-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部优先级</option>
+                                    <option value="高">高</option>
+                                    <option value="中">中</option>
+                                    <option value="低">低</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2263,29 +2292,45 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openClientIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="client-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterClientIssues()">
-                            <select id="client-issue-status-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="client-issue-type-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部类型</option>
-                                <option value="界面问题">界面问题</option>
-                                <option value="功能异常">功能异常</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="崩溃闪退">崩溃闪退</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="client-issue-priority-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="client-issue-search" class="filter-input" placeholder="搜索问题描述..." oninput="filterClientIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="client-issue-status-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="client-issue-type-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="界面问题">界面问题</option>
+                                    <option value="功能异常">功能异常</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="崩溃闪退">崩溃闪退</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>优先级</label>
+                                <select id="client-issue-priority-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部优先级</option>
+                                    <option value="高">高</option>
+                                    <option value="中">中</option>
+                                    <option value="低">低</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -3214,25 +3259,25 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260611b"></script>
-    <script src="js/auth.js?v=20260611b"></script>
+    <script src="js/core.js?v=20260611d"></script>
+    <script src="js/auth.js?v=20260611d"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260611b"></script>
-    <script src="js/components/media-viewer.js?v=20260611b"></script>
-    <script src="js/crud-module.js?v=20260611b"></script>
-    <script src="js/router.js?v=20260611b"></script>
-    <script src="js/entities.js?v=20260611b"></script>
-    <script src="js/plans.js?v=20260611b"></script>
-    <script src="js/dashboard.js?v=20260611b"></script>
-    <script src="js/ui-features.js?v=20260611b"></script>
-    <script src="js/admin.js?v=20260611b"></script>
-    <script src="js/requirements.js?v=20260611b"></script>
-    <script src="js/testcases.js?v=20260611b"></script>
-    <script src="js/issues-versions.js?v=20260611b"></script>
-    <script src="js/social.js?v=20260611b"></script>
-    <script src="js/reports.js?v=20260611b"></script>
+    <script src="js/components/searchable-select.js?v=20260611d"></script>
+    <script src="js/components/media-viewer.js?v=20260611d"></script>
+    <script src="js/crud-module.js?v=20260611d"></script>
+    <script src="js/router.js?v=20260611d"></script>
+    <script src="js/entities.js?v=20260611d"></script>
+    <script src="js/plans.js?v=20260611d"></script>
+    <script src="js/dashboard.js?v=20260611d"></script>
+    <script src="js/ui-features.js?v=20260611d"></script>
+    <script src="js/admin.js?v=20260611d"></script>
+    <script src="js/requirements.js?v=20260611d"></script>
+    <script src="js/testcases.js?v=20260611d"></script>
+    <script src="js/issues-versions.js?v=20260611d"></script>
+    <script src="js/social.js?v=20260611d"></script>
+    <script src="js/reports.js?v=20260611d"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260611b"></script>
+    <script src="modules-extra.js?v=20260611d"></script>
 </body>
 </html>

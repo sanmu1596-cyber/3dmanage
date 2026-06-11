@@ -202,6 +202,18 @@ button.btn-primary {
     border-radius: var(--ds-radius-lg);
 }
 
+/* ★ 表格操作列小按钮：紧凑、无 min-width、间距小（统一所有列表的"编辑/删除/详情"） */
+.btn.btn-small,
+.data-table .btn-small {
+    height: 26px;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: var(--fs-xs);
+    border-radius: var(--ds-radius-sm);
+    margin: 0 2px;
+    gap: 2px;
+}
+
 /* 图标按钮（仅图标） */
 .btn.btn-icon,
 .action-icon-btn,

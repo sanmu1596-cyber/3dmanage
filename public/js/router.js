@@ -731,9 +731,9 @@ const BREADCRUMB_MAP = {
     'user-management':{label:'用户管理', icon: '🔐', parent: null },
     'versions':  { label: '版本管理', icon: '🏷️', parent: 'devices' },
     'game-versions':{label:'游戏版本', icon: '🎯', parent: 'games' },
-    'interlace-issues':{label:'交错问题', icon: '🔀', parent: 'games' },
-    'interlace-versions':{label:'交错版本', icon: '🔀', parent: 'devices' },
-    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' },
+    'interlace-issues':{label:'交织问题', icon: '⚠️', parent: 'games' },
+    'interlace-versions':{label:'交织版本', icon: '🔀', parent: 'devices' },
+    'client-issues':{label: '客户端问题', icon: '⚠️', parent: 'games' },
     'reports':    { label: '汇报报表', icon: '📊', parent: null }
 };
 
