@@ -73,11 +73,11 @@ function renderVersionsTable(status, data) {
         tbody.innerHTML = data.map((v, index) => {
             const typeBadge = getVersionTypeBadge(v.version_type);
             const actions = status === 'testing'
-                ? `<button class="action-icon-btn edit" onclick="editVersion(${v.id})" title="编辑">✏️</button>
-                   <button class="action-icon-btn" onclick="releaseVersion(${v.id}, '${escapeHtml(v.version_number)}')" title="发布" style="color:#52c41a">🚀</button>
-                   <button class="action-icon-btn delete" onclick="deleteVersion(${v.id})" title="删除">🗑️</button>`
-                : `<button class="action-icon-btn edit" onclick="editVersion(${v.id})" title="编辑">✏️</button>
-                   <button class="action-icon-btn delete" onclick="deleteVersion(${v.id})" title="删除">🗑️</button>`;
+                ? `<button class="btn btn-small btn-edit" onclick="editVersion(${v.id})">编辑</button>
+                   <button class="btn btn-small btn-success" onclick="releaseVersion(${v.id}, '${escapeHtml(v.version_number)}')">发布</button>
+                   <button class="btn btn-small btn-delete" onclick="deleteVersion(${v.id})">删除</button>`
+                : `<button class="btn btn-small btn-edit" onclick="editVersion(${v.id})">编辑</button>
+                   <button class="btn btn-small btn-delete" onclick="deleteVersion(${v.id})">删除</button>`;
             return `
             <tr data-id="${v.id}">
                 <td class="text-center"><strong>${index + 1}</strong></td>
@@ -391,14 +391,15 @@ function getPriorityBadge(priority) {
 }
 
 function getGameIssueStatusBadge(status) {
-    const colors = {
-        '待处理': '#ffc107',
-        '处理中': '#17a2b8',
-        '已解决': '#28a745',
-        '已关闭': '#6c757d'
+    // ★ 统一语义色（design-system 标准）：待处理=warning黄 / 处理中=info蓝 / 已解决=success绿 / 已关闭=灰
+    const cls = {
+        '待处理': 'badge-warning',
+        '处理中': 'badge-info',
+        '已解决': 'badge-success',
+        '已关闭': 'badge-default'
     };
-    if (!status) return '<span class="badge" style="background:#ffc107">待处理</span>';
-    return `<span class="badge" style="background:${colors[status] || '#6c757d'}">${escapeHtml(status)}</span>`;
+    if (!status) return '<span class="badge badge-warning">待处理</span>';
+    return `<span class="badge ${cls[status] || 'badge-default'}">${escapeHtml(status)}</span>`;
 }
 
 function updateGameIssuesStats() {

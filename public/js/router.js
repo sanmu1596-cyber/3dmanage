@@ -343,8 +343,8 @@ function renderMembersTable(data) {
 
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editMember(${member.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteMember(${member.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editMember(${member.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteMember(${member.id})">删除</button>
                 </td>
             `;
             return `<tr data-id="${member.id}">${rowHtml}</tr>`;
@@ -513,8 +513,8 @@ function renderDevicesTable(data) {
             // 操作列
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editDevice(${device.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteDevice(${device.id})">删除</button>
                 </td>
             `;
             // draggable-row 类启用行拖拽

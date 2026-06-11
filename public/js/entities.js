@@ -417,8 +417,8 @@ function renderGamesPage() {
 
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editGame(${game.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteGame(${game.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editGame(${game.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteGame(${game.id})">删除</button>
                 </td>
             `;
 
