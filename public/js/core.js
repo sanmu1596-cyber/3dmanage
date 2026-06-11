@@ -862,6 +862,53 @@ function renderModuleFilterChips(moduleId, filters, options = {}) {
     };
 }
 
+// ========== 通用：生成带省略号的页码序列 ==========
+/**
+ * 计算分页要显示的页码（中间页过多时用省略号 '...' 折叠）
+ * 规则：始终显示首页/末页 + 当前页前后各 1 页 + 省略号
+ * @param {number} current 当前页
+ * @param {number} total 总页数
+ * @returns {Array<number|'...'>}
+ * 示例：buildPageSequence(7, 20) => [1, '...', 6, 7, 8, '...', 20]
+ */
+function buildPageSequence(current, total) {
+    if (total <= 7) {
+        // 页数少，全部显示
+        const arr = [];
+        for (let i = 1; i <= total; i++) arr.push(i);
+        return arr;
+    }
+    const pages = new Set([1, total, current, current - 1, current + 1]);
+    // 首尾相邻也补上，避免出现只省略一个的尴尬（如 1 ... 3）
+    if (current <= 4) { pages.add(2); pages.add(3); pages.add(4); pages.add(5); }
+    if (current >= total - 3) { for (let i = total - 4; i < total; i++) pages.add(i); }
+    const sorted = Array.from(pages).filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+    const result = [];
+    let prev = 0;
+    sorted.forEach(p => {
+        if (prev && p - prev > 1) result.push('...');
+        result.push(p);
+        prev = p;
+    });
+    return result;
+}
+
+/**
+ * 渲染页码按钮 HTML（带省略号），各模块通用
+ * @param {number} current 当前页
+ * @param {number} total 总页数
+ * @param {string} onClickFn 点击调用的函数名，接收页码参数，如 'goToPage'
+ * @returns {string} HTML
+ */
+function renderPageButtons(current, total, onClickFn) {
+    if (total <= 1) return '';
+    return buildPageSequence(current, total).map(p => {
+        if (p === '...') return '<span class="page-ellipsis">···</span>';
+        const active = p === current ? ' active' : '';
+        return `<button class="btn btn-small page-number${active}" onclick="${onClickFn}(${p})">${p}</button>`;
+    }).join('');
+}
+
 // ========== P1.7: 通用分页增强函数 ==========
 // 将游戏表已实现的分页增强功能（跳转页/条数选择）推广到所有模块
 

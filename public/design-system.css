@@ -853,3 +853,129 @@ td.empty-table,
     border-radius: 50%;
     animation: uiSpin 0.7s linear infinite;
 }
+
+/* ============================================================
+   17) 分页控件统一（省略号、跳转输入框、条数选择器）
+   ============================================================ */
+/* 省略号占位 */
+.page-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    color: var(--text-light, #999);
+    font-size: var(--fs-sm);
+    user-select: none;
+    letter-spacing: 1px;
+}
+/* 页码按钮（统一尺寸，覆盖 .btn-small 在分页里的紧凑值） */
+.page-number.btn.btn-small {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    font-variant-numeric: tabular-nums;
+}
+/* 跳转输入框 */
+.page-jump-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fs-sm);
+    color: var(--text-secondary, #616161);
+    white-space: nowrap;
+}
+.page-jump-wrapper input {
+    width: 48px;
+    height: 28px;
+    padding: 0 6px;
+    text-align: center;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: var(--ds-radius-sm);
+    font-size: var(--fs-sm);
+    color: var(--text-primary, #1f2329);
+    background: var(--bg-input, #fff);
+    /* 隐藏 number 的上下箭头，更干净 */
+    -moz-appearance: textfield;
+}
+.page-jump-wrapper input::-webkit-outer-spin-button,
+.page-jump-wrapper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.page-jump-wrapper input:focus {
+    outline: none;
+    border-color: var(--primary, #1677ff);
+    box-shadow: var(--focus-ring, 0 0 0 2px rgba(22,119,255,0.18));
+}
+/* 每页条数选择器 */
+.page-size-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fs-sm);
+    color: var(--text-secondary, #616161);
+    white-space: nowrap;
+}
+.page-size-selector select {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 24px 0 8px;
+    font-size: var(--fs-sm);
+    border-radius: var(--ds-radius-sm);
+    width: auto;
+}
+[data-theme="dark"] .page-jump-wrapper input {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+
+/* ============================================================
+   18) 移动端响应式补强（新组件 + 分页 + 弹窗）
+   ============================================================ */
+@media (max-width: 768px) {
+    /* 分页：换行居中，不再贴右 */
+    .pagination-extra {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-2);
+    }
+    .pagination-extra .page-numbers { flex-wrap: wrap; justify-content: center; }
+    /* 触摸友好：页码/跳转控件加大点击区 */
+    .page-number.btn.btn-small,
+    .page-jump-wrapper input,
+    .page-size-selector select { height: 32px; min-height: 32px; }
+    .page-ellipsis { height: 32px; }
+
+    /* 常驻筛选面板：每组占满一行，下拉全宽 */
+    .filter-row { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+    .filter-group { width: 100%; }
+    .filter-group .filter-select,
+    .filter-group .filter-input { width: 100%; }
+
+    /* 统一确认弹窗：留出安全边距 */
+    .ui-dialog-content { width: calc(100% - 32px); max-width: none; }
+
+    /* 新结构弹窗（modal-container）移动端近全屏 */
+    .modal > .modal-container {
+        width: calc(100% - 24px);
+        max-width: none;
+        margin: 4vh auto;
+        max-height: 90vh;
+    }
+
+    /* 表格操作列文字按钮：换行不撑破 */
+    .data-table td .btn.btn-small { margin-bottom: 2px; }
+
+    /* tooltip 在小屏限制宽度避免溢出 */
+    .ui-tooltip { max-width: calc(100vw - 24px); }
+}
+
+/* 触摸设备：操作按钮常驻可见（无 hover 概念） */
+@media (hover: none) and (pointer: coarse) {
+    .action-icon-btn { opacity: 0.85 !important; pointer-events: auto !important; }
+    /* 列宽拖拽手柄触摸设备隐藏（无精确拖拽） */
+    .col-resize-handle { display: none; }
+}

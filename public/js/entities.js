@@ -764,12 +764,16 @@ function updatePaginationControls() {
         return;
     }
 
-    // 生成页码按钮
-    let pageNumbersHTML = '';
-    for (let i = 1; i <= totalPages; i++) {
-        const isActive = i === currentPage ? 'active' : '';
-        pageNumbersHTML += `<button class="btn btn-small page-number ${isActive}" onclick="goToPage(${i})">${i}</button>`;
-    }
+    // 生成页码按钮（带省略号，避免页数多时溢出）
+    const pageNumbersHTML = (typeof renderPageButtons === 'function')
+        ? renderPageButtons(currentPage, totalPages, 'goToPage')
+        : (function () {
+            let h = '';
+            for (let i = 1; i <= totalPages; i++) {
+                h += `<button class="btn btn-small page-number ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            return h;
+        })();
     pageNumbersDiv.innerHTML = pageNumbersHTML + buildPaginationExtras(totalPages);
 }
 
