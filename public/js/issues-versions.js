@@ -349,7 +349,11 @@ function renderGameIssuesTable(data) {
     if (!tbody) return;
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无游戏问题数据</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <div class="empty-text">暂无游戏问题</div>
+            <div class="empty-sub">点击"新增问题"记录第一条游戏问题</div>
+        </td></tr>`;
         return;
     }
     
@@ -1313,7 +1317,11 @@ function renderInterlaceIssuesTable(data) {
     if (!tbody) return;
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无交织问题数据</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="10" class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <div class="empty-text">暂无交织问题</div>
+            <div class="empty-sub">点击"新增问题"记录第一条交织问题</div>
+        </td></tr>`;
         return;
     }
     
@@ -1706,7 +1714,11 @@ function renderClientIssuesTable(data) {
     if (!tbody) return;
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="empty-table">暂无客户端问题数据</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="10" class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <div class="empty-text">暂无客户端问题</div>
+            <div class="empty-sub">点击"新增问题"记录第一条客户端问题</div>
+        </td></tr>`;
         return;
     }
     
