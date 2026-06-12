@@ -626,7 +626,7 @@ async function showGameIssueDetail(id) {
 
     overlay.innerHTML = `
         <div class="modal-overlay" onclick="if(event.target===this)closeGameIssueDetail()" style="position:absolute;inset:0;"></div>
-        <div class="modal-container modal-game-issue" style="position:relative;z-index:2;display:flex;flex-direction:column;background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+        <div class="modal-container modal-game-issue" style="position:relative;z-index:2;display:flex;flex-direction:column;background:var(--bg-card,#fff);color:var(--text-primary,#1f2329);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
             <div class="modal-content" style="display:flex;flex-direction:column;max-height:85vh;">
                 <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border,#eee);display:flex;align-items:center;justify-content:space-between;">
                     <h3 style="margin:0;font-size:16px;">问题详情 #${item.id} <span style="color:var(--text-tertiary,#999);font-weight:normal;font-size:13px;margin-left:8px;">${escapeHtml(item.game_name || '')}</span></h3>

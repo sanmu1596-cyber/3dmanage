@@ -725,8 +725,9 @@ td.empty-table,
     white-space: nowrap;
 }
 [data-theme="dark"] .data-table thead th {
-    background: var(--bg-th-dark, #21262d);
-    color: var(--text-secondary, #b3b9c2);
+    /* 对齐暗色主题表头基准 --bg-surface(#182636)，避免与卡片背景割裂 */
+    background: var(--bg-surface, #182636);
+    color: var(--text-secondary, #9aa0b0);
 }
 
 /* ============================================================
@@ -978,4 +979,92 @@ td.empty-table,
     .action-icon-btn { opacity: 0.85 !important; pointer-events: auto !important; }
     /* 列宽拖拽手柄触摸设备隐藏（无精确拖拽） */
     .col-resize-handle { display: none; }
+}
+
+/* ============================================================
+   19) 无障碍（A11y）— 键盘 Tab 导航焦点指示
+   ============================================================
+   原则：用 :focus-visible 只在键盘导航时显示焦点环（鼠标点击不显示，
+   避免干扰视觉），覆盖所有交互元素：链接、可点击行、侧栏项、输入控件等。
+   ============================================================ */
+
+/* 全局键盘焦点环（统一蓝色 halo） */
+a:focus-visible,
+[tabindex]:focus-visible,
+.sidebar-item:focus-visible,
+.editable-cell:focus-visible,
+.page-number:focus-visible,
+.modal-close:focus-visible,
+.searchable-select-input:focus-visible,
+.rich-paste-editor:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[onclick]:focus-visible {
+    outline: 2px solid var(--primary, #1677ff);
+    outline-offset: 2px;
+    border-radius: var(--ds-radius-sm);
+}
+
+/* 表单控件用 halo（不用 outline，避免与边框冲突） */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.searchable-select-input:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-color: var(--primary, #1677ff);
+}
+
+/* 侧栏项键盘焦点：内移焦点环更清晰 */
+.sidebar-item:focus-visible {
+    outline-offset: -2px;
+    background: var(--primary-light, rgba(22,119,255,0.08));
+}
+
+/* 鼠标点击时不显示焦点环（仅键盘 Tab 时显示） */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* 跳转到主内容的无障碍链接（Tab 第一下出现） */
+.skip-to-main {
+    position: fixed;
+    top: -100px;
+    left: 12px;
+    z-index: 100000;
+    padding: 8px 16px;
+    background: var(--primary, #1677ff);
+    color: #fff;
+    border-radius: var(--ds-radius-md);
+    font-size: var(--fs-sm);
+    text-decoration: none;
+    transition: top var(--duration-base) ease;
+}
+.skip-to-main:focus {
+    top: 12px;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+/* 屏幕阅读器专用文本（视觉隐藏但可被读屏软件识别） */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* 减弱动效（尊重用户系统偏好，避免眩晕） */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
