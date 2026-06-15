@@ -129,7 +129,8 @@ function normalizeBoard(data) {
         cols: Array.isArray(g.cols) ? g.cols : [],
         rows: (g.rows || []).map(r => ({
             id: r.id,
-            cells: Array.isArray(r.cells) ? r.cells : []
+            cells: Array.isArray(r.cells) ? r.cells : [],
+            fills: Array.isArray(r.fills) ? r.fills : []
         }))
     }));
     return { groups, meta: { colWidths: meta.colWidths || null, rowHeights: meta.rowHeights || {} } };
@@ -138,9 +139,21 @@ function normalizeBoard(data) {
 // CSS class 安全化
 function txCls(s) { return String(s || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9_-]/g, ''); }
 
-// 备注内"本周进展/本周无进展"高亮
+// 判断一个 cell 值是否已是 HTML（含标签）。新数据走富文本存 HTML，旧数据是纯文本。
+function txIsHtml(s) { return /<[a-z!/][^>]*>/i.test(String(s || '')); }
+
+// 单元格展示：HTML 内容直接渲染；纯文本转义 + 换行
+function txCellDisplay(val) {
+    const s = String(val || '');
+    if (txIsHtml(s)) return s;                       // 富文本：原样渲染
+    return escapeHtml(s).replace(/\n/g, '<br>');     // 纯文本：转义
+}
+
+// 备注内"本周进展/本周无进展"高亮（仅对纯文本生效；富文本由用户自定义颜色）
 function txHighlight(text) {
-    let html = escapeHtml(text || '');
+    const s = String(text || '');
+    if (txIsHtml(s)) return s;                        // 富文本不再二次高亮
+    let html = escapeHtml(s);
     html = html.replace(/本周无进展/g, '<span class="tx-hl-red">本周无进展</span>');
     html = html.replace(/(^|<br>|\n)(本周进展)/g, '$1<span class="tx-hl-green">本周进展</span>');
     html = html.replace(/\n/g, '<br>');
@@ -230,10 +243,12 @@ function renderTxBoard() {
                     return;
                 }
                 const val = (row.cells && row.cells[ci]) || '';
+                const fill = (row.fills && row.fills[ci]) || '';
                 const isNote = col.indexOf('备注') >= 0;
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
-                const display = isNote ? txHighlight(val) : (escapeHtml(val).replace(/\n/g, '<br>') || '<span style="color:#c0c4cc">—</span>');
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${display}${rowHandle}</td>`;
+                const display = isNote ? txHighlight(val) : (txCellDisplay(val) || '<span style="color:#c0c4cc">—</span>');
+                const fillStyle = fill ? ` style="background:${escapeHtml(fill)}"` : '';
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle} ondblclick="startTxCellEdit(this)" title="双击编辑">${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -381,6 +396,127 @@ function startTxGroupTitleEdit(th) {
     });
 }
 
+// ============================================================
+// 富文本格式工具栏（作用于当前正在编辑的单元格 contenteditable）
+// ============================================================
+var _txFmtEd = null;        // 当前绑定的编辑器
+var _txFmtCtx = null;       // {td, rowObj, ci}
+var _txFmtInteracting = false; // 工具栏交互中（防 blur 误保存）
+var _txFmtBound = false;    // 工具栏事件是否已绑定
+
+// 激活工具栏并绑定到某个编辑器
+function txActivateFormatBar(ed, td, rowObj, ci) {
+    const bar = document.getElementById('tx-format-bar');
+    if (!bar) return;
+    _txFmtEd = ed;
+    _txFmtCtx = { td, rowObj, ci };
+    bar.classList.add('active');
+    if (!_txFmtBound) { txBindFormatBar(bar); _txFmtBound = true; }
+}
+
+// 取消激活
+function txDeactivateFormatBar() {
+    const bar = document.getElementById('tx-format-bar');
+    if (bar) bar.classList.remove('active');
+    _txFmtEd = null;
+    _txFmtCtx = null;
+}
+
+// 绑定工具栏一次（事件委托）
+function txBindFormatBar(bar) {
+    // mousedown 阻止默认，避免编辑器失焦（保住选区）
+    bar.addEventListener('mousedown', (e) => {
+        const interactive = e.target.closest('button, select, input, label');
+        if (interactive) { _txFmtInteracting = true; }
+        // 按钮点击不应让编辑器失焦
+        if (e.target.closest('.tx-fmt-btn, .tx-fmt-color')) e.preventDefault();
+    });
+    document.addEventListener('mouseup', () => {
+        // 略延迟复位，确保 click/change 处理完
+        setTimeout(() => { _txFmtInteracting = false; }, 0);
+    });
+
+    // 按钮（execCommand）
+    bar.querySelectorAll('.tx-fmt-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const cmd = btn.dataset.cmd;
+            txExecOnEditor(() => {
+                if (cmd === 'removeFormat') {
+                    document.execCommand('removeFormat', false, null);
+                    document.execCommand('unlink', false, null);
+                } else {
+                    document.execCommand(cmd, false, null);
+                }
+            });
+            txSyncFmtState();
+        });
+    });
+
+    // 字体 / 字号 / 行距（select）
+    bar.querySelectorAll('.tx-fmt-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            const cmd = sel.dataset.cmd;
+            const val = sel.value;
+            if (!val) return;
+            txExecOnEditor(() => {
+                if (cmd === 'fontName') document.execCommand('fontName', false, val);
+                else if (cmd === 'fontSize') document.execCommand('fontSize', false, val);
+                else if (cmd === 'lineHeight') txApplyLineHeight(val);
+            });
+            sel.selectedIndex = 0; // 复位为占位
+        });
+    });
+
+    // 文字颜色
+    const fore = document.getElementById('tx-fmt-fore');
+    if (fore) fore.addEventListener('input', (e) => {
+        txExecOnEditor(() => document.execCommand('foreColor', false, fore.value));
+        const ico = fore.parentElement.querySelector('.tx-fmt-color-ico');
+        if (ico) ico.style.borderBottom = '3px solid ' + fore.value;
+    });
+
+    // 单元格填充色（作用于整个编辑器背景 + 保存到 rowObj.fills）
+    const fill = document.getElementById('tx-fmt-fill');
+    if (fill) fill.addEventListener('input', (e) => {
+        if (!_txFmtEd || !_txFmtCtx) return;
+        _txFmtEd.style.background = fill.value;
+        _txFmtCtx.rowObj.fills = _txFmtCtx.rowObj.fills || [];
+        _txFmtCtx.rowObj.fills[_txFmtCtx.ci] = fill.value;
+        // 即时存后端（fills 随 cell 一起，用专门接口）
+        txApiPatchFill(_txFmtCtx.rowObj.id, _txFmtCtx.ci, fill.value);
+        const ico = fill.parentElement.querySelector('.tx-fmt-color-ico');
+        if (ico) ico.style.background = fill.value;
+    });
+}
+
+// 在编辑器上下文执行格式命令（确保选区在编辑器内）
+function txExecOnEditor(fn) {
+    if (!_txFmtEd) return;
+    _txFmtEd.focus();
+    fn();
+}
+
+// 行距：对选区所在块级元素设置 line-height（execCommand 无原生命令）
+function txApplyLineHeight(lh) {
+    if (!_txFmtEd) return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount) { _txFmtEd.style.lineHeight = lh; return; }
+    // 简化：整个编辑器统一行距（单元格内容通常为一段）
+    _txFmtEd.style.lineHeight = lh;
+}
+
+// 同步按钮 active 态（粗/斜/下划线等）
+function txSyncFmtState() {
+    const bar = document.getElementById('tx-format-bar');
+    if (!bar) return;
+    ['bold', 'italic', 'underline', 'strikeThrough'].forEach(cmd => {
+        const btn = bar.querySelector(`.tx-fmt-btn[data-cmd="${cmd}"]`);
+        if (!btn) return;
+        try { btn.classList.toggle('on', document.queryCommandState(cmd)); } catch (e) {}
+    });
+}
+
 // ===== 单元格双击编辑（→ PATCH /cell）=====
 async function startTxCellEdit(td) {
     if (td.classList.contains('editing')) return;
@@ -407,32 +543,62 @@ async function startTxCellEdit(td) {
     const cur = (rowObj.cells && rowObj.cells[ci]) || '';
 
     td.classList.add('editing');
-    const ta = document.createElement('textarea');
-    ta.className = 'tx-cell-input';
-    ta.value = cur;
-    ta.rows = Math.max(2, (cur.match(/\n/g) || []).length + 1);
+    // 富文本可编辑区（contenteditable）
+    const ed = document.createElement('div');
+    ed.className = 'tx-cell-rich';
+    ed.setAttribute('contenteditable', 'true');
+    ed.innerHTML = txIsHtml(cur) ? cur : escapeHtml(cur).replace(/\n/g, '<br>');
     td.innerHTML = '';
-    td.appendChild(ta);
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
+    td.appendChild(ed);
+    // 应用已存的单元格填充色（若有）
+    if (rowObj.fills && rowObj.fills[ci]) ed.style.background = rowObj.fills[ci];
+    ed.focus();
+    txPlaceCaretEnd(ed);
+
+    // 激活工具栏，绑定当前编辑器
+    txActivateFormatBar(ed, td, rowObj, ci);
 
     let done = false;
     const finish = async (save) => {
         if (done) return; done = true;
-        if (save && ta.value !== cur) {
+        txDeactivateFormatBar();
+        const html = txCleanHtml(ed.innerHTML);
+        if (save && html !== cur) {
             while (rowObj.cells.length <= ci) rowObj.cells.push('');
-            rowObj.cells[ci] = ta.value;
-            await txApiPatchCell(rowObj.id, ci, ta.value);
+            rowObj.cells[ci] = html;
+            await txApiPatchCell(rowObj.id, ci, html);
             if (typeof showToast === 'function') showToast('已保存', 'success');
         }
         td.classList.remove('editing');
         renderTxBoard();
     };
-    ta.addEventListener('blur', () => finish(true));
-    ta.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-        else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
+    ed.addEventListener('blur', () => {
+        // 延迟，避免点击工具栏按钮时误触发 blur 保存
+        setTimeout(() => { if (!_txFmtInteracting) finish(true); }, 150);
     });
+    ed.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        // Enter 默认换行（富文本多行）；Ctrl/Cmd+Enter 保存退出
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finish(true); }
+    });
+}
+
+// 光标移到末尾
+function txPlaceCaretEnd(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+}
+
+// 清理粘贴/编辑产生的冗余（去掉空内容、统一空格），保留格式标签
+function txCleanHtml(html) {
+    let s = String(html || '').trim();
+    // 空内容归一
+    if (s === '<br>' || s === '<div><br></div>' || s === '&nbsp;') return '';
+    return s;
 }
 
 // ===== 追加一行（→ POST /row）=====
@@ -532,6 +698,15 @@ async function txApiPatchCell(rowId, colIndex, value) {
             body: JSON.stringify({ rowId, colIndex, value })
         });
     } catch (e) { console.error('[tx] 保存单元格失败', e); if (typeof showToast === 'function') showToast('保存失败', 'danger'); }
+}
+async function txApiPatchFill(rowId, colIndex, color) {
+    try {
+        await authFetch(TX_API + '/fill', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rowId, colIndex, color })
+        });
+    } catch (e) { console.error('[tx] 保存填充色失败', e); }
 }
 async function txApiPatchGroup(groupId, payload) {
     try {

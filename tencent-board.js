@@ -41,7 +41,7 @@ router.get('/', (req, res) => {
         });
         rows.forEach(r => {
           const grp = groupMap[r.group_id];
-          if (grp) grp.rows.push({ id: r.id, cells: J(r.cells, []) });
+          if (grp) grp.rows.push({ id: r.id, cells: J(r.cells, []), fills: J(r.fills, []) });
         });
         res.json({ groups: out, meta });
       });
@@ -90,6 +90,25 @@ router.patch('/cell', (req, res) => {
     cells[colIndex] = value == null ? '' : String(value);
     db.run('UPDATE tx_board_rows SET cells = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [JSON.stringify(cells), rowId], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json({ success: true });
+      });
+  });
+});
+
+// ============ 单元格填充色更新 ============
+// body: { rowId, colIndex, color }  (color 为空字符串则清除该格填充)
+router.patch('/fill', (req, res) => {
+  const { rowId, colIndex, color } = req.body;
+  if (rowId == null || colIndex == null) return res.status(400).json({ error: '缺少 rowId/colIndex' });
+  db.get('SELECT fills FROM tx_board_rows WHERE id = ?', [rowId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '行不存在' });
+    const fills = J(row.fills, []);
+    while (fills.length <= colIndex) fills.push('');
+    fills[colIndex] = color == null ? '' : String(color);
+    db.run('UPDATE tx_board_rows SET fills = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [JSON.stringify(fills), rowId], function (e) {
         if (e) return res.status(500).json({ error: e.message });
         res.json({ success: true });
       });

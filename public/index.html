@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260615f">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260615g">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260615f">
+    <link rel="stylesheet" href="design-system.css?v=20260615g">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2515,6 +2515,27 @@
                         .tx-board-tip { flex-shrink:0; padding:8px 12px; font-size:12px; color:var(--text-light,#999); }
                         .tx-board-table td.tx-editing-cell { padding:0; }
                         .tx-board-table td textarea.tx-cell-input { width:100%; min-width:120px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; resize:vertical; outline:none; box-sizing:border-box; font-family:inherit; }
+                        /* ★ 富文本可编辑区（contenteditable 单元格） */
+                        .tx-board-table td .tx-cell-rich { width:100%; min-width:120px; min-height:32px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; outline:none; box-sizing:border-box; font-family:inherit; background:#fff; overflow:auto; }
+                        .tx-board-table td .tx-cell-rich:focus { border-color:#1677ff; box-shadow:0 0 0 2px rgba(22,119,255,0.12); }
+                        .tx-board-table td .tx-cell-rich ul, .tx-board-table td .tx-cell-rich ol { margin:2px 0; padding-left:20px; }
+                        /* ★ 简约富文本工具栏 */
+                        .tx-format-bar { flex-shrink:0; display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:6px 10px; margin:0 0 6px; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:0.5; pointer-events:none; transition:opacity .15s; }
+                        .tx-format-bar.active { opacity:1; pointer-events:auto; }
+                        .tx-fmt-btn { min-width:28px; height:28px; padding:0 7px; border:1px solid transparent; background:transparent; color:var(--text-secondary,#555); border-radius:5px; cursor:pointer; font-size:13px; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; }
+                        .tx-fmt-btn:hover { background:rgba(22,119,255,0.08); color:var(--primary,#1677ff); }
+                        .tx-fmt-btn.on { background:rgba(22,119,255,0.14); color:var(--primary,#1677ff); }
+                        .tx-fmt-select { height:28px; border:1px solid var(--border,#d4d8dc); background:var(--bg-input,#fff); color:var(--text-primary,#1f2329); border-radius:5px; font-size:12px; padding:0 6px; cursor:pointer; outline:none; line-height:normal; }
+                        .tx-fmt-select:focus { border-color:var(--primary,#1677ff); }
+                        .tx-fmt-div { width:1px; height:18px; background:var(--border,#e5e6eb); margin:0 4px; }
+                        .tx-fmt-color { position:relative; width:28px; height:28px; border-radius:5px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; transition:background .12s; }
+                        .tx-fmt-color:hover { background:rgba(22,119,255,0.08); }
+                        .tx-fmt-color-ico { font-size:13px; font-weight:700; color:var(--text-secondary,#555); line-height:1; pointer-events:none; padding:0 1px; }
+                        .tx-fmt-color input[type="color"] { position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; border:none; padding:0; }
+                        [data-theme="dark"] .tx-format-bar { background:#1c2330; border-color:#2a3140; }
+                        [data-theme="dark"] .tx-fmt-btn { color:#cbd0d8; }
+                        [data-theme="dark"] .tx-fmt-select { background:#1c2330; color:#e8eaed; border-color:#2a3140; }
+                        [data-theme="dark"] .tx-board-table td .tx-cell-rich { background:#1c2330; color:#e8eaed; }
                         /* 暗色适配 */
                         [data-theme="dark"] .tx-board-table th, [data-theme="dark"] .tx-board-table td { border-color:#2a3140; color:#e8eaed; }
                         [data-theme="dark"] .tx-grp-适配进行中, [data-theme="dark"] .tx-grp-未来排期 { background:#1e3a5f; }
@@ -2603,13 +2624,77 @@
                                 <button class="tool-btn tool-btn-primary" onclick="exportTxBoard()" title="导出当前看板"><span class="tool-icon">⬇</span>导出</button>
                             </div>
                         </div>
+                        <!-- ★ 富文本格式工具栏（常驻，作用于当前正在编辑的单元格） -->
+                        <div class="tx-format-bar" id="tx-format-bar" aria-label="文本格式工具栏">
+                            <!-- 字体 -->
+                            <select class="tx-fmt-select" id="tx-fmt-font" title="字体" data-cmd="fontName">
+                                <option value="">字体</option>
+                                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                                <option value="SimSun, serif">宋体</option>
+                                <option value="SimHei, sans-serif">黑体</option>
+                                <option value="KaiTi, serif">楷体</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Times New Roman', serif">Times</option>
+                                <option value="Consolas, monospace">Consolas</option>
+                            </select>
+                            <!-- 字号 -->
+                            <select class="tx-fmt-select" id="tx-fmt-size" title="文字大小" data-cmd="fontSize">
+                                <option value="">字号</option>
+                                <option value="1">小</option>
+                                <option value="2">较小</option>
+                                <option value="3">正常</option>
+                                <option value="4">较大</option>
+                                <option value="5">大</option>
+                                <option value="6">特大</option>
+                                <option value="7">超大</option>
+                            </select>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 粗细 / 斜体 / 下划线 / 删除线 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="bold" title="加粗" style="font-weight:700;">B</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="italic" title="斜体" style="font-style:italic;">I</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="underline" title="下划线" style="text-decoration:underline;">U</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="strikeThrough" title="删除线" style="text-decoration:line-through;">S</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 文字颜色 -->
+                            <label class="tx-fmt-color" title="文字颜色">
+                                <span class="tx-fmt-color-ico" style="border-bottom:3px solid #e23b3b;">A</span>
+                                <input type="color" id="tx-fmt-fore" value="#e23b3b" data-cmd="foreColor">
+                            </label>
+                            <!-- 单元格填充色 -->
+                            <label class="tx-fmt-color" title="单元格填充色">
+                                <span class="tx-fmt-color-ico" style="background:#fff3a8;border-radius:2px;">▩</span>
+                                <input type="color" id="tx-fmt-fill" value="#fff3a8" data-cmd="cellFill">
+                            </label>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 对齐 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="justifyLeft" title="左对齐">⬅</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="justifyCenter" title="居中">↔</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="justifyRight" title="右对齐">➡</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 列表 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="insertUnorderedList" title="项目符号">•≡</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="insertOrderedList" title="编号列表">1.≡</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 行距 -->
+                            <select class="tx-fmt-select" id="tx-fmt-lh" title="行距" data-cmd="lineHeight">
+                                <option value="">行距</option>
+                                <option value="1.2">1.2</option>
+                                <option value="1.5">1.5</option>
+                                <option value="1.8">1.8</option>
+                                <option value="2.0">2.0</option>
+                                <option value="2.5">2.5</option>
+                            </select>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 清除格式 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="removeFormat" title="清除格式">✕格</button>
+                        </div>
                         <!-- 看板：横向滚动容器，内部一张大表（4 大分组并排，子表头 + 双击编辑） -->
                         <div class="table-container tx-board-container">
                             <table class="data-table tx-board-table" id="tx-board-table">
                                 <!-- 由 renderTxBoard() 动态生成 -->
                             </table>
                         </div>
-                        <div class="tx-board-tip">💡 双击任意单元格可编辑；行尾"＋"按钮可向该分组追加一行；表头⚙可管理分组</div>
+                        <div class="tx-board-tip">💡 双击单元格编辑（含空白格）；选中文字后用上方工具栏设格式；行尾"＋"追加行</div>
                     </div><!-- /#report-sub-tencent -->
                 </section>
 
@@ -3352,29 +3437,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260615f"></script>
-    <script src="js/auth.js?v=20260615f"></script>
+    <script src="js/core.js?v=20260615g"></script>
+    <script src="js/auth.js?v=20260615g"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260615f"></script>
-    <script src="js/components/media-viewer.js?v=20260615f"></script>
-    <script src="js/components/tooltip.js?v=20260615f"></script>
-    <script src="js/components/ui-dialog.js?v=20260615f"></script>
-    <script src="js/components/a11y.js?v=20260615f"></script>
-    <script src="js/crud-module.js?v=20260615f"></script>
-    <script src="js/router.js?v=20260615f"></script>
-    <script src="js/entities.js?v=20260615f"></script>
-    <script src="js/plans.js?v=20260615f"></script>
-    <script src="js/dashboard.js?v=20260615f"></script>
-    <script src="js/ui-features.js?v=20260615f"></script>
-    <script src="js/admin.js?v=20260615f"></script>
-    <script src="js/requirements.js?v=20260615f"></script>
-    <script src="js/testcases.js?v=20260615f"></script>
-    <script src="js/issues-versions.js?v=20260615f"></script>
-    <script src="js/social.js?v=20260615f"></script>
-    <script src="js/reports.js?v=20260615f"></script>
-    <script src="js/tencent-games.js?v=20260615f"></script>
+    <script src="js/components/searchable-select.js?v=20260615g"></script>
+    <script src="js/components/media-viewer.js?v=20260615g"></script>
+    <script src="js/components/tooltip.js?v=20260615g"></script>
+    <script src="js/components/ui-dialog.js?v=20260615g"></script>
+    <script src="js/components/a11y.js?v=20260615g"></script>
+    <script src="js/crud-module.js?v=20260615g"></script>
+    <script src="js/router.js?v=20260615g"></script>
+    <script src="js/entities.js?v=20260615g"></script>
+    <script src="js/plans.js?v=20260615g"></script>
+    <script src="js/dashboard.js?v=20260615g"></script>
+    <script src="js/ui-features.js?v=20260615g"></script>
+    <script src="js/admin.js?v=20260615g"></script>
+    <script src="js/requirements.js?v=20260615g"></script>
+    <script src="js/testcases.js?v=20260615g"></script>
+    <script src="js/issues-versions.js?v=20260615g"></script>
+    <script src="js/social.js?v=20260615g"></script>
+    <script src="js/reports.js?v=20260615g"></script>
+    <script src="js/tencent-games.js?v=20260615g"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260615f"></script>
+    <script src="modules-extra.js?v=20260615g"></script>
 </body>
 </html>

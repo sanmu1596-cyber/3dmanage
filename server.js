@@ -122,6 +122,7 @@ const newModuleTables = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER,
     cells TEXT DEFAULT '[]',
+    fills TEXT DEFAULT '[]',
     sort_order INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -143,6 +144,17 @@ newModuleTables.forEach((sql, i) => {
   db.run(sql, (err) => {
     if (err) console.error(`  [启动] 新模块建表 ${i+1} 失败:`, err.message);
   });
+});
+
+// 兼容旧库：确保 tx_board_rows 表有 fills 列（单元格填充色，JSON 数组）
+db.all("PRAGMA table_info(tx_board_rows)", [], (err, columns) => {
+  if (err || !columns) return;
+  if (!columns.some(c => c.name === 'fills')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN fills TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加fills失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加fills列');
+    });
+  }
 });
 
 // 兼容旧库：确保 devices 表有 sort_order 列
