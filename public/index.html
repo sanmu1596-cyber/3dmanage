@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260615c">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260615d">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260615c">
+    <link rel="stylesheet" href="design-system.css?v=20260615d">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2467,7 +2467,8 @@
                         /* ===== 腾讯系游戏开发进展 — 4分组并排看板（忠实还原图片） ===== */
                         section#reports.tab-content.active { display:flex; flex-direction:column; }
                         .tx-board-container { overflow:auto; min-height:0; flex:1; }
-                        .tx-board-table { border-collapse:collapse; width:auto; min-width:100%; table-layout:fixed; }
+                        /* 总宽由 JS 显式设置(各列之和)，不用 min-width:100% 避免被容器拉伸导致拖一列其他列重排 */
+                        .tx-board-table { border-collapse:collapse; table-layout:fixed; }
                         .tx-board-table th, .tx-board-table td { border:1px solid #d7dce3; padding:8px 10px; font-size:13px; vertical-align:top; overflow:hidden; }
                         /* 大分组表头（第一行，彩色块） */
                         .tx-board-table thead .tx-grp-h { text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; cursor:pointer; }
@@ -3349,29 +3350,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260615c"></script>
-    <script src="js/auth.js?v=20260615c"></script>
+    <script src="js/core.js?v=20260615d"></script>
+    <script src="js/auth.js?v=20260615d"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260615c"></script>
-    <script src="js/components/media-viewer.js?v=20260615c"></script>
-    <script src="js/components/tooltip.js?v=20260615c"></script>
-    <script src="js/components/ui-dialog.js?v=20260615c"></script>
-    <script src="js/components/a11y.js?v=20260615c"></script>
-    <script src="js/crud-module.js?v=20260615c"></script>
-    <script src="js/router.js?v=20260615c"></script>
-    <script src="js/entities.js?v=20260615c"></script>
-    <script src="js/plans.js?v=20260615c"></script>
-    <script src="js/dashboard.js?v=20260615c"></script>
-    <script src="js/ui-features.js?v=20260615c"></script>
-    <script src="js/admin.js?v=20260615c"></script>
-    <script src="js/requirements.js?v=20260615c"></script>
-    <script src="js/testcases.js?v=20260615c"></script>
-    <script src="js/issues-versions.js?v=20260615c"></script>
-    <script src="js/social.js?v=20260615c"></script>
-    <script src="js/reports.js?v=20260615c"></script>
-    <script src="js/tencent-games.js?v=20260615c"></script>
+    <script src="js/components/searchable-select.js?v=20260615d"></script>
+    <script src="js/components/media-viewer.js?v=20260615d"></script>
+    <script src="js/components/tooltip.js?v=20260615d"></script>
+    <script src="js/components/ui-dialog.js?v=20260615d"></script>
+    <script src="js/components/a11y.js?v=20260615d"></script>
+    <script src="js/crud-module.js?v=20260615d"></script>
+    <script src="js/router.js?v=20260615d"></script>
+    <script src="js/entities.js?v=20260615d"></script>
+    <script src="js/plans.js?v=20260615d"></script>
+    <script src="js/dashboard.js?v=20260615d"></script>
+    <script src="js/ui-features.js?v=20260615d"></script>
+    <script src="js/admin.js?v=20260615d"></script>
+    <script src="js/requirements.js?v=20260615d"></script>
+    <script src="js/testcases.js?v=20260615d"></script>
+    <script src="js/issues-versions.js?v=20260615d"></script>
+    <script src="js/social.js?v=20260615d"></script>
+    <script src="js/reports.js?v=20260615d"></script>
+    <script src="js/tencent-games.js?v=20260615d"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260615c"></script>
+    <script src="modules-extra.js?v=20260615d"></script>
 </body>
 </html>

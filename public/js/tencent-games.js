@@ -150,11 +150,13 @@ function renderTxBoard() {
     // 默认宽度：游戏名称类 150，备注类 360，其他 150
     let colgroup = '<colgroup>';
     let leafIdx = 0;
+    let totalW = 0;
     groups.forEach(g => {
         g.cols.forEach(col => {
             let w = (savedW && savedW[leafIdx]) ? savedW[leafIdx]
                 : (col.indexOf('备注') >= 0 ? 360 : 150);
             colgroup += `<col style="width:${w}px">`;
+            totalW += w;
             leafIdx++;
         });
     });
@@ -216,6 +218,10 @@ function renderTxBoard() {
     tbody += '</tbody>';
 
     table.style.tableLayout = 'fixed';
+    // ★ 显式总宽 = 各列之和，让表格按真实列宽渲染（不被容器拉伸），
+    //   这样拖某列时其他列才不会被重新分配（Excel 式）
+    table.style.width = totalW + 'px';
+    table.style.minWidth = totalW + 'px';
     table.innerHTML = colgroup + thead + tbody;
 }
 
@@ -229,11 +235,17 @@ function startTxColResize(e, leafIdx) {
     if (!col) return;
     const startX = e.pageX;
     const startW = parseInt(col.style.width) || 150;
+    // ★ Excel 式：拖拽时表格总宽度同步增减，多出/减少的量全由当前列吸收，
+    //   其他列 <col> 宽度完全不变（不再被浏览器重新分配）
+    const startTableW = table.offsetWidth;
     document.body.classList.add('col-resizing');
 
     const onMove = (ev) => {
-        const w = Math.max(60, startW + (ev.pageX - startX));
+        const delta = ev.pageX - startX;
+        const w = Math.max(60, startW + delta);
+        const realDelta = w - startW;            // 受 min 60 约束后的实际变化量
         col.style.width = w + 'px';
+        table.style.width = (startTableW + realDelta) + 'px';  // 总宽同步 → 其他列不动
     };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
