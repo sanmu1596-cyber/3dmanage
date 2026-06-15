@@ -13,6 +13,7 @@ const gameVersionsRouter = require('./game-versions');
 const interlaceIssuesRouter = require('./interlace-issues');
 const interlaceVersionsRouter = require('./interlace-versions');
 const clientIssuesRouter = require('./client-issues');
+const tencentBoardRouter = require('./tencent-board');
 const { validate, rules } = require('./validator');
 
 const app = express();
@@ -108,12 +109,35 @@ const newModuleTables = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // 腾讯系游戏开发进展 看板（分组 + 行 + 配置）
+  `CREATE TABLE IF NOT EXISTS tx_board_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_key TEXT,
+    title TEXT,
+    cols TEXT DEFAULT '[]',
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS tx_board_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    cells TEXT DEFAULT '[]',
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS tx_board_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
   // 索引
   'CREATE INDEX IF NOT EXISTS idx_game_versions_game ON game_versions(game_id)',
   'CREATE INDEX IF NOT EXISTS idx_game_versions_status ON game_versions(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_issues_status ON interlace_issues(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_versions_status ON interlace_versions(status)',
-  'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)'
+  'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)',
+  'CREATE INDEX IF NOT EXISTS idx_tx_board_rows_group ON tx_board_rows(group_id)'
 ];
 newModuleTables.forEach((sql, i) => {
   db.run(sql, (err) => {
@@ -2568,6 +2592,7 @@ app.use('/api/game-versions', gameVersionsRouter);
 app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
+app.use('/api/tencent-board', tencentBoardRouter);
 app.use('/api/focus-items', focusItemsRouter);
 
 // ==================== 汇报报表 API ====================
