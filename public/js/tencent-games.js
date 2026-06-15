@@ -115,26 +115,69 @@ function txHighlight(text) {
     return html;
 }
 
-// ===== 渲染整张看板（一张大 table，每组 2 列并排）=====
+// 叶子列总数（所有分组的子列数之和）
+function txLeafCount() {
+    return txBoard.groups.reduce((n, g) => n + g.cols.length, 0);
+}
+
+// ===== 列宽 / 行高 持久化 =====
+const TX_COLW_KEY = 'tx_board_colwidths_v2';
+const TX_ROWH_KEY = 'tx_board_rowheights_v2';
+function txGetColWidths() {
+    try { const r = localStorage.getItem(TX_COLW_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function txSaveColWidths(arr) {
+    try { localStorage.setItem(TX_COLW_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+function txGetRowHeights() {
+    try { const r = localStorage.getItem(TX_ROWH_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; }
+}
+function txSaveRowHeights(obj) {
+    try { localStorage.setItem(TX_ROWH_KEY, JSON.stringify(obj)); } catch (e) {}
+}
+
+// ===== 渲染整张看板（一张大 table，每组多列并排）=====
 function renderTxBoard() {
     const table = document.getElementById('tx-board-table');
     if (!table || !txBoard) return;
     const groups = txBoard.groups;
     const maxRows = Math.max.apply(null, groups.map(g => g.rows.length));
+    const leafCount = txLeafCount();
+    const savedW = txGetColWidths();
+    const savedH = txGetRowHeights();
+
+    // —— colgroup：用 table-layout:fixed + col 宽度精确控制列宽（可拖拽持久化）——
+    // 默认宽度：游戏名称类 150，备注类 360，其他 150
+    let colgroup = '<colgroup>';
+    let leafIdx = 0;
+    groups.forEach(g => {
+        g.cols.forEach(col => {
+            let w = (savedW && savedW[leafIdx]) ? savedW[leafIdx]
+                : (col.indexOf('备注') >= 0 ? 360 : 150);
+            colgroup += `<col style="width:${w}px">`;
+            leafIdx++;
+        });
+    });
+    colgroup += '</colgroup>';
 
     // —— 表头（两行）——
     let thead = '<thead>';
     // 第一行：大分组标题（每组 colspan=该组列数）
     thead += '<tr>';
-    groups.forEach(g => {
-        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}">${escapeHtml(g.title)}</th>`;
+    groups.forEach((g, gi) => {
+        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}" data-g="${gi}" ondblclick="startTxGroupTitleEdit(this)" title="双击编辑分组名">${escapeHtml(g.title)}</th>`;
     });
     thead += '</tr>';
-    // 第二行：子列标题
+    // 第二行：子列标题（可双击编辑列名 + 右侧列宽拖拽手柄）
     thead += '<tr>';
-    groups.forEach(g => {
-        g.cols.forEach(col => {
-            thead += `<th class="tx-sub-h s-${txCls(g.key)}">${escapeHtml(col)}</th>`;
+    leafIdx = 0;
+    groups.forEach((g, gi) => {
+        g.cols.forEach((col, ci) => {
+            thead += `<th class="tx-sub-h s-${txCls(g.key)}" data-g="${gi}" data-c="${ci}" data-leaf="${leafIdx}" ondblclick="startTxColNameEdit(this)" title="双击编辑列名">`
+                + `<span class="tx-colname">${escapeHtml(col)}</span>`
+                + `<span class="tx-col-resize" onmousedown="startTxColResize(event, ${leafIdx})"></span>`
+                + `</th>`;
+            leafIdx++;
         });
     });
     thead += '</tr>';
@@ -143,21 +186,23 @@ function renderTxBoard() {
     // —— 表体（按 maxRows 对齐，缺的格留空）——
     let tbody = '<tbody>';
     for (let r = 0; r < maxRows; r++) {
-        tbody += '<tr>';
+        const rh = savedH[r] ? ` style="height:${savedH[r]}px"` : '';
+        tbody += `<tr data-row="${r}"${rh}>`;
         groups.forEach((g, gi) => {
             const row = g.rows[r];
             g.cols.forEach((col, ci) => {
                 if (!row) {
-                    // 该组这一行不存在 → 空格（不可编辑）
                     tbody += `<td class="tx-c-empty"></td>`;
                     return;
                 }
                 const val = row[ci] || '';
-                // 备注列（第2列且列名含"备注"）→ 多行 + 高亮
                 const isNote = col.indexOf('备注') >= 0;
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
                 const display = isNote ? txHighlight(val) : (escapeHtml(val).replace(/\n/g, '<br>') || '<span style="color:#c0c4cc">—</span>');
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${display}</td>`;
+                // 第一组第一列的格子带行高拖拽手柄（每行底部一个即可）
+                const rowHandle = (gi === 0 && ci === 0)
+                    ? `<span class="tx-row-resize" onmousedown="startTxRowResize(event, ${r})"></span>` : '';
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -170,7 +215,134 @@ function renderTxBoard() {
     tbody += '</tr>';
     tbody += '</tbody>';
 
-    table.innerHTML = thead + tbody;
+    table.style.tableLayout = 'fixed';
+    table.innerHTML = colgroup + thead + tbody;
+}
+
+// ===== 列宽拖拽（参考游戏列表 initColumnResize 做法）=====
+function startTxColResize(e, leafIdx) {
+    e.preventDefault();
+    e.stopPropagation();
+    const table = document.getElementById('tx-board-table');
+    const cols = table.querySelectorAll('colgroup col');
+    const col = cols[leafIdx];
+    if (!col) return;
+    const startX = e.pageX;
+    const startW = parseInt(col.style.width) || 150;
+    document.body.classList.add('col-resizing');
+
+    const onMove = (ev) => {
+        const w = Math.max(60, startW + (ev.pageX - startX));
+        col.style.width = w + 'px';
+    };
+    const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('col-resizing');
+        // 保存所有列宽
+        const widths = Array.from(cols).map(c => parseInt(c.style.width) || 150);
+        txSaveColWidths(widths);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+// ===== 行高拖拽 =====
+function startTxRowResize(e, rowIdx) {
+    e.preventDefault();
+    e.stopPropagation();
+    const table = document.getElementById('tx-board-table');
+    const tr = table.querySelector(`tbody tr[data-row="${rowIdx}"]`);
+    if (!tr) return;
+    const startY = e.pageY;
+    const startH = tr.offsetHeight;
+    document.body.classList.add('row-resizing');
+
+    const onMove = (ev) => {
+        const h = Math.max(32, startH + (ev.pageY - startY));
+        tr.style.height = h + 'px';
+    };
+    const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('row-resizing');
+        const heights = txGetRowHeights();
+        heights[rowIdx] = tr.offsetHeight;
+        txSaveRowHeights(heights);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+// ===== 列名双击编辑 =====
+function startTxColNameEdit(th) {
+    if (th.classList.contains('editing')) return;
+    const gi = +th.dataset.g, ci = +th.dataset.c;
+    const group = txBoard.groups[gi];
+    if (!group) return;
+    th.classList.add('editing');
+    const cur = group.cols[ci] || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tx-colname-input';
+    input.value = cur;
+    th.innerHTML = '';
+    th.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = (save) => {
+        if (done) return; done = true;
+        if (save && input.value.trim()) {
+            group.cols[ci] = input.value.trim();
+            saveTxBoard();
+            if (typeof showToast === 'function') showToast('列名已更新', 'success');
+        }
+        th.classList.remove('editing');
+        renderTxBoard();
+    };
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+        else if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    });
+}
+
+// ===== 分组名双击编辑 =====
+function startTxGroupTitleEdit(th) {
+    if (th.classList.contains('editing')) return;
+    const gi = +th.dataset.g;
+    const group = txBoard.groups[gi];
+    if (!group) return;
+    th.classList.add('editing');
+    const cur = group.title || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tx-colname-input';
+    input.style.textAlign = 'center';
+    input.value = cur;
+    th.innerHTML = '';
+    th.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = (save) => {
+        if (done) return; done = true;
+        if (save && input.value.trim()) {
+            group.title = input.value.trim();
+            saveTxBoard();
+            if (typeof showToast === 'function') showToast('分组名已更新', 'success');
+        }
+        th.classList.remove('editing');
+        renderTxBoard();
+    };
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+        else if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    });
 }
 
 // ===== 单元格双击编辑（textarea 浮层，回车/失焦保存）=====

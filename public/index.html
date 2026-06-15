@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260615b">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260615c">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260615b">
+    <link rel="stylesheet" href="design-system.css?v=20260615c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2467,22 +2467,32 @@
                         /* ===== 腾讯系游戏开发进展 — 4分组并排看板（忠实还原图片） ===== */
                         section#reports.tab-content.active { display:flex; flex-direction:column; }
                         .tx-board-container { overflow:auto; min-height:0; flex:1; }
-                        .tx-board-table { border-collapse:collapse; width:auto; min-width:100%; table-layout:auto; }
-                        .tx-board-table th, .tx-board-table td { border:1px solid #d7dce3; padding:8px 10px; font-size:13px; vertical-align:top; }
+                        .tx-board-table { border-collapse:collapse; width:auto; min-width:100%; table-layout:fixed; }
+                        .tx-board-table th, .tx-board-table td { border:1px solid #d7dce3; padding:8px 10px; font-size:13px; vertical-align:top; overflow:hidden; }
                         /* 大分组表头（第一行，彩色块） */
-                        .tx-board-table thead .tx-grp-h { text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; }
+                        .tx-board-table thead .tx-grp-h { text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; cursor:pointer; }
                         .tx-grp-适配进行中, .tx-grp-未来排期 { background:#dbeafe; }
                         .tx-grp-已适配-修复BUG { background:#fef3c7; }
                         .tx-grp-已适配游戏列表 { background:#dcfce7; }
-                        /* 子列表头（第二行，浅色块） */
-                        .tx-board-table thead .tx-sub-h { text-align:center; font-weight:600; font-size:13px; color:#374151; background:rgba(255,255,255,0.55); white-space:nowrap; }
+                        /* 子列表头（第二行，浅色块） — relative 容纳列宽手柄 */
+                        .tx-board-table thead .tx-sub-h { position:relative; text-align:center; font-weight:600; font-size:13px; color:#374151; background:rgba(255,255,255,0.55); white-space:nowrap; cursor:pointer; }
                         .tx-board-table thead .tx-sub-h.s-适配进行中, .tx-board-table thead .tx-sub-h.s-未来排期 { background:#eff6ff; }
                         .tx-board-table thead .tx-sub-h.s-已适配-修复BUG { background:#fffbeb; }
                         .tx-board-table thead .tx-sub-h.s-已适配游戏列表 { background:#f0fdf4; }
-                        /* 单元格：游戏名称居中加粗、备注左对齐多行 */
-                        .tx-board-table td.tx-c-name { text-align:center; font-weight:600; white-space:normal; word-break:break-word; }
-                        .tx-board-table td.tx-c-note { text-align:left; white-space:pre-wrap; line-height:1.6; word-break:break-word; }
-                        .tx-board-table td.tx-c-plain { text-align:center; white-space:normal; word-break:break-word; }
+                        /* 列宽拖拽手柄（hover 列头时显示，参考游戏列表；th overflow:hidden 故贴 right:0 内侧） */
+                        .tx-board-table thead .tx-sub-h { overflow:visible; }
+                        .tx-col-resize { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:6; }
+                        .tx-col-resize:hover, body.col-resizing .tx-col-resize { background:rgba(22,119,255,0.45); }
+                        body.col-resizing, body.row-resizing { cursor:col-resize; user-select:none; }
+                        body.row-resizing { cursor:row-resize; }
+                        /* 行高拖拽手柄（每行第一格底部，td overflow:hidden 故贴 bottom:0 内侧） */
+                        .tx-board-table td.tx-c-name { position:relative; }
+                        .tx-row-resize { position:absolute; left:0; right:0; bottom:0; height:5px; cursor:row-resize; z-index:5; }
+                        .tx-row-resize:hover, body.row-resizing .tx-row-resize { background:rgba(22,119,255,0.45); }
+                        /* 单元格：游戏名称水平+垂直居中加粗、备注左对齐多行 */
+                        .tx-board-table td.tx-c-name { text-align:center; vertical-align:middle; font-weight:600; white-space:normal; word-break:break-word; }
+                        .tx-board-table td.tx-c-note { text-align:left; vertical-align:top; white-space:pre-wrap; line-height:1.6; word-break:break-word; }
+                        .tx-board-table td.tx-c-plain { text-align:center; vertical-align:middle; white-space:normal; word-break:break-word; }
                         .tx-board-table td.tx-c-empty { text-align:center; color:#c0c4cc; }
                         /* 备注里"本周进展/本周无进展"高亮（由JS加span） */
                         .tx-hl-red { color:#dc2626; font-weight:700; }
@@ -2491,6 +2501,8 @@
                         .tx-board-table td.tx-editable { cursor:text; transition:background .12s; }
                         .tx-board-table td.tx-editable:hover { background:rgba(22,119,255,0.06); }
                         .tx-board-table td.tx-editable.editing { background:#fff; }
+                        /* 列名/分组名编辑输入框 */
+                        .tx-colname-input { width:100%; box-sizing:border-box; border:2px solid #1677ff; border-radius:4px; padding:4px 6px; font-size:13px; font-weight:600; outline:none; text-align:center; font-family:inherit; }
                         /* 行尾追加按钮行 */
                         .tx-board-table tr.tx-add-row td { text-align:center; padding:4px; }
                         .tx-add-btn { border:1px dashed #c0c4cc; background:transparent; color:#1677ff; cursor:pointer; border-radius:4px; padding:3px 14px; font-size:13px; transition:all .12s; }
@@ -3337,29 +3349,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260615b"></script>
-    <script src="js/auth.js?v=20260615b"></script>
+    <script src="js/core.js?v=20260615c"></script>
+    <script src="js/auth.js?v=20260615c"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260615b"></script>
-    <script src="js/components/media-viewer.js?v=20260615b"></script>
-    <script src="js/components/tooltip.js?v=20260615b"></script>
-    <script src="js/components/ui-dialog.js?v=20260615b"></script>
-    <script src="js/components/a11y.js?v=20260615b"></script>
-    <script src="js/crud-module.js?v=20260615b"></script>
-    <script src="js/router.js?v=20260615b"></script>
-    <script src="js/entities.js?v=20260615b"></script>
-    <script src="js/plans.js?v=20260615b"></script>
-    <script src="js/dashboard.js?v=20260615b"></script>
-    <script src="js/ui-features.js?v=20260615b"></script>
-    <script src="js/admin.js?v=20260615b"></script>
-    <script src="js/requirements.js?v=20260615b"></script>
-    <script src="js/testcases.js?v=20260615b"></script>
-    <script src="js/issues-versions.js?v=20260615b"></script>
-    <script src="js/social.js?v=20260615b"></script>
-    <script src="js/reports.js?v=20260615b"></script>
-    <script src="js/tencent-games.js?v=20260615b"></script>
+    <script src="js/components/searchable-select.js?v=20260615c"></script>
+    <script src="js/components/media-viewer.js?v=20260615c"></script>
+    <script src="js/components/tooltip.js?v=20260615c"></script>
+    <script src="js/components/ui-dialog.js?v=20260615c"></script>
+    <script src="js/components/a11y.js?v=20260615c"></script>
+    <script src="js/crud-module.js?v=20260615c"></script>
+    <script src="js/router.js?v=20260615c"></script>
+    <script src="js/entities.js?v=20260615c"></script>
+    <script src="js/plans.js?v=20260615c"></script>
+    <script src="js/dashboard.js?v=20260615c"></script>
+    <script src="js/ui-features.js?v=20260615c"></script>
+    <script src="js/admin.js?v=20260615c"></script>
+    <script src="js/requirements.js?v=20260615c"></script>
+    <script src="js/testcases.js?v=20260615c"></script>
+    <script src="js/issues-versions.js?v=20260615c"></script>
+    <script src="js/social.js?v=20260615c"></script>
+    <script src="js/reports.js?v=20260615c"></script>
+    <script src="js/tencent-games.js?v=20260615c"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260615b"></script>
+    <script src="modules-extra.js?v=20260615c"></script>
 </body>
 </html>
