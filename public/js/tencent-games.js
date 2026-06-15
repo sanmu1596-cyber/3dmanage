@@ -220,14 +220,19 @@ function renderTxBoard() {
         tbody += `<tr data-row="${r}"${rh}>`;
         groups.forEach((g, gi) => {
             const row = g.rows[r];
+            const rowHandleBase = (gi === 0)
+                ? `<span class="tx-row-resize" onmousedown="startTxRowResize(event, ${r})"></span>` : '';
             g.cols.forEach((col, ci) => {
-                if (!row) { tbody += `<td class="tx-c-empty"></td>`; return; }
+                const rowHandle = (gi === 0 && ci === 0) ? rowHandleBase : '';
+                if (!row) {
+                    // ★ 空白格（该分组此行无数据）也支持双击编辑：双击时自动为该分组补足空行后进入编辑
+                    tbody += `<td class="tx-editable tx-c-empty" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${rowHandle}</td>`;
+                    return;
+                }
                 const val = (row.cells && row.cells[ci]) || '';
                 const isNote = col.indexOf('备注') >= 0;
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
                 const display = isNote ? txHighlight(val) : (escapeHtml(val).replace(/\n/g, '<br>') || '<span style="color:#c0c4cc">—</span>');
-                const rowHandle = (gi === 0 && ci === 0)
-                    ? `<span class="tx-row-resize" onmousedown="startTxRowResize(event, ${r})"></span>` : '';
                 tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${display}${rowHandle}</td>`;
             });
         });
@@ -377,11 +382,27 @@ function startTxGroupTitleEdit(th) {
 }
 
 // ===== 单元格双击编辑（→ PATCH /cell）=====
-function startTxCellEdit(td) {
+async function startTxCellEdit(td) {
     if (td.classList.contains('editing')) return;
     const gi = +td.dataset.g, r = +td.dataset.r, ci = +td.dataset.c;
     const group = txBoard.groups[gi];
-    if (!group || !group.rows[r]) return;
+    if (!group) return;
+
+    // ★ 空白格：该分组在这一行还没有数据 → 先为其补足空行（含中间缺失的行）再编辑
+    if (!group.rows[r]) {
+        const created = await txEnsureRowsUpTo(group, r);
+        if (!created) return;
+        // 行已创建并重渲染，DOM 中原 td 已失效，需重新取新的 td 继续编辑
+        renderTxBoard();
+        const newTd = document.querySelector(
+            `#tx-board-table td.tx-editable[data-g="${gi}"][data-r="${r}"][data-c="${ci}"]`);
+        if (newTd && !newTd.classList.contains('editing')) {
+            // 递归一次：此时 group.rows[r] 已存在，会走到下面正常编辑分支
+            return startTxCellEdit(newTd);
+        }
+        return;
+    }
+
     const rowObj = group.rows[r];
     const cur = (rowObj.cells && rowObj.cells[ci]) || '';
 
@@ -434,6 +455,29 @@ async function addTxRow(gi) {
     } catch (e) {
         console.error('[tx] 追加行失败', e);
         if (typeof showToast === 'function') showToast('追加失败', 'danger');
+    }
+}
+
+// ===== 为分组补足空行到指定行索引（含中间缺失行）=====
+// 用于"双击空白格直接编辑"：该分组 rows 不足 targetRow+1 时，逐行 POST 创建空行
+async function txEnsureRowsUpTo(group, targetRow) {
+    try {
+        while (group.rows.length <= targetRow) {
+            const cells = group.cols.map(() => '');
+            const resp = await authFetch(TX_API + '/row', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ groupId: group.id, cells })
+            });
+            const result = await resp.json();
+            if (!result || !result.id) throw new Error('创建行失败');
+            group.rows.push({ id: result.id, cells });
+        }
+        return true;
+    } catch (e) {
+        console.error('[tx] 补足空行失败', e);
+        if (typeof showToast === 'function') showToast('创建行失败', 'danger');
+        return false;
     }
 }
 
