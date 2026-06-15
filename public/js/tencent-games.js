@@ -1,28 +1,25 @@
 /**
- * 腾讯系游戏开发进展 — tencent-games.js
+ * 腾讯系游戏开发进展 — tencent-games.js（4分组并排看板版）
  * ============================================================
- * 汇报报表下的子集，标准可编辑表格（风格对齐游戏列表）：
- * - 单击下拉编辑：分组 / 下载状态 / 本周进展
- * - 双击文本编辑：游戏名称 / 备注 / 仅预约关联
- * - 列宽拖拽 / 排序 / tooltip 复用游戏列表的通用能力
- * 数据：当前阶段纯前端，持久化到 localStorage（key: tx_games_data）
- * 后续接后端时，把 loadTxGames/saveTxGamesLocal 换成 authFetch 即可。
+ * 忠实还原乔老师提供的看板布局：4 个大分组横向并排，每组子列不同、行数不齐。
+ *   1. 适配进行中   → [游戏名称, 备注]
+ *   2. 未来排期     → [游戏名称, 新游(可预约)]
+ *   3. 已适配-修复BUG → [游戏名称, 备注]
+ *   4. 已适配游戏列表 → [游戏名称A, 游戏名称B]（双子列）
+ * 每个单元格可双击编辑；每组行尾"＋"可追加一行。
+ * 数据：纯前端 localStorage（key: tx_board_data_v2）。
+ * 后续接后端时把 loadTxBoard/saveTxBoard 换成 authFetch 即可。
  * ============================================================
  */
 
-// ===== 全局变量（必须 var，踩坑#1）=====
-var allTxGamesData = [];        // 全量
-var filteredTxGamesData = [];   // 筛选后
-var _txCurrentSubTab = 'report-main';
+// ===== 全局（必须 var，踩坑#1）=====
+var txBoard = null;             // { groups: [ {key, title, cols:[...], rows:[ [c0,c1], ... ] } ] }
+var _txSubTabInited = false;
 
-const TX_STORE_KEY = 'tx_games_data';
-const TX_GROUPS = ['适配中', '已适配有BUG', '已适配'];
-const TX_DOWNLOAD_OPTS = ['', '可下载', '仅预约'];
-const TX_PROGRESS_OPTS = ['', '本周进展', '本周无进展'];
+const TX_STORE_KEY = 'tx_board_data_v2';
 
 // ===== 子 Tab 切换 =====
 function switchReportSubTab(subtab) {
-    _txCurrentSubTab = subtab;
     document.querySelectorAll('.report-sub-tab').forEach(b => {
         b.classList.toggle('active', b.dataset.subtab === subtab);
     });
@@ -33,286 +30,228 @@ function switchReportSubTab(subtab) {
     } else {
         const t = document.getElementById('report-sub-tencent');
         if (t) t.style.display = 'flex';
-        loadTxGames();
+        loadTxBoard();
     }
 }
 
-// ===== 默认种子数据（来自乔老师提供的截图）=====
-function getTxSeedData() {
-    let id = 1;
-    const mk = (group, game_name, notes, download_status, reservation, progress_status) =>
-        ({ id: id++, group, game_name, notes: notes || '', download_status: download_status || '', reservation: reservation || '', progress_status: progress_status || '' });
-    return [
-        // ===== 适配中 =====
-        mk('适配中', '龙息：神寂', '本周无进展\n1、游戏中，2D状态下黑屏，再次交织-3D状态下也黑屏；\n2、游戏交互界面，部分UI消失，部分UI未分离；', '可下载', '穿越火线 - RUST玩法授权', '本周无进展'),
-        mk('适配中', '王者荣耀世界', '1、分辨率为3840*2160时，游戏内黑屏，仅显示UI；\n2、鼠标放在"共鸣"上时，有另一个UI，debug抓不到；', '可下载', '终极角逐 THE FINALS', ''),
-        mk('适配中', '洛克王国：世界', '本周无进展\n1、宠物界面周围多了一个黑框；\n2、我的衣柜和主界面切换时，编译条闪烁；\n3、和宠物对决，屏幕上方出现一条透明黑框；\n4、任务地点指引图标、左键长按击图标需要优化为UI不分离；\n5、内嵌的网页显示hook进度条；\n6、宠物界面displays不全；', '可下载', '星痕共鸣', ''),
-        mk('适配中', '', '', '可下载', '彩虹六号：攻势', ''),
-        mk('适配中', '', '', '', '王者万象棋', ''),
-        mk('适配中', '', '', '', '粒粒的小人国', ''),
-        mk('适配中', '', '', '', '地下城与勇士：卡赞', ''),
-        mk('适配中', '', '', '仅预约', '失控进化 - RUST玩法授权', ''),
-        mk('适配中', '', '', '仅预约', '异人之下', ''),
-        mk('适配中', '', '', '仅预约', '灰境行者', ''),
-        mk('适配中', '', '', '仅预约', '星际战甲', ''),
-        // ===== 已适配有BUG =====
-        mk('已适配有BUG', '全境封锁2', '本周进展\n1、游戏中的"交互点"，"任务指引点等UI贴屏，影响游戏体验；\n2、"准心"贴屏，影响命中率；\n3、敌人血条有拖影，血条改为不贴屏；', '', '', '本周进展'),
-        mk('已适配有BUG', '无畏契约', '本周无进展\n研发测试版本：已解决"人物介绍UI"不抖动，但部分UI不分离；', '', '', '本周无进展'),
-        mk('已适配有BUG', '石器时代：觉醒', '本周进展\n1、游戏内切换非极致画面后，UI消失', '', '', '本周进展'),
-        mk('已适配有BUG', '元梦之星-山海寻灵（中低档）', '', '', '', ''),
-        mk('已适配有BUG', '逆战：未来', '', '', '', ''),
-        // ===== 已适配 =====
-        mk('已适配', '流放之路', '', '', '天涯明月刀', ''),
-        mk('已适配', '暗区突围', '', '', '流放之路：降临', ''),
-        mk('已适配', 'NBA2KOL2', '', '', '卡拉彼丘', ''),
-        mk('已适配', '逆战', '', '', '三角洲行动', ''),
-        mk('已适配', '英雄联盟lol', '', '', '', ''),
-        mk('已适配', '矩阵：零日危机', '', '', '', '')
-    ];
+// ===== 种子数据（忠实还原第二张截图）=====
+function getTxSeed() {
+    return {
+        groups: [
+            {
+                key: '适配进行中', title: '适配进行中',
+                cols: ['游戏名称', '备注'],
+                rows: [
+                    ['逆战：未来', '1、有两个UI界面会闪失-正在优化中，预计本周解决上线；'],
+                    ['龙息：神寂', '1、游戏中，2D状态下黑屏，再次交织-3D状态下也黑屏；\n2、游戏交互界面，部分UI消失，部分UI未分离；\n3、目前打开分析，游戏UI分离难度较大，暂时降低优先级，解决其他游戏问题；'],
+                    ['矩阵：零日危机', '本周出版本顺利'],
+                    ['石器时代：觉醒', '1、更改游戏分辨率，3840*2160改成2560*1440，游戏画面正常切换不卡死；\n2、争取本周解决上线；'],
+                    ['《王者荣耀世界》', '分辨率部分UI后，游戏中画面黑屏，仅显示UI，本周完工优化中；'],
+                    ['洛克王国：世界', '1、添加UPass，使用release hook打开游戏后，部分界面图标显示不全；']
+                ]
+            },
+            {
+                key: '未来排期', title: '未来排期',
+                cols: ['游戏名称', '新游（可预约）'],
+                rows: [
+                    ['穿越火线', '失控进化 - RUST玩法授权'],
+                    ['终极角逐\n(THE FINALS)', '异人之下'],
+                    ['白荆回廊', '灰境行者'],
+                    ['星展共鸣', '彩虹六号：攻势'],
+                    ['星际战甲', '王者万象棋'],
+                    ['桃源深处有人家', '粒粒的小人国'],
+                    ['', '地下城与勇士：卡赞']
+                ]
+            },
+            {
+                key: '已适配-修复BUG', title: '已适配-修复BUG',
+                cols: ['游戏名称', '备注'],
+                rows: [
+                    ['全境封锁2', '本周无进展\n1、红魔窗口模式黑屏；（截图文件物以可用，加用户提示）\n2、游戏中的"交互点"，"任务指引点等UI贴屏，影响游戏体验；\n3、"准心"贴屏，影响命中率；\n4、地图，重生界面，UI分离不合理，影响视觉效果；'],
+                    ['无畏契约', '研发测试版本-已解决"人物介绍UI"不抖动，但部分UI无畏契约不分离;;']
+                ]
+            },
+            {
+                key: '已适配游戏列表', title: '已适配游戏列表',
+                cols: ['游戏名称', '游戏名称'],
+                rows: [
+                    ['流放之路', '天涯明月刀'],
+                    ['暗区突围', '流放之路：降临'],
+                    ['NBA2KOL2', '卡拉彼丘'],
+                    ['逆战', '三角洲行动'],
+                    ['元梦之星-山海寻灵（中低档）', '英雄联盟lol']
+                ]
+            }
+        ]
+    };
 }
 
-// ===== 加载/保存（localStorage）=====
-function loadTxGames() {
+// ===== 加载/保存 =====
+function loadTxBoard() {
     try {
         const saved = localStorage.getItem(TX_STORE_KEY);
-        if (saved) {
-            allTxGamesData = JSON.parse(saved);
-        } else {
-            allTxGamesData = getTxSeedData();
-            saveTxGamesLocal();
-        }
+        txBoard = saved ? JSON.parse(saved) : getTxSeed();
     } catch (e) {
-        console.error('[tx] 加载失败，使用种子数据', e);
-        allTxGamesData = getTxSeedData();
+        console.error('[tx] 加载失败，用种子', e);
+        txBoard = getTxSeed();
     }
-    filterTxGames();
+    if (!isValidBoard(txBoard)) txBoard = getTxSeed();
+    renderTxBoard();
+}
+function isValidBoard(b) { return b && Array.isArray(b.groups) && b.groups.length > 0; }
+function saveTxBoard() {
+    try { localStorage.setItem(TX_STORE_KEY, JSON.stringify(txBoard)); } catch (e) {}
 }
 
-function saveTxGamesLocal() {
-    try { localStorage.setItem(TX_STORE_KEY, JSON.stringify(allTxGamesData)); } catch (e) {}
+// CSS class 安全化
+function txCls(s) { return String(s || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9_-]/g, ''); }
+
+// 备注内"本周进展/本周无进展"高亮
+function txHighlight(text) {
+    let html = escapeHtml(text || '');
+    html = html.replace(/本周无进展/g, '<span class="tx-hl-red">本周无进展</span>');
+    html = html.replace(/(^|<br>|\n)(本周进展)/g, '$1<span class="tx-hl-green">本周进展</span>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
 }
 
-// ===== 筛选 =====
-function filterTxGames() {
-    const kw = (document.getElementById('tx-game-search')?.value || '').trim().toLowerCase();
-    const grp = document.getElementById('tx-group-filter')?.value || '';
-    const dl = document.getElementById('tx-download-filter')?.value || '';
-    filteredTxGamesData = (allTxGamesData || []).filter(r => {
-        if (grp && r.group !== grp) return false;
-        if (dl) {
-            if (dl === '可下载' || dl === '仅预约') { if (r.download_status !== dl) return false; }
-            else if (dl === '本周进展' || dl === '本周无进展') { if (r.progress_status !== dl) return false; }
-        }
-        if (kw) {
-            const hay = `${r.game_name} ${r.notes} ${r.reservation}`.toLowerCase();
-            if (!hay.includes(kw)) return false;
-        }
-        return true;
+// ===== 渲染整张看板（一张大 table，每组 2 列并排）=====
+function renderTxBoard() {
+    const table = document.getElementById('tx-board-table');
+    if (!table || !txBoard) return;
+    const groups = txBoard.groups;
+    const maxRows = Math.max.apply(null, groups.map(g => g.rows.length));
+
+    // —— 表头（两行）——
+    let thead = '<thead>';
+    // 第一行：大分组标题（每组 colspan=该组列数）
+    thead += '<tr>';
+    groups.forEach(g => {
+        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}">${escapeHtml(g.title)}</th>`;
     });
-    renderTxGamesTable();
-}
+    thead += '</tr>';
+    // 第二行：子列标题
+    thead += '<tr>';
+    groups.forEach(g => {
+        g.cols.forEach(col => {
+            thead += `<th class="tx-sub-h s-${txCls(g.key)}">${escapeHtml(col)}</th>`;
+        });
+    });
+    thead += '</tr>';
+    thead += '</thead>';
 
-// ===== 渲染表格 =====
-function renderTxGamesTable() {
-    const tbody = document.getElementById('tx-games-table');
-    if (!tbody) return;
-    const data = filteredTxGamesData;
-
-    if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">
-            <div class="empty-icon">🐧</div>
-            <div class="empty-text">暂无腾讯系游戏</div>
-            <div class="empty-sub">点击"新增游戏"添加第一条开发进展</div>
-        </td></tr>`;
-        return;
+    // —— 表体（按 maxRows 对齐，缺的格留空）——
+    let tbody = '<tbody>';
+    for (let r = 0; r < maxRows; r++) {
+        tbody += '<tr>';
+        groups.forEach((g, gi) => {
+            const row = g.rows[r];
+            g.cols.forEach((col, ci) => {
+                if (!row) {
+                    // 该组这一行不存在 → 空格（不可编辑）
+                    tbody += `<td class="tx-c-empty"></td>`;
+                    return;
+                }
+                const val = row[ci] || '';
+                // 备注列（第2列且列名含"备注"）→ 多行 + 高亮
+                const isNote = col.indexOf('备注') >= 0;
+                const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
+                const display = isNote ? txHighlight(val) : (escapeHtml(val).replace(/\n/g, '<br>') || '<span style="color:#c0c4cc">—</span>');
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${display}</td>`;
+            });
+        });
+        tbody += '</tr>';
     }
+    // —— 追加行按钮行（每组一个＋，跨该组列数）——
+    tbody += '<tr class="tx-add-row">';
+    groups.forEach((g, gi) => {
+        tbody += `<td colspan="${g.cols.length}"><button class="tx-add-btn" onclick="addTxRow(${gi})">＋ 追加一行</button></td>`;
+    });
+    tbody += '</tr>';
+    tbody += '</tbody>';
 
-    tbody.innerHTML = data.map((r, idx) => {
-        const groupBadge = `<span class="tx-group-badge tx-group-${sanitizeTxClass(r.group)}">${escapeHtml(r.group)}</span>`;
-        const notesHtml = escapeHtml(r.notes || '-').replace(/\n/g, '<br>');
-        const progressCls = r.progress_status ? `tx-progress-${sanitizeTxClass(r.progress_status)}` : '';
-        return `
-        <tr data-id="${r.id}">
-            <td>${idx + 1}</td>
-            <td class="editable-cell" onclick="startTxDropdownEdit(this, ${r.id}, 'group')" title="点击选择">${groupBadge}</td>
-            <td class="editable-cell" ondblclick="startTxTextEdit(this, ${r.id}, 'game_name')" title="双击编辑">${escapeHtml(r.game_name || '-')}</td>
-            <td class="editable-cell tx-notes-cell" ondblclick="startTxTextEdit(this, ${r.id}, 'notes')" title="双击编辑">${notesHtml || '-'}</td>
-            <td class="editable-cell" onclick="startTxDropdownEdit(this, ${r.id}, 'download_status')" title="点击选择">${escapeHtml(r.download_status || '-')}</td>
-            <td class="editable-cell" ondblclick="startTxTextEdit(this, ${r.id}, 'reservation')" title="双击编辑">${escapeHtml(r.reservation || '-')}</td>
-            <td class="editable-cell ${progressCls}" onclick="startTxDropdownEdit(this, ${r.id}, 'progress_status')" title="点击选择">${escapeHtml(r.progress_status || '-')}</td>
-            <td>
-                <button class="btn btn-small btn-edit" onclick="editTxGame(${r.id})">编辑</button>
-                <button class="btn btn-small btn-delete" onclick="deleteTxGame(${r.id})">删除</button>
-            </td>
-        </tr>`;
-    }).join('');
-
-    // 复用游戏列表通用能力
-    if (typeof applyCellTooltips === 'function') applyCellTooltips('tx-games-table');
-    if (typeof initTableSort === 'function') initTableSort('tx-games-data-table');
-    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
+    table.innerHTML = thead + tbody;
 }
 
-// CSS class 安全化（中文也可作为 class 后缀，但去掉空格/特殊符号）
-function sanitizeTxClass(s) {
-    return String(s || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9_-]/g, '');
-}
-
-// ===== 行内编辑：下拉 =====
-function startTxDropdownEdit(td, id, field) {
+// ===== 单元格双击编辑（textarea 浮层，回车/失焦保存）=====
+function startTxCellEdit(td) {
     if (td.classList.contains('editing')) return;
-    const row = allTxGamesData.find(r => r.id === id);
-    if (!row) return;
+    const gi = +td.dataset.g, r = +td.dataset.r, ci = +td.dataset.c;
+    const group = txBoard.groups[gi];
+    if (!group || !group.rows[r]) return;
+    const cur = group.rows[r][ci] || '';
+
     td.classList.add('editing');
-    td.style.position = 'relative';
-
-    const opts = field === 'group' ? TX_GROUPS
-        : field === 'download_status' ? TX_DOWNLOAD_OPTS
-        : TX_PROGRESS_OPTS;
-    const cur = row[field] || '';
-
-    // 占位符撑住 td 尺寸（踩坑：absolute 浮层 + 占位符防 reflow）
     const originalHtml = td.innerHTML;
-    const placeholder = document.createElement('span');
-    placeholder.style.cssText = 'visibility:hidden;display:block;';
-    placeholder.innerHTML = originalHtml;
 
-    const sel = document.createElement('select');
-    sel.className = 'inline-edit-select';
-    sel.style.cssText = 'position:absolute;left:4px;top:50%;transform:translateY(-50%);width:calc(100% - 8px);z-index:30;';
-    sel.innerHTML = opts.map(o => `<option value="${escapeHtml(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o || '（空）')}</option>`).join('');
+    const ta = document.createElement('textarea');
+    ta.className = 'tx-cell-input';
+    ta.value = cur;
+    ta.rows = Math.max(2, (cur.match(/\n/g) || []).length + 1);
 
     td.innerHTML = '';
-    td.appendChild(placeholder);
-    td.appendChild(sel);
-    sel.focus();
+    td.appendChild(ta);
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
 
+    let done = false;
     const finish = (save) => {
+        if (done) return; done = true;
         if (save) {
-            row[field] = sel.value;
-            saveTxGamesLocal();
+            group.rows[r][ci] = ta.value;
+            saveTxBoard();
             if (typeof showToast === 'function') showToast('已保存', 'success');
         }
         td.classList.remove('editing');
-        td.style.position = '';
-        filterTxGames();
+        renderTxBoard();
     };
-    sel.addEventListener('change', () => finish(true));
-    sel.addEventListener('blur', () => finish(false));
-    sel.addEventListener('keydown', (e) => {
+    ta.addEventListener('blur', () => finish(true));
+    ta.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-        else if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        // 普通回车保存；Shift+Enter 换行
+        else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
     });
 }
 
-// ===== 行内编辑：文本 =====
-function startTxTextEdit(td, id, field) {
-    if (td.classList.contains('editing')) return;
-    const row = allTxGamesData.find(r => r.id === id);
-    if (!row) return;
-    td.classList.add('editing');
-    td.style.position = 'relative';
-
-    const isLong = field === 'notes';
-    const cur = row[field] || '';
-
-    const originalHtml = td.innerHTML;
-    const placeholder = document.createElement('span');
-    placeholder.style.cssText = 'visibility:hidden;display:block;';
-    placeholder.innerHTML = originalHtml;
-
-    const input = document.createElement(isLong ? 'textarea' : 'input');
-    input.className = 'inline-edit-input';
-    if (isLong) {
-        input.rows = Math.max(3, (cur.match(/\n/g) || []).length + 1);
-        input.style.cssText = 'position:absolute;left:4px;top:4px;width:calc(100% - 8px);min-height:80px;z-index:30;resize:vertical;';
-    } else {
-        input.type = 'text';
-        input.style.cssText = 'position:absolute;left:4px;top:50%;transform:translateY(-50%);width:calc(100% - 8px);z-index:30;';
-    }
-    input.value = cur;
-
-    td.innerHTML = '';
-    td.appendChild(placeholder);
-    td.appendChild(input);
-    input.focus();
-    if (input.setSelectionRange) input.setSelectionRange(input.value.length, input.value.length);
-
-    let saved = false;
-    const finish = (save) => {
-        if (saved) return; saved = true;
-        if (save) {
-            row[field] = input.value;
-            saveTxGamesLocal();
-            if (typeof showToast === 'function') showToast('已保存', 'success');
-        }
-        td.classList.remove('editing');
-        td.style.position = '';
-        filterTxGames();
-    };
-    input.addEventListener('blur', () => finish(true));
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-        // 单行输入回车保存；多行用 Ctrl+Enter 保存
-        else if (e.key === 'Enter' && (!isLong || e.ctrlKey)) { e.preventDefault(); finish(true); }
-    });
+// ===== 追加一行 =====
+function addTxRow(gi) {
+    const group = txBoard.groups[gi];
+    if (!group) return;
+    group.rows.push(group.cols.map(() => ''));
+    saveTxBoard();
+    renderTxBoard();
+    if (typeof showToast === 'function') showToast('已追加一行（双击填写）', 'success');
 }
 
-// ===== 新增/编辑弹窗 =====
-function openTxGameModal(id) {
-    document.getElementById('tx-game-form').reset();
-    document.getElementById('tx-id').value = '';
-    document.getElementById('tx-game-modal-title').textContent = id ? '编辑游戏' : '新增游戏';
-    if (id) {
-        const row = allTxGamesData.find(r => r.id === id);
-        if (row) {
-            document.getElementById('tx-id').value = row.id;
-            document.getElementById('tx-group').value = row.group || '适配中';
-            document.getElementById('tx-game-name').value = row.game_name || '';
-            document.getElementById('tx-download-status').value = row.download_status || '';
-            document.getElementById('tx-reservation').value = row.reservation || '';
-            document.getElementById('tx-progress-status').value = row.progress_status || '';
-            document.getElementById('tx-notes').value = row.notes || '';
-        }
-    }
-    openModal('tx-game-modal');
-}
-
-function editTxGame(id) { openTxGameModal(id); }
-
-function submitTxGameForm(event) {
-    event.preventDefault();
-    const id = document.getElementById('tx-id').value;
-    const payload = {
-        group: document.getElementById('tx-group').value,
-        game_name: document.getElementById('tx-game-name').value.trim(),
-        download_status: document.getElementById('tx-download-status').value,
-        reservation: document.getElementById('tx-reservation').value.trim(),
-        progress_status: document.getElementById('tx-progress-status').value,
-        notes: document.getElementById('tx-notes').value.trim()
-    };
-    if (!payload.game_name) { if (typeof showToast === 'function') showToast('请输入游戏名称', 'warning'); return; }
-
-    if (id) {
-        const row = allTxGamesData.find(r => r.id === Number(id));
-        if (row) Object.assign(row, payload);
-    } else {
-        const newId = (allTxGamesData.reduce((m, r) => Math.max(m, r.id), 0) || 0) + 1;
-        allTxGamesData.push(Object.assign({ id: newId }, payload));
-    }
-    saveTxGamesLocal();
-    closeModal('tx-game-modal');
-    if (typeof showToast === 'function') showToast(id ? '更新成功' : '创建成功', 'success');
-    filterTxGames();
-}
-
-async function deleteTxGame(id) {
+// ===== 重置看板 =====
+async function resetTxBoard() {
     const ok = (typeof uiConfirm === 'function')
-        ? await uiConfirm('确定要删除这条记录吗？', { danger: true, okText: '删除' })
-        : confirm('确定要删除这条记录吗？');
+        ? await uiConfirm('确定恢复为初始数据吗？当前编辑内容将丢失。', { danger: true, okText: '重置' })
+        : confirm('确定恢复为初始数据吗？');
     if (!ok) return;
-    allTxGamesData = allTxGamesData.filter(r => r.id !== id);
-    saveTxGamesLocal();
-    if (typeof showToast === 'function') showToast('已删除', 'success');
-    filterTxGames();
+    txBoard = getTxSeed();
+    saveTxBoard();
+    renderTxBoard();
+    if (typeof showToast === 'function') showToast('已重置', 'success');
+}
+
+// ===== 导出（CSV，按分组）=====
+function exportTxBoard() {
+    if (!txBoard) return;
+    let csv = '\ufeff';
+    txBoard.groups.forEach(g => {
+        csv += g.title + '\n';
+        csv += g.cols.map(c => '"' + c.replace(/"/g, '""') + '"').join(',') + '\n';
+        g.rows.forEach(row => {
+            csv += row.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',') + '\n';
+        });
+        csv += '\n';
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '腾讯系游戏开发进展_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    if (typeof showToast === 'function') showToast('已导出 CSV', 'success');
 }
