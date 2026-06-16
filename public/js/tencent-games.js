@@ -501,12 +501,13 @@ function txBindFormatBar(bar) {
         });
     });
 
-    // 下拉触发器（点击开/关菜单）
+    // 下拉触发器（用 mousedown 开/关，避免 click 时序与全局关闭监听冲突）
     bar.querySelectorAll('.tx-fmt-menu').forEach(menu => {
         const trigger = menu.querySelector('.tx-fmt-trigger, .tx-fmt-split');
         if (trigger) {
-            trigger.addEventListener('click', (e) => {
-                e.preventDefault(); e.stopPropagation();
+            trigger.addEventListener('mousedown', (e) => {
+                // bar 的 mousedown 已 preventDefault 保住选区；这里只管开关菜单
+                e.stopPropagation();
                 const wasOpen = menu.classList.contains('open');
                 txCloseMenus();
                 if (!wasOpen) menu.classList.add('open');
@@ -553,8 +554,8 @@ function txBindFormatBar(bar) {
     const fill = document.getElementById('tx-fmt-fill');
     if (fill) fill.addEventListener('input', () => txApplyFill(fill.value));
 
-    // 点工具栏外部关闭所有下拉
-    document.addEventListener('click', (e) => {
+    // 点工具栏外部关闭所有下拉（用 mousedown，与触发器同一阶段，避免 click 时序把刚开的菜单关掉）
+    document.addEventListener('mousedown', (e) => {
         if (!e.target.closest('#tx-format-bar')) txCloseMenus();
     });
 }
