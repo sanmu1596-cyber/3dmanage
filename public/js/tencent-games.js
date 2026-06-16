@@ -565,6 +565,10 @@ function txBindFormatBar(bar) {
     document.addEventListener('mousedown', (e) => {
         if (!e.target.closest('#tx-format-bar')) txCloseMenus();
     });
+    // ★ 浮层是 position:fixed 不随滚动跟随触发器，滚动看板时直接关闭，避免"飘"在错误位置
+    const boardContainer = document.querySelector('.tx-board-container');
+    if (boardContainer) boardContainer.addEventListener('scroll', txCloseMenus, { passive: true });
+    window.addEventListener('resize', txCloseMenus);
 }
 
 // 渲染色板
