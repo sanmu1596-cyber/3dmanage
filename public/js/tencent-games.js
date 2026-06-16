@@ -418,25 +418,41 @@ function txActivateFormatBar(ed, td, rowObj, ci) {
 function txDeactivateFormatBar() {
     const bar = document.getElementById('tx-format-bar');
     if (bar) bar.classList.remove('active');
+    if (typeof txCloseMenus === 'function') txCloseMenus();
     _txFmtEd = null;
     _txFmtCtx = null;
 }
 
+// 常用颜色板
+var TX_PALETTE = [
+    '#1f2329', '#5e6470', '#8a909c', '#bcc0c7', '#dfe2e6', '#ffffff',
+    '#e23b3b', '#fa8c16', '#faad14', '#52c41a', '#1677ff', '#722ed1',
+    '#ff7875', '#ffc069', '#fff3a8', '#b7eb8f', '#91caff', '#d3adf7',
+    '#cf1322', '#d46b08', '#d48806', '#389e0d', '#0958d9', '#531dab'
+];
+
 // 绑定工具栏一次（事件委托）
 function txBindFormatBar(bar) {
+    // 渲染颜色色板
+    txRenderSwatches('tx-fmt-fore-swatches', (color) => {
+        txExecOnEditor(() => document.execCommand('foreColor', false, color));
+        const ico = document.getElementById('tx-fmt-fore-ico');
+        if (ico) ico.style.borderBottom = '3px solid ' + color;
+        txCloseMenus();
+    });
+    txRenderSwatches('tx-fmt-fill-swatches', (color) => { txApplyFill(color); txCloseMenus(); });
+
     // mousedown 阻止默认，避免编辑器失焦（保住选区）
     bar.addEventListener('mousedown', (e) => {
-        const interactive = e.target.closest('button, select, input, label');
-        if (interactive) { _txFmtInteracting = true; }
-        // 按钮点击不应让编辑器失焦
-        if (e.target.closest('.tx-fmt-btn, .tx-fmt-color')) e.preventDefault();
+        // input[type=color] / 自定义需要正常交互，其余阻止失焦
+        if (!e.target.closest('input[type="color"]')) e.preventDefault();
+        _txFmtInteracting = true;
     });
     document.addEventListener('mouseup', () => {
-        // 略延迟复位，确保 click/change 处理完
         setTimeout(() => { _txFmtInteracting = false; }, 0);
     });
 
-    // 按钮（execCommand）
+    // 直接命令按钮（B/I/U/S、撤销重做、清除格式）
     bar.querySelectorAll('.tx-fmt-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -453,41 +469,93 @@ function txBindFormatBar(bar) {
         });
     });
 
-    // 字体 / 字号 / 行距（select）
-    bar.querySelectorAll('.tx-fmt-select').forEach(sel => {
-        sel.addEventListener('change', (e) => {
-            const cmd = sel.dataset.cmd;
-            const val = sel.value;
-            if (!val) return;
-            txExecOnEditor(() => {
-                if (cmd === 'fontName') document.execCommand('fontName', false, val);
-                else if (cmd === 'fontSize') document.execCommand('fontSize', false, val);
-                else if (cmd === 'lineHeight') txApplyLineHeight(val);
+    // 下拉触发器（点击开/关菜单）
+    bar.querySelectorAll('.tx-fmt-menu').forEach(menu => {
+        const trigger = menu.querySelector('.tx-fmt-trigger, .tx-fmt-split');
+        if (trigger) {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const wasOpen = menu.classList.contains('open');
+                txCloseMenus();
+                if (!wasOpen) menu.classList.add('open');
             });
-            sel.selectedIndex = 0; // 复位为占位
+        }
+    });
+
+    // 下拉项点击（execCommand / 行距 / 字体字号回显）
+    bar.querySelectorAll('.tx-fmt-opt').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            e.preventDefault();
+            // 清除填充
+            if (opt.classList.contains('tx-fmt-clearfill')) { txApplyFill(''); txCloseMenus(); return; }
+            const cmd = opt.dataset.cmd;
+            const val = opt.dataset.val;
+            txExecOnEditor(() => {
+                if (cmd === 'fontName') {
+                    document.execCommand('fontName', false, val);
+                    const lbl = document.getElementById('tx-fmt-font-label');
+                    if (lbl) lbl.textContent = opt.textContent.trim();
+                } else if (cmd === 'fontSize') {
+                    document.execCommand('fontSize', false, val);
+                    const lbl = document.getElementById('tx-fmt-size-label');
+                    if (lbl) lbl.textContent = opt.dataset.label || opt.textContent.trim();
+                } else if (cmd === 'lineHeight') {
+                    txApplyLineHeight(val);
+                } else if (cmd) {
+                    document.execCommand(cmd, false, null);
+                }
+            });
+            txCloseMenus();
         });
     });
 
-    // 文字颜色
+    // 文字颜色自定义
     const fore = document.getElementById('tx-fmt-fore');
-    if (fore) fore.addEventListener('input', (e) => {
+    if (fore) fore.addEventListener('input', () => {
         txExecOnEditor(() => document.execCommand('foreColor', false, fore.value));
-        const ico = fore.parentElement.querySelector('.tx-fmt-color-ico');
+        const ico = document.getElementById('tx-fmt-fore-ico');
         if (ico) ico.style.borderBottom = '3px solid ' + fore.value;
     });
 
-    // 单元格填充色（作用于整个编辑器背景 + 保存到 rowObj.fills）
+    // 单元格填充自定义
     const fill = document.getElementById('tx-fmt-fill');
-    if (fill) fill.addEventListener('input', (e) => {
-        if (!_txFmtEd || !_txFmtCtx) return;
-        _txFmtEd.style.background = fill.value;
-        _txFmtCtx.rowObj.fills = _txFmtCtx.rowObj.fills || [];
-        _txFmtCtx.rowObj.fills[_txFmtCtx.ci] = fill.value;
-        // 即时存后端（fills 随 cell 一起，用专门接口）
-        txApiPatchFill(_txFmtCtx.rowObj.id, _txFmtCtx.ci, fill.value);
-        const ico = fill.parentElement.querySelector('.tx-fmt-color-ico');
-        if (ico) ico.style.background = fill.value;
+    if (fill) fill.addEventListener('input', () => txApplyFill(fill.value));
+
+    // 点工具栏外部关闭所有下拉
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#tx-format-bar')) txCloseMenus();
     });
+}
+
+// 渲染色板
+function txRenderSwatches(containerId, onPick) {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+    box.innerHTML = '';
+    TX_PALETTE.forEach(c => {
+        const sw = document.createElement('div');
+        sw.className = 'tx-fmt-swatch';
+        sw.style.background = c;
+        sw.title = c;
+        sw.addEventListener('click', (e) => { e.preventDefault(); onPick(c); });
+        box.appendChild(sw);
+    });
+}
+
+// 关闭所有下拉
+function txCloseMenus() {
+    document.querySelectorAll('#tx-format-bar .tx-fmt-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+// 应用单元格填充色（空字符串=清除）
+function txApplyFill(color) {
+    if (!_txFmtEd || !_txFmtCtx) return;
+    _txFmtEd.style.background = color || '';
+    _txFmtCtx.rowObj.fills = _txFmtCtx.rowObj.fills || [];
+    _txFmtCtx.rowObj.fills[_txFmtCtx.ci] = color || '';
+    txApiPatchFill(_txFmtCtx.rowObj.id, _txFmtCtx.ci, color || '');
+    const ico = document.getElementById('tx-fmt-fill-ico');
+    if (ico) ico.style.background = color || '#fff3a8';
 }
 
 // 在编辑器上下文执行格式命令（确保选区在编辑器内）
