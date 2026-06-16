@@ -209,14 +209,14 @@ function renderTxBoard() {
     let thead = '<thead>';
     thead += '<tr>';
     groups.forEach((g, gi) => {
-        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}" data-g="${gi}" ondblclick="startTxGroupTitleEdit(this)" title="双击编辑分组名">${escapeHtml(g.title)}</th>`;
+        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}" data-g="${gi}" ondblclick="startTxGroupTitleEdit(this)">${escapeHtml(g.title)}</th>`;
     });
     thead += '</tr>';
     thead += '<tr>';
     leafIdx = 0;
     groups.forEach((g, gi) => {
         g.cols.forEach((col, ci) => {
-            thead += `<th class="tx-sub-h s-${txCls(g.key)}" data-g="${gi}" data-c="${ci}" data-leaf="${leafIdx}" ondblclick="startTxColNameEdit(this)" title="双击编辑列名">`
+            thead += `<th class="tx-sub-h s-${txCls(g.key)}" data-g="${gi}" data-c="${ci}" data-leaf="${leafIdx}" ondblclick="startTxColNameEdit(this)">`
                 + `<span class="tx-colname">${escapeHtml(col)}</span>`
                 + `<span class="tx-col-resize" onmousedown="startTxColResize(event, ${leafIdx})"></span>`
                 + `</th>`;
@@ -238,8 +238,8 @@ function renderTxBoard() {
             g.cols.forEach((col, ci) => {
                 const rowHandle = (gi === 0 && ci === 0) ? rowHandleBase : '';
                 if (!row) {
-                    // ★ 空白格（该分组此行无数据）也支持双击编辑：双击时自动为该分组补足空行后进入编辑
-                    tbody += `<td class="tx-editable tx-c-empty" data-g="${gi}" data-r="${r}" data-c="${ci}" ondblclick="startTxCellEdit(this)" title="双击编辑">${rowHandle}</td>`;
+                    // ★ 空白格（该分组此行无数据）也支持单击编辑：自动为该分组补足空行后进入编辑
+                    tbody += `<td class="tx-editable tx-c-empty" data-g="${gi}" data-r="${r}" data-c="${ci}" onclick="startTxCellEdit(this)">${rowHandle}</td>`;
                     return;
                 }
                 const val = (row.cells && row.cells[ci]) || '';
@@ -248,7 +248,7 @@ function renderTxBoard() {
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
                 const display = isNote ? txHighlight(val) : (txCellDisplay(val) || '<span style="color:#c0c4cc">—</span>');
                 const fillStyle = fill ? ` style="background:${escapeHtml(fill)}"` : '';
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle} ondblclick="startTxCellEdit(this)" title="双击编辑">${display}${rowHandle}</td>`;
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle} onclick="startTxCellEdit(this)">${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -403,6 +403,33 @@ var _txFmtEd = null;        // 当前绑定的编辑器
 var _txFmtCtx = null;       // {td, rowObj, ci}
 var _txFmtInteracting = false; // 工具栏交互中（防 blur 误保存）
 var _txFmtBound = false;    // 工具栏事件是否已绑定
+var _txSavedRange = null;   // ★ 保存编辑器内的选区（点工具栏时编辑器会失焦，需先存后恢复）
+
+// 保存当前选区（仅当选区在编辑器内时）
+function txSaveSelection() {
+    if (!_txFmtEd) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        // 选区必须落在当前编辑器内
+        if (_txFmtEd.contains(range.commonAncestorContainer)) {
+            _txSavedRange = range.cloneRange();
+        }
+    }
+}
+
+// 恢复之前保存的选区
+function txRestoreSelection() {
+    if (!_txFmtEd) return false;
+    _txFmtEd.focus();
+    if (_txSavedRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(_txSavedRange);
+        return true;
+    }
+    return false;
+}
 
 // 激活工具栏并绑定到某个编辑器
 function txActivateFormatBar(ed, td, rowObj, ci) {
@@ -442,11 +469,16 @@ function txBindFormatBar(bar) {
     });
     txRenderSwatches('tx-fmt-fill-swatches', (color) => { txApplyFill(color); txCloseMenus(); });
 
-    // mousedown 阻止默认，避免编辑器失焦（保住选区）
+    // ★ mousedown 先保存选区（此刻编辑器尚未失焦），再阻止默认避免失焦
     bar.addEventListener('mousedown', (e) => {
+        txSaveSelection();
         // input[type=color] / 自定义需要正常交互，其余阻止失焦
         if (!e.target.closest('input[type="color"]')) e.preventDefault();
         _txFmtInteracting = true;
+    });
+    // ★ 编辑器内选区实时变化时保存（鼠标选词、键盘 Shift 选择）
+    document.addEventListener('selectionchange', () => {
+        if (_txFmtEd && document.activeElement === _txFmtEd) txSaveSelection();
     });
     document.addEventListener('mouseup', () => {
         setTimeout(() => { _txFmtInteracting = false; }, 0);
@@ -496,7 +528,7 @@ function txBindFormatBar(bar) {
                     const lbl = document.getElementById('tx-fmt-font-label');
                     if (lbl) lbl.textContent = opt.textContent.trim();
                 } else if (cmd === 'fontSize') {
-                    document.execCommand('fontSize', false, val);
+                    txApplyFontSize(val);
                     const lbl = document.getElementById('tx-fmt-size-label');
                     if (lbl) lbl.textContent = opt.dataset.label || opt.textContent.trim();
                 } else if (cmd === 'lineHeight') {
@@ -558,20 +590,42 @@ function txApplyFill(color) {
     if (ico) ico.style.background = color || '#fff3a8';
 }
 
-// 在编辑器上下文执行格式命令（确保选区在编辑器内）
+// 在编辑器上下文执行格式命令（先恢复选区，再执行，确保命令作用在选中文字上）
 function txExecOnEditor(fn) {
     if (!_txFmtEd) return;
-    _txFmtEd.focus();
+    // ★ 恢复点工具栏前保存的选区（否则 focus 会丢失选中文字 → 命令对空光标无效）
+    txRestoreSelection();
+    // ★ 用 CSS 内联样式实现格式（fontSize/foreColor 等用 styleWithCSS 才可靠生效）
+    try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
     fn();
+    // 命令执行后选区可能变化，重新保存供连续操作
+    txSaveSelection();
+}
+
+// 字号：execCommand('fontSize') 只支持 1-7 档且生成 <font>，改用 CSS px 包裹选区
+var TX_SIZE_PX = { '1': '10px', '2': '13px', '3': '14px', '4': '16px', '5': '20px', '6': '24px', '7': '32px' };
+function txApplyFontSize(sizeKey) {
+    if (!_txFmtEd) return;
+    txRestoreSelection();
+    const px = TX_SIZE_PX[sizeKey] || '14px';
+    // 用 fontSize=7 做标记（styleWithCSS 下会生成 font-size:xxx-large 的 span/font），
+    // 再统一改写为目标 px，规避 execCommand fontSize 只能 1-7 档的限制
+    try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
+    document.execCommand('fontSize', false, '7');
+    _txFmtEd.querySelectorAll('font[size], [style*="xxx-large"]').forEach(el => {
+        el.removeAttribute('size');
+        el.style.fontSize = px;
+    });
+    txSaveSelection();
 }
 
 // 行距：对选区所在块级元素设置 line-height（execCommand 无原生命令）
 function txApplyLineHeight(lh) {
     if (!_txFmtEd) return;
-    const sel = window.getSelection();
-    if (!sel.rangeCount) { _txFmtEd.style.lineHeight = lh; return; }
-    // 简化：整个编辑器统一行距（单元格内容通常为一段）
+    txRestoreSelection();
+    // 单元格内容通常为一段 → 整个编辑器统一行距
     _txFmtEd.style.lineHeight = lh;
+    txSaveSelection();
 }
 
 // 同步按钮 active 态（粗/斜/下划线等）
@@ -585,9 +639,11 @@ function txSyncFmtState() {
     });
 }
 
-// ===== 单元格双击编辑（→ PATCH /cell）=====
+// ===== 单元格单击编辑（→ PATCH /cell）=====
 async function startTxCellEdit(td) {
     if (td.classList.contains('editing')) return;
+    // 忽略刚拖过列宽/行高的情况（拖拽后 mouseup 会触发一次 click）
+    if (document.body.classList.contains('row-resizing') || document.body.classList.contains('col-resizing')) return;
     const gi = +td.dataset.g, r = +td.dataset.r, ci = +td.dataset.c;
     const group = txBoard.groups[gi];
     if (!group) return;
@@ -625,6 +681,10 @@ async function startTxCellEdit(td) {
 
     // 激活工具栏，绑定当前编辑器
     txActivateFormatBar(ed, td, rowObj, ci);
+
+    // ★ 单击进入编辑后，编辑器内的点击/选择都会被 selectionchange 捕获保存；
+    //    阻止该 td 的 onclick 再次触发（contenteditable 已接管交互）
+    ed.addEventListener('click', (ev) => ev.stopPropagation());
 
     let done = false;
     const finish = async (save) => {
