@@ -501,16 +501,21 @@ function txBindFormatBar(bar) {
         });
     });
 
-    // 下拉触发器（用 mousedown 开/关，避免 click 时序与全局关闭监听冲突）
+    // 下拉触发器（mousedown 开/关；★必须 preventDefault 避免编辑器失焦被销毁）
     bar.querySelectorAll('.tx-fmt-menu').forEach(menu => {
         const trigger = menu.querySelector('.tx-fmt-trigger, .tx-fmt-split');
         if (trigger) {
             trigger.addEventListener('mousedown', (e) => {
-                // bar 的 mousedown 已 preventDefault 保住选区；这里只管开关菜单
-                e.stopPropagation();
+                // ★ 关键：不能让编辑器失焦（失焦会触发 finish→renderTxBoard 销毁工具栏）
+                e.preventDefault();
+                // ★ 不 stopPropagation：让 bar 的 mousedown 也能保存选区；
+                //    但要标记交互中，阻止全局 mousedown 关闭本菜单
+                _txFmtInteracting = true;
+                txSaveSelection();
                 const wasOpen = menu.classList.contains('open');
                 txCloseMenus();
                 if (!wasOpen) menu.classList.add('open');
+                e.stopPropagation(); // 防止冒泡到 document 的关闭监听
             });
         }
     });
