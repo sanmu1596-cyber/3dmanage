@@ -508,13 +508,15 @@ function txBindFormatBar(bar) {
             trigger.addEventListener('mousedown', (e) => {
                 // ★ 关键：不能让编辑器失焦（失焦会触发 finish→renderTxBoard 销毁工具栏）
                 e.preventDefault();
-                // ★ 不 stopPropagation：让 bar 的 mousedown 也能保存选区；
-                //    但要标记交互中，阻止全局 mousedown 关闭本菜单
                 _txFmtInteracting = true;
                 txSaveSelection();
                 const wasOpen = menu.classList.contains('open');
                 txCloseMenus();
-                if (!wasOpen) menu.classList.add('open');
+                if (!wasOpen) {
+                    menu.classList.add('open');
+                    // ★ 浮层用 position:fixed，按触发器位置定位（脱离表头/overflow 裁剪，永不被遮挡）
+                    txPositionPop(trigger, menu.querySelector('.tx-fmt-pop'));
+                }
                 e.stopPropagation(); // 防止冒泡到 document 的关闭监听
             });
         }
@@ -583,6 +585,26 @@ function txRenderSwatches(containerId, onPick) {
 // 关闭所有下拉
 function txCloseMenus() {
     document.querySelectorAll('#tx-format-bar .tx-fmt-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+// 把 position:fixed 的下拉浮层定位到触发器正下方（脱离表头与 overflow 裁剪）
+function txPositionPop(trigger, pop) {
+    if (!trigger || !pop) return;
+    const r = trigger.getBoundingClientRect();
+    // 先显示出来才能量到尺寸（菜单已 add open → display:block）
+    let left = r.left;
+    let top = r.bottom + 4;
+    // 量宽高做边界修正
+    const pw = pop.offsetWidth || 160;
+    const ph = pop.offsetHeight || 200;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);   // 右越界 → 左移
+    if (top + ph > vh - 8) {                                    // 下越界 → 翻到触发器上方
+        const up = r.top - 4 - ph;
+        top = up > 8 ? up : Math.max(8, vh - ph - 8);
+    }
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
 }
 
 // 应用单元格填充色（空字符串=清除）

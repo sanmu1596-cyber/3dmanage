@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260616d">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260616e">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260616d">
+    <link rel="stylesheet" href="design-system.css?v=20260616e">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2539,8 +2539,8 @@
                         .tx-fmt-ico { font-size:14px; line-height:1; }
                         .tx-fmt-caret { font-size:9px; color:#9aa0a8; line-height:1; }
                         .tx-fmt-color-ico { font-size:13px; font-weight:700; color:var(--text-secondary,#555); line-height:1; padding:0 1px; }
-                        /* 弹出层 */
-                        .tx-fmt-pop { position:absolute; top:calc(100% + 4px); left:0; z-index:200; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.12); padding:4px; display:none; }
+                        /* 弹出层：position:fixed 脱离工具栏 overflow 裁剪 + 表头层叠，位置由 JS 计算 */
+                        .tx-fmt-pop { position:fixed; z-index:10050; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.16); padding:4px; display:none; }
                         .tx-fmt-menu.open .tx-fmt-pop { display:block; }
                         .tx-fmt-pop-list { min-width:130px; max-height:280px; overflow-y:auto; }
                         .tx-fmt-pop-grid { min-width:120px; }
@@ -3499,29 +3499,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260616d"></script>
-    <script src="js/auth.js?v=20260616d"></script>
+    <script src="js/core.js?v=20260616e"></script>
+    <script src="js/auth.js?v=20260616e"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260616d"></script>
-    <script src="js/components/media-viewer.js?v=20260616d"></script>
-    <script src="js/components/tooltip.js?v=20260616d"></script>
-    <script src="js/components/ui-dialog.js?v=20260616d"></script>
-    <script src="js/components/a11y.js?v=20260616d"></script>
-    <script src="js/crud-module.js?v=20260616d"></script>
-    <script src="js/router.js?v=20260616d"></script>
-    <script src="js/entities.js?v=20260616d"></script>
-    <script src="js/plans.js?v=20260616d"></script>
-    <script src="js/dashboard.js?v=20260616d"></script>
-    <script src="js/ui-features.js?v=20260616d"></script>
-    <script src="js/admin.js?v=20260616d"></script>
-    <script src="js/requirements.js?v=20260616d"></script>
-    <script src="js/testcases.js?v=20260616d"></script>
-    <script src="js/issues-versions.js?v=20260616d"></script>
-    <script src="js/social.js?v=20260616d"></script>
-    <script src="js/reports.js?v=20260616d"></script>
-    <script src="js/tencent-games.js?v=20260616d"></script>
+    <script src="js/components/searchable-select.js?v=20260616e"></script>
+    <script src="js/components/media-viewer.js?v=20260616e"></script>
+    <script src="js/components/tooltip.js?v=20260616e"></script>
+    <script src="js/components/ui-dialog.js?v=20260616e"></script>
+    <script src="js/components/a11y.js?v=20260616e"></script>
+    <script src="js/crud-module.js?v=20260616e"></script>
+    <script src="js/router.js?v=20260616e"></script>
+    <script src="js/entities.js?v=20260616e"></script>
+    <script src="js/plans.js?v=20260616e"></script>
+    <script src="js/dashboard.js?v=20260616e"></script>
+    <script src="js/ui-features.js?v=20260616e"></script>
+    <script src="js/admin.js?v=20260616e"></script>
+    <script src="js/requirements.js?v=20260616e"></script>
+    <script src="js/testcases.js?v=20260616e"></script>
+    <script src="js/issues-versions.js?v=20260616e"></script>
+    <script src="js/social.js?v=20260616e"></script>
+    <script src="js/reports.js?v=20260616e"></script>
+    <script src="js/tencent-games.js?v=20260616e"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260616d"></script>
+    <script src="modules-extra.js?v=20260616e"></script>
 </body>
 </html>
