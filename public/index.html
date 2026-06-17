@@ -2494,6 +2494,9 @@
                         .tx-board-table td.tx-c-name { text-align:center; vertical-align:middle; font-weight:600; white-space:normal; word-break:break-word; }
                         .tx-board-table td.tx-c-note { text-align:left; vertical-align:top; white-space:pre-wrap; line-height:1.6; word-break:break-word; }
                         .tx-board-table td.tx-c-plain { text-align:center; vertical-align:middle; white-space:normal; word-break:break-word; }
+                        /* ★ 单元格自定义格式容器(tx-cellfmt)：默认继承所在格的字重/对齐，
+                           一旦 wrapper 自身带了内联 style(加粗/字体/颜色等)，内联天然压过本规则 → 自定义格式生效 */
+                        .tx-board-table td .tx-cellfmt { display:block; font-weight:inherit; }
                         .tx-board-table td.tx-c-empty { text-align:center; vertical-align:middle; color:#c0c4cc; position:relative; }
                         /* 空白格 hover 时显示淡"＋"提示可双击添加 */
                         .tx-board-table td.tx-c-empty.tx-editable:hover::after { content:'＋'; color:#1677ff; opacity:0.5; font-size:16px; pointer-events:none; }
@@ -3532,7 +3535,7 @@
     <script src="js/issues-versions.js?v=20260617a"></script>
     <script src="js/social.js?v=20260617a"></script>
     <script src="js/reports.js?v=20260617a"></script>
-    <script src="js/tencent-games.js?v=20260617g"></script>
+    <script src="js/tencent-games.js?v=20260617h"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260617a"></script>
