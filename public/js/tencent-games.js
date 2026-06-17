@@ -843,8 +843,6 @@ function txApplyFormatInEditor(type, value) {
         case 'lineHeight': _txFmtEd.style.lineHeight = value; break;
         case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
             document.execCommand(type, false, null); break;
-        case 'insertUnorderedList': txExecList(_txFmtEd, 'insertUnorderedList'); break;
-        case 'insertOrderedList': txExecList(_txFmtEd, 'insertOrderedList'); break;
         case 'fill':
             _txFmtEd.style.background = value || '';
             if (_txFmtCtx) {
@@ -857,20 +855,6 @@ function txApplyFormatInEditor(type, value) {
             break;
     }
     txSaveSelection();
-}
-
-// ★ 列表 toggle（编辑态）：直接用浏览器原生 execCommand
-//   原生 insertOrderedList / insertUnorderedList 本身就是 toggle：
-//     - 选区不在列表中 → 把选中的段落包成列表
-//     - 选区已在该类型列表中 → 再点一次自动取消（拆回普通段落）
-//   且只作用于「当前选区」，不会重写整格 innerHTML，绝不会重复增生。
-//   之前手写拆行重组逻辑脆弱（对已是 <li> 的结构拆不开 → 整块塞进 1 个 li 且旧列表残留 → 累加），已废弃。
-function txExecList(ed, cmd) {
-    if (!ed) return;
-    ed.focus();
-    txRestoreSelection();
-    try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
-    document.execCommand(cmd, false, null);
 }
 
 // 模式B：对所有选中格的整格内容批量套用格式（包整段，存回 cells）
@@ -938,8 +922,6 @@ function txWrapWholeCell(html, type, value) {
         case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
         case 'alignTop': case 'alignMiddle': case 'alignBottom': return html;
         case 'removeFormat': return txStripTags(inner);
-        case 'insertUnorderedList': return txCellToList(inner, 'ul');
-        case 'insertOrderedList': return txCellToList(inner, 'ol');
         case 'undo': case 'redo': return html; // 批量模式不支持撤销重做
         default: return html;
     }
@@ -961,17 +943,6 @@ function txStripTags(html) {
     const d = document.createElement('div'); d.innerHTML = html;
     return d.textContent || '';
 }
-function txCellToList(inner, tag) {
-    const tmp = document.createElement('div'); tmp.innerHTML = inner;
-    // 已是该列表 → 取消
-    if (tmp.children.length === 1 && tmp.firstElementChild && tmp.firstElementChild.tagName.toLowerCase() === tag) {
-        return Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML).join('<br>');
-    }
-    const lines = inner.split(/<br\s*\/?>/i).map(s => s.trim()).filter(s => s && s !== '<br>');
-    const items = (lines.length ? lines : [inner]).map(l => `<li>${l || '<br>'}</li>`).join('');
-    return `<${tag}>${items}</${tag}>`;
-}
-
 // 同步按钮 active 态（仅格内编辑时有意义）
 function txSyncFmtState() {
     const bar = document.getElementById('tx-format-bar');
