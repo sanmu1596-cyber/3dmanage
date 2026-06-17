@@ -123,6 +123,8 @@ const newModuleTables = [
     group_id INTEGER,
     cells TEXT DEFAULT '[]',
     fills TEXT DEFAULT '[]',
+    aligns TEXT DEFAULT '[]',
+    valigns TEXT DEFAULT '[]',
     sort_order INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -146,13 +148,25 @@ newModuleTables.forEach((sql, i) => {
   });
 });
 
-// 兼容旧库：确保 tx_board_rows 表有 fills 列（单元格填充色，JSON 数组）
+// 兼容旧库：确保 tx_board_rows 表有 fills / aligns / valigns 列（JSON 数组）
 db.all("PRAGMA table_info(tx_board_rows)", [], (err, columns) => {
   if (err || !columns) return;
   if (!columns.some(c => c.name === 'fills')) {
     db.run("ALTER TABLE tx_board_rows ADD COLUMN fills TEXT DEFAULT '[]'", (e) => {
       if (e) console.error('  [启动] tx_board_rows添加fills失败:', e.message);
       else console.log('  [启动] tx_board_rows表已添加fills列');
+    });
+  }
+  if (!columns.some(c => c.name === 'aligns')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN aligns TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加aligns失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加aligns列（水平对齐）');
+    });
+  }
+  if (!columns.some(c => c.name === 'valigns')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN valigns TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加valigns失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加valigns列（垂直对齐）');
     });
   }
 });

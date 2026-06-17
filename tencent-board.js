@@ -41,7 +41,7 @@ router.get('/', (req, res) => {
         });
         rows.forEach(r => {
           const grp = groupMap[r.group_id];
-          if (grp) grp.rows.push({ id: r.id, cells: J(r.cells, []), fills: J(r.fills, []) });
+          if (grp) grp.rows.push({ id: r.id, cells: J(r.cells, []), fills: J(r.fills, []), aligns: J(r.aligns, []), valigns: J(r.valigns, []) });
         });
         res.json({ groups: out, meta });
       });
@@ -109,6 +109,28 @@ router.patch('/fill', (req, res) => {
     fills[colIndex] = color == null ? '' : String(color);
     db.run('UPDATE tx_board_rows SET fills = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [JSON.stringify(fills), rowId], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json({ success: true });
+      });
+  });
+});
+
+// ============ 单元格对齐更新 ============
+// body: { rowId, colIndex, axis: 'h'|'v', value }
+//   axis='h' → aligns（left/center/right，空则清除）
+//   axis='v' → valigns（top/middle/bottom，空则清除）
+router.patch('/align', (req, res) => {
+  const { rowId, colIndex, axis, value } = req.body;
+  if (rowId == null || colIndex == null) return res.status(400).json({ error: '缺少 rowId/colIndex' });
+  const col = axis === 'v' ? 'valigns' : 'aligns';
+  db.get(`SELECT ${col} FROM tx_board_rows WHERE id = ?`, [rowId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: '行不存在' });
+    const arr = J(row[col], []);
+    while (arr.length <= colIndex) arr.push('');
+    arr[colIndex] = value == null ? '' : String(value);
+    db.run(`UPDATE tx_board_rows SET ${col} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [JSON.stringify(arr), rowId], function (e) {
         if (e) return res.status(500).json({ error: e.message });
         res.json({ success: true });
       });

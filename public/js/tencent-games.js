@@ -139,7 +139,9 @@ function normalizeBoard(data) {
         rows: (g.rows || []).map(r => ({
             id: r.id,
             cells: Array.isArray(r.cells) ? r.cells : [],
-            fills: Array.isArray(r.fills) ? r.fills : []
+            fills: Array.isArray(r.fills) ? r.fills : [],
+            aligns: Array.isArray(r.aligns) ? r.aligns : [],
+            valigns: Array.isArray(r.valigns) ? r.valigns : []
         }))
     }));
     return { groups, meta: { colWidths: meta.colWidths || null, rowHeights: meta.rowHeights || {} } };
@@ -253,11 +255,17 @@ function renderTxBoard() {
                 }
                 const val = (row.cells && row.cells[ci]) || '';
                 const fill = (row.fills && row.fills[ci]) || '';
+                const halign = (row.aligns && row.aligns[ci]) || '';
+                const valign = (row.valigns && row.valigns[ci]) || '';
                 const isNote = col.indexOf('备注') >= 0;
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
                 const display = isNote ? txHighlight(val) : (txCellDisplay(val) || '<span style="color:#c0c4cc">—</span>');
-                const fillStyle = fill ? ` style="background:${escapeHtml(fill)}"` : '';
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle}>${display}${rowHandle}</td>`;
+                let st = '';
+                if (fill) st += `background:${escapeHtml(fill)};`;
+                if (halign) st += `text-align:${halign};`;
+                if (valign) st += `vertical-align:${valign};`;
+                const styleAttr = st ? ` style="${st}"` : '';
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${styleAttr}>${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -753,6 +761,9 @@ function txPositionPop(trigger, pop) {
 }
 
 var TX_SIZE_PX = { '1': '10px', '2': '13px', '3': '14px', '4': '16px', '5': '20px', '6': '24px', '7': '32px' };
+// 对齐命令 → CSS 值映射（批量模式作用于 td；编辑态走 execCommand）
+var TX_ALIGN_MAP = { justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right' };
+var TX_VALIGN_MAP = { alignTop: 'top', alignMiddle: 'middle', alignBottom: 'bottom' };
 
 // ============================================================
 // ★★★ 统一格式入口：两种模式 ★★★
@@ -760,6 +771,15 @@ var TX_SIZE_PX = { '1': '10px', '2': '13px', '3': '14px', '4': '16px', '5': '20p
 //   B) 仅选中态（_txSelected 有格，无编辑）→ 对所有选中格的整格内容批量套格式
 // ============================================================
 function txApplyFormat(type, value) {
+    // ★ 对齐是「单元格级」属性，无论编辑态/选中态都作用于 td（不嵌套 div、不动文字）
+    if (TX_ALIGN_MAP[type] || TX_VALIGN_MAP[type]) {
+        if (_txEditingCell && _txFmtCtx) {
+            txApplyAlignInEditor(type);          // 编辑态：改当前格 td，不打断编辑
+        } else if (_txSelected.length > 0) {
+            txApplyFormatToSelection(type, value); // 选中态：批量改 td
+        }
+        return;
+    }
     if (_txEditingCell && _txFmtEd) {
         // —— 模式A：格内编辑，作用于选中文字 ——
         txApplyFormatInEditor(type, value);
@@ -767,6 +787,26 @@ function txApplyFormat(type, value) {
         // —— 模式B：批量对选中格 ——
         txApplyFormatToSelection(type, value);
     }
+}
+
+// 编辑态对齐：直接改当前编辑格 td 的 text-align/vertical-align + 存回 + 持久化（不重渲染，保持编辑不中断）
+function txApplyAlignInEditor(type) {
+    const ctx = _txFmtCtx;
+    if (!ctx || !ctx.rowObj || !_txEditingCell) return;
+    const isV = !!TX_VALIGN_MAP[type];
+    const key = isV ? 'valigns' : 'aligns';
+    const alignVal = isV ? TX_VALIGN_MAP[type] : TX_ALIGN_MAP[type];
+    ctx.rowObj[key] = ctx.rowObj[key] || [];
+    while (ctx.rowObj[key].length <= ctx.ci) ctx.rowObj[key].push('');
+    const nextVal = (ctx.rowObj[key][ctx.ci] === alignVal) ? '' : alignVal; // 再点取消
+    ctx.rowObj[key][ctx.ci] = nextVal;
+    // 直接改正在编辑的 td 样式（不重渲染）
+    const td = ctx.td || _txEditingCell;
+    if (td) {
+        if (isV) td.style.verticalAlign = nextVal || '';
+        else td.style.textAlign = nextVal || '';
+    }
+    txApiPatchAlign(ctx.rowObj.id, ctx.ci, isV ? 'v' : 'h', nextVal);
 }
 
 // 模式A：在 contenteditable 内对选中文字执行
@@ -843,6 +883,22 @@ async function txApplyFormatToSelection(type, value) {
             await txApiPatchFill(rowObj.id, c.ci, value || '');
             continue;
         }
+        // ★ 水平/垂直对齐：作用于单元格(td)本身，互斥切换 + 持久化（不嵌套 div）
+        if (TX_ALIGN_MAP[type] || TX_VALIGN_MAP[type]) {
+            if (!group.rows[c.r]) { await txEnsureRowsUpTo(group, c.r); }
+            const rowObj = group.rows[c.r];
+            if (!rowObj) continue;
+            const isV = !!TX_VALIGN_MAP[type];
+            const key = isV ? 'valigns' : 'aligns';
+            const alignVal = isV ? TX_VALIGN_MAP[type] : TX_ALIGN_MAP[type];
+            rowObj[key] = rowObj[key] || [];
+            while (rowObj[key].length <= c.ci) rowObj[key].push('');
+            // 再点同一对齐 → 取消
+            const nextVal = (rowObj[key][c.ci] === alignVal) ? '' : alignVal;
+            rowObj[key][c.ci] = nextVal;
+            await txApiPatchAlign(rowObj.id, c.ci, isV ? 'v' : 'h', nextVal);
+            continue;
+        }
         const rowObj = group.rows[c.r];
         if (!rowObj) continue; // 空白格不套文字格式（无内容）
         const cur = (rowObj.cells && rowObj.cells[c.ci]) || '';
@@ -871,9 +927,9 @@ function txWrapWholeCell(html, type, value) {
         case 'foreColor': return wrap('color:' + value);
         case 'fontSize': return wrap('font-size:' + (TX_SIZE_PX[value] || '14px'));
         case 'lineHeight': return `<div style="line-height:${value}">${inner}</div>`;
-        case 'justifyLeft': return `<div style="text-align:left">${inner}</div>`;
-        case 'justifyCenter': return `<div style="text-align:center">${inner}</div>`;
-        case 'justifyRight': return `<div style="text-align:right">${inner}</div>`;
+        // 对齐已在 txApplyFormatToSelection 里走 td 级 aligns/valigns，不在此嵌套 div（兜底返回原文）
+        case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
+        case 'alignTop': case 'alignMiddle': case 'alignBottom': return html;
         case 'removeFormat': return txStripTags(inner);
         case 'insertUnorderedList': return txCellToList(inner, 'ul');
         case 'insertOrderedList': return txCellToList(inner, 'ol');
@@ -1118,6 +1174,15 @@ async function txApiPatchFill(rowId, colIndex, color) {
             body: JSON.stringify({ rowId, colIndex, color })
         });
     } catch (e) { console.error('[tx] 保存填充色失败', e); }
+}
+async function txApiPatchAlign(rowId, colIndex, axis, value) {
+    try {
+        await authFetch(TX_API + '/align', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rowId, colIndex, axis, value })
+        });
+    } catch (e) { console.error('[tx] 保存对齐失败', e); }
 }
 async function txApiPatchGroup(groupId, payload) {
     try {
