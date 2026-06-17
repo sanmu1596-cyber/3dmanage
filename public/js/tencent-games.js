@@ -265,7 +265,9 @@ function renderTxBoard() {
                 if (halign) st += `text-align:${halign};`;
                 if (valign) st += `vertical-align:${valign};`;
                 const styleAttr = st ? ` style="${st}"` : '';
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${styleAttr}>${display}${rowHandle}</td>`;
+                // data-halign/data-valign 让 CSS 把对齐级联到块级子元素(ol/ul) → 列表也能真正对齐
+                const alignAttr = (halign ? ` data-halign="${halign}"` : '') + (valign ? ` data-valign="${valign}"` : '');
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${styleAttr}${alignAttr}>${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -800,11 +802,16 @@ function txApplyAlignInEditor(type) {
     while (ctx.rowObj[key].length <= ctx.ci) ctx.rowObj[key].push('');
     const nextVal = (ctx.rowObj[key][ctx.ci] === alignVal) ? '' : alignVal; // 再点取消
     ctx.rowObj[key][ctx.ci] = nextVal;
-    // 直接改正在编辑的 td 样式（不重渲染）
+    // 直接改正在编辑的 td 样式 + data 属性（不重渲染；data-* 让对齐级联到块级列表子元素）
     const td = ctx.td || _txEditingCell;
     if (td) {
-        if (isV) td.style.verticalAlign = nextVal || '';
-        else td.style.textAlign = nextVal || '';
+        if (isV) {
+            td.style.verticalAlign = nextVal || '';
+            if (nextVal) td.setAttribute('data-valign', nextVal); else td.removeAttribute('data-valign');
+        } else {
+            td.style.textAlign = nextVal || '';
+            if (nextVal) td.setAttribute('data-halign', nextVal); else td.removeAttribute('data-halign');
+        }
     }
     txApiPatchAlign(ctx.rowObj.id, ctx.ci, isV ? 'v' : 'h', nextVal);
 }

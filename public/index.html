@@ -2523,6 +2523,19 @@
                         .tx-board-table td .tx-cell-rich { width:100%; min-width:120px; min-height:32px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; outline:none; box-sizing:border-box; font-family:inherit; background:#fff; overflow:auto; }
                         .tx-board-table td .tx-cell-rich:focus { border-color:#1677ff; box-shadow:0 0 0 2px rgba(22,119,255,0.12); }
                         .tx-board-table td .tx-cell-rich ul, .tx-board-table td .tx-cell-rich ol { margin:2px 0; padding-left:20px; }
+                        /* ★ 单元格对齐：让 td 的对齐真正作用到块级子元素(ol/ul/div/p) —— 否则列表块撑满整格，text-align 看不出效果 */
+                        .tx-board-table td[data-halign="center"] { text-align:center; }
+                        .tx-board-table td[data-halign="right"]  { text-align:right; }
+                        .tx-board-table td[data-halign="left"]   { text-align:left; }
+                        /* 块级列表/段落本身宽度撑满，需用 inline-block + auto margin 才能整体水平移动 */
+                        .tx-board-table td[data-halign] > ul, .tx-board-table td[data-halign] > ol,
+                        .tx-board-table td[data-halign] ul, .tx-board-table td[data-halign] ol { display:inline-block; text-align:left; }
+                        .tx-board-table td[data-halign="center"] > ul, .tx-board-table td[data-halign="center"] > ol { margin-left:auto; margin-right:auto; }
+                        .tx-board-table td[data-halign="right"]  > ul, .tx-board-table td[data-halign="right"]  > ol { margin-left:auto; margin-right:0; }
+                        .tx-board-table td[data-halign="left"]   > ul, .tx-board-table td[data-halign="left"]   > ol { margin-left:0; margin-right:auto; }
+                        .tx-board-table td[data-valign="top"]    { vertical-align:top; }
+                        .tx-board-table td[data-valign="middle"] { vertical-align:middle; }
+                        .tx-board-table td[data-valign="bottom"] { vertical-align:bottom; }
                         /* ★ 腾讯文档式富文本工具栏：单行紧凑 + 下拉子选项 */
                         .tx-format-bar { flex-shrink:0; display:flex; flex-wrap:nowrap; align-items:center; gap:1px; padding:5px 10px; margin:0 0 6px; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:0.45; pointer-events:none; transition:opacity .15s; overflow-x:auto; }
                         .tx-format-bar.active { opacity:1; pointer-events:auto; }
@@ -3527,7 +3540,7 @@
     <script src="js/issues-versions.js?v=20260617a"></script>
     <script src="js/social.js?v=20260617a"></script>
     <script src="js/reports.js?v=20260617a"></script>
-    <script src="js/tencent-games.js?v=20260617c"></script>
+    <script src="js/tencent-games.js?v=20260617d"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260617a"></script>
