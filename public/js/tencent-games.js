@@ -27,6 +27,7 @@ var _txSelected = [];           // 当前选中的单元格列表
 var _txAnchor = null;           // 选区锚点 { gi, r, ci }（Shift/拖拽起点）
 var _txSelecting = false;       // 鼠标拖拽框选中
 var _txEditingCell = null;      // 当前正在「格内编辑」的 td（null=无格内编辑，仅选中态）
+var _txTextSelecting = false;   // ★ 编辑态：正在编辑器内长按拖选文字（期间禁止 blur 退出/框选接管）
 // 单元格唯一 key
 function txKey(gi, r, ci) { return gi + ':' + r + ':' + ci; }
 
@@ -302,7 +303,13 @@ function txBindSelectionOnce(table) {
 
     // mousedown：开始选择（区分 resize 手柄、表头、追加行按钮）
     container.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.tx-col-resize, .tx-row-resize, .tx-add-btn, thead, .tx-cell-rich')) return;
+        // ★ 在富文本编辑器内按下 → 这是要「拖选文字」，标记之，且绝不进入框选/退出编辑
+        if (e.target.closest('.tx-cell-rich')) {
+            _txTextSelecting = true;
+            _txSelecting = false; // 确保不触发单元格框选
+            return;
+        }
+        if (e.target.closest('.tx-col-resize, .tx-row-resize, .tx-add-btn, thead')) return;
         const td = e.target.closest('td.tx-editable');
         if (!td) return;
         // 正在格内编辑时，点其它格先结束编辑
@@ -325,6 +332,7 @@ function txBindSelectionOnce(table) {
 
     // mousemove：拖拽框选
     container.addEventListener('mousemove', (e) => {
+        if (_txTextSelecting) return; // ★ 编辑态拖选文字中，不接管为单元格框选
         if (!_txSelecting || !_txAnchor) return;
         const td = e.target.closest('td.tx-editable');
         if (!td) return;
@@ -340,8 +348,12 @@ function txBindSelectionOnce(table) {
     });
 }
 
-// 全局 mouseup 结束拖拽框选
-document.addEventListener('mouseup', () => { _txSelecting = false; });
+// 全局 mouseup 结束拖拽框选 / 文字拖选
+document.addEventListener('mouseup', () => {
+    _txSelecting = false;
+    // 文字拖选结束：延迟清标志，确保紧随其后的 blur 判断仍能看到「刚才在拖选」
+    if (_txTextSelecting) setTimeout(() => { _txTextSelecting = false; }, 0);
+});
 
 // 点击看板与工具栏之外 → 清空选区（结束批量模式）
 document.addEventListener('mousedown', (e) => {
@@ -1018,7 +1030,12 @@ async function txEnterCellEdit(td) {
         renderTxBoard();
     };
     ed.addEventListener('blur', () => {
-        setTimeout(() => { if (!_txFmtInteracting && _txEditingCell === td) txFinishCellEdit(true); }, 150);
+        // ★ 正在拖选文字（鼠标越出编辑框导致的 blur）→ 不退出，把焦点抢回，保住选区
+        if (_txTextSelecting) { return; }
+        setTimeout(() => {
+            if (_txFmtInteracting || _txTextSelecting) return; // 工具栏交互/文字拖选中，不退出
+            if (_txEditingCell === td) txFinishCellEdit(true);
+        }, 150);
     });
     ed.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); txFinishCellEdit(false); }
