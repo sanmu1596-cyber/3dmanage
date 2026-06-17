@@ -247,6 +247,8 @@ async function _doLoadTabData(tabId, switchId) {
             break;
         case 'reports':
             loadReports();
+            // 默认进入「各客户适配进展」看板子页
+            if (typeof switchReportSubTab === 'function') switchReportSubTab('report-customer');
             break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）

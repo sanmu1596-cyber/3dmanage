@@ -2592,12 +2592,13 @@
                     </style>
                     <!-- 子 Tab 切换：汇报报表 / 腾讯系游戏开发进展 -->
                     <div class="report-sub-tabs">
-                        <button class="report-sub-tab active" data-subtab="report-main" onclick="switchReportSubTab('report-main')">📊 汇报报表</button>
+                        <button class="report-sub-tab active" data-subtab="report-customer" onclick="switchReportSubTab('report-customer')">📋 各客户适配进展</button>
                         <button class="report-sub-tab" data-subtab="report-tencent" onclick="switchReportSubTab('report-tencent')">🐧 腾讯系游戏开发进展</button>
+                        <button class="report-sub-tab" data-subtab="report-main" onclick="switchReportSubTab('report-main')">📊 汇报报表</button>
                     </div>
 
-                    <!-- ========== 子面板1：汇报报表（原有内容） ========== -->
-                    <div id="report-sub-main" class="report-sub-panel">
+                    <!-- ========== 子面板1：汇报报表（原有内容；默认隐藏，默认显示「各客户适配进展」看板） ========== -->
+                    <div id="report-sub-main" class="report-sub-panel" style="display:none;">
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <div style="position:relative;">
@@ -2659,11 +2660,11 @@
                     </div>
                     </div><!-- /#report-sub-main -->
 
-                    <!-- ========== 子面板2：腾讯系游戏开发进展（4分组并排看板，忠实还原） ========== -->
+                    <!-- ========== 看板面板（腾讯系 / 各客户适配进展 共用同一引擎，按 _txBoardId 切换数据） ========== -->
                     <div id="report-sub-tencent" class="report-sub-panel" style="display:none;">
                         <div class="toolbar">
                             <div class="toolbar-left">
-                                <span style="font-weight:600;color:var(--text-primary);">腾讯系游戏开发进展</span>
+                                <span id="tx-board-title" style="font-weight:600;color:var(--text-primary);">腾讯系游戏开发进展</span>
                             </div>
                             <div class="toolbar-right">
                                 <button class="tool-btn" onclick="resetTxBoard()" title="恢复为初始数据">重置</button>
@@ -3524,7 +3525,7 @@
     <script src="js/components/ui-dialog.js?v=20260617a"></script>
     <script src="js/components/a11y.js?v=20260617a"></script>
     <script src="js/crud-module.js?v=20260617a"></script>
-    <script src="js/router.js?v=20260617a"></script>
+    <script src="js/router.js?v=20260617i"></script>
     <script src="js/entities.js?v=20260617a"></script>
     <script src="js/plans.js?v=20260617a"></script>
     <script src="js/dashboard.js?v=20260617a"></script>
@@ -3535,7 +3536,7 @@
     <script src="js/issues-versions.js?v=20260617a"></script>
     <script src="js/social.js?v=20260617a"></script>
     <script src="js/reports.js?v=20260617a"></script>
-    <script src="js/tencent-games.js?v=20260617h"></script>
+    <script src="js/tencent-games.js?v=20260617i"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260617a"></script>

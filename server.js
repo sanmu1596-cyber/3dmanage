@@ -112,6 +112,7 @@ const newModuleTables = [
   // 腾讯系游戏开发进展 看板（分组 + 行 + 配置）
   `CREATE TABLE IF NOT EXISTS tx_board_groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board TEXT DEFAULT 'tencent',
     group_key TEXT,
     title TEXT,
     cols TEXT DEFAULT '[]',
@@ -170,6 +171,23 @@ db.all("PRAGMA table_info(tx_board_rows)", [], (err, columns) => {
     });
   }
 });
+
+// 兼容旧库：确保 tx_board_groups 表有 board 列（多看板区分，旧数据归入 'tencent'）
+db.all("PRAGMA table_info(tx_board_groups)", [], (err, columns) => {
+  if (err || !columns) return;
+  if (!columns.some(c => c.name === 'board')) {
+    db.run("ALTER TABLE tx_board_groups ADD COLUMN board TEXT DEFAULT 'tencent'", (e) => {
+      if (e) console.error('  [启动] tx_board_groups添加board失败:', e.message);
+      else {
+        db.run("UPDATE tx_board_groups SET board = 'tencent' WHERE board IS NULL OR board = ''");
+        console.log('  [启动] tx_board_groups表已添加board列（多看板区分）');
+      }
+    });
+  }
+});
+
+// 兼容旧库：旧的 meta key='board' 迁移为 key='board:tencent'
+db.run("UPDATE tx_board_meta SET key = 'board:tencent' WHERE key = 'board'", () => {});
 
 // 兼容旧库：确保 devices 表有 sort_order 列
 db.all("PRAGMA table_info(devices)", [], (err, columns) => {

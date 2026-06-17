@@ -19,13 +19,27 @@ router.use(auth.verifyToken);
 
 const J = (v, fallback) => { try { return JSON.parse(v); } catch { return fallback; } };
 
+// ★ 看板标识：支持多块看板共用同一套表（board 列区分）。默认 'tencent' 兼容老数据。
+//   - tencent  → 腾讯系游戏开发进展（4分组）
+//   - customer → 各客户适配进展（单分组5列）
+const boardOf = (req) => {
+  const b = (req.query.board || req.body.board || 'tencent');
+  return String(b).replace(/[^a-z0-9_-]/gi, '') || 'tencent';
+};
+const metaKeyOf = (board) => 'board:' + board;
+
 // ============ 获取整张看板 ============
 router.get('/', (req, res) => {
-  db.all('SELECT * FROM tx_board_groups ORDER BY sort_order ASC, id ASC', [], (err, groups) => {
+  const board = boardOf(req);
+  db.all('SELECT * FROM tx_board_groups WHERE board = ? ORDER BY sort_order ASC, id ASC', [board], (err, groups) => {
     if (err) return res.status(500).json({ error: err.message });
-    db.all('SELECT * FROM tx_board_rows ORDER BY sort_order ASC, id ASC', [], (err2, rows) => {
+    const gids = groups.map(g => g.id);
+    const rowsSql = gids.length
+      ? `SELECT * FROM tx_board_rows WHERE group_id IN (${gids.map(() => '?').join(',')}) ORDER BY sort_order ASC, id ASC`
+      : 'SELECT * FROM tx_board_rows WHERE 0 ORDER BY sort_order ASC, id ASC';
+    db.all(rowsSql, gids, (err2, rows) => {
       if (err2) return res.status(500).json({ error: err2.message });
-      db.get("SELECT value FROM tx_board_meta WHERE key = 'board'", [], (err3, metaRow) => {
+      db.get('SELECT value FROM tx_board_meta WHERE key = ?', [metaKeyOf(board)], (err3, metaRow) => {
         const meta = metaRow ? J(metaRow.value, {}) : {};
         const groupMap = {};
         const out = groups.map(g => {
@@ -49,19 +63,20 @@ router.get('/', (req, res) => {
   });
 });
 
-// ============ 种子初始化（仅当空表时写入） ============
+// ============ 种子初始化（仅当该看板空表时写入） ============
 router.post('/init-seed', (req, res) => {
+  const board = boardOf(req);
   const seed = req.body && Array.isArray(req.body.groups) ? req.body.groups : null;
   if (!seed) return res.status(400).json({ error: '缺少种子数据' });
-  db.get('SELECT COUNT(*) AS cnt FROM tx_board_groups', [], (err, row) => {
+  db.get('SELECT COUNT(*) AS cnt FROM tx_board_groups WHERE board = ?', [board], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row.cnt > 0) return res.json({ success: true, skipped: true }); // 已有数据不覆盖
     db.serialize(() => {
-      const gStmt = db.prepare('INSERT INTO tx_board_groups (group_key, title, cols, sort_order) VALUES (?, ?, ?, ?)');
+      const gStmt = db.prepare('INSERT INTO tx_board_groups (board, group_key, title, cols, sort_order) VALUES (?, ?, ?, ?, ?)');
       let pending = seed.length;
       if (pending === 0) return res.json({ success: true });
       seed.forEach((g, gi) => {
-        gStmt.run([g.key || g.title, g.title || '', JSON.stringify(g.cols || []), gi], function (e) {
+        gStmt.run([board, g.key || g.title, g.title || '', JSON.stringify(g.cols || []), gi], function (e) {
           if (e) { return; }
           const groupId = this.lastID;
           const rws = g.rows || [];
@@ -176,23 +191,26 @@ router.patch('/group/:id', (req, res) => {
 });
 
 // ============ 保存看板配置（列宽/行高等） ============
-// body: { colWidths?, rowHeights? }  — 整体覆盖式存 JSON
+// body: { colWidths?, rowHeights? }  — 整体覆盖式存 JSON（按 board 区分）
 router.put('/meta', (req, res) => {
-  const value = JSON.stringify(req.body || {});
-  db.run(`INSERT INTO tx_board_meta (key, value, updated_at) VALUES ('board', ?, CURRENT_TIMESTAMP)
+  const board = boardOf(req);
+  const payload = Object.assign({}, req.body); delete payload.board;
+  const value = JSON.stringify(payload || {});
+  db.run(`INSERT INTO tx_board_meta (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
-    [value], function (e) {
+    [metaKeyOf(board), value], function (e) {
       if (e) return res.status(500).json({ error: e.message });
       res.json({ success: true });
     });
 });
 
-// ============ 重置（清空所有，前端随后会重新 init-seed） ============
+// ============ 重置（清空该看板，前端随后会重新 init-seed） ============
 router.post('/reset', (req, res) => {
+  const board = boardOf(req);
   db.serialize(() => {
-    db.run('DELETE FROM tx_board_rows');
-    db.run('DELETE FROM tx_board_groups');
-    db.run("DELETE FROM tx_board_meta WHERE key = 'board'", function (e) {
+    db.run('DELETE FROM tx_board_rows WHERE group_id IN (SELECT id FROM tx_board_groups WHERE board = ?)', [board]);
+    db.run('DELETE FROM tx_board_groups WHERE board = ?', [board]);
+    db.run('DELETE FROM tx_board_meta WHERE key = ?', [metaKeyOf(board)], function (e) {
       if (e) return res.status(500).json({ error: e.message });
       res.json({ success: true });
     });

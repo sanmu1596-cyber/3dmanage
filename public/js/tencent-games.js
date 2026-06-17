@@ -20,6 +20,13 @@ var txBoard = null;
 var _txLoading = false;
 
 const TX_API = (typeof API_BASE !== 'undefined' ? API_BASE : '/api') + '/tencent-board';
+// ★ 当前看板标识（多看板共用同一引擎）：tencent=腾讯系；customer=各客户适配进展
+var _txBoardId = 'tencent';
+// 给任意看板 API 路径拼上 ?board=<当前看板>，使一套引擎可服务多张看板
+function txUrl(path) {
+    const base = TX_API + (path || '');
+    return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'board=' + encodeURIComponent(_txBoardId);
+}
 
 // ===== Excel 式选区模型 =====
 // 选中的单元格集合：每项 { gi, r, ci }（仅含真实存在的格）
@@ -40,15 +47,23 @@ function switchReportSubTab(subtab) {
     if (subtab === 'report-main') {
         const m = document.getElementById('report-sub-main');
         if (m) m.style.display = 'flex';
-    } else {
-        const t = document.getElementById('report-sub-tencent');
-        if (t) t.style.display = 'flex';
-        loadTxBoard();
+        return;
     }
+    // 腾讯系看板 / 各客户适配进展：共用同一看板引擎，仅切换 _txBoardId + 标题 + 数据
+    const isCustomer = (subtab === 'report-customer');
+    _txBoardId = isCustomer ? 'customer' : 'tencent';
+    const title = document.getElementById('tx-board-title');
+    if (title) title.textContent = isCustomer ? '各客户适配进展' : '腾讯系游戏开发进展';
+    const t = document.getElementById('report-sub-tencent');
+    if (t) t.style.display = 'flex';
+    // 切看板前清空当前选区/编辑态，避免跨看板串状态
+    _txSelected = []; _txAnchor = null; _txEditingCell = null;
+    loadTxBoard();
 }
 
-// ===== 种子数据（首次为空时写入后端）=====
+// ===== 种子数据（首次为空时写入后端，按当前看板返回）=====
 function getTxSeed() {
+    if (_txBoardId === 'customer') return getCustomerSeed();
     return {
         groups: [
             {
@@ -99,6 +114,31 @@ function getTxSeed() {
     };
 }
 
+// ===== 各客户适配进展 种子（单分组 5 列；累计适配数字标红，备注红字用 HTML）=====
+function getCustomerSeed() {
+    const RED = (t) => '<span style="color:#e23b3b">' + t + '</span>';
+    return {
+        groups: [
+            {
+                key: '各客户适配进展', title: '各客户适配进展',
+                cols: ['序号', '项目', '类型', '累计适配', '备注'],
+                rows: [
+                    ['1', '泰坦-27', '显示器', RED('58'), 'wegame：16款　steam：42款　　' + RED('本周上线3款')],
+                    ['2', 'ViewX', '显示器', RED('42'), '国内：wegame：8款　steam：34款\n海外：wegame：6款　steam：34款　　无更新'],
+                    ['3', 'ACER-27', '显示器', RED('56'), 'wegame：15款　steam：40款　garena版：1款　　' + RED('本周上线4款')],
+                    ['4', 'AOC-27', '显示器', RED('45'), 'wegame：15款　steam：30款　　' + RED('本周上线5款')],
+                    ['5', 'Chill-blast-16', '笔记本', RED('35'), '国内：wegame：0款　steam：35款\n海外：wegame：0款　steam：35款　　' + RED('本周上线5款')],
+                    ['6', '雷神-27', '显示器', RED('2'), '国内：wegame：1款　steam：1款　　' + RED('本周上线2款')],
+                    ['7', 'BOE-GPR-27', '显示器', RED('7'), 'wegame：5款　steam：2款　　无更新'],
+                    ['8', '视延-32', '显示器', RED('6'), 'wegame：4款　steam：2款　　无更新'],
+                    ['9', 'BOE-18', '笔记本', RED('9'), 'wegame：2款　steam：7款　　无更新'],
+                    ['10', '红魔', '笔记本', RED('39'), 'wegame：9款　steam：30款　　无更新']
+                ]
+            }
+        ]
+    };
+}
+
 // ===== 数据加载（后端） =====
 async function loadTxBoard() {
     if (_txLoading) return;
@@ -106,16 +146,16 @@ async function loadTxBoard() {
     const tableEl = document.getElementById('tx-board-table');
     if (tableEl) tableEl.innerHTML = '<tbody><tr><td class="table-loading"><span class="table-loading-spinner"></span>加载中...</td></tr></tbody>';
     try {
-        let resp = await authFetch(TX_API);
+        let resp = await authFetch(txUrl(''));
         let data = await resp.json();
         // 空看板 → 推送种子初始化，再重新拉
         if (!data || !Array.isArray(data.groups) || data.groups.length === 0) {
-            await authFetch(TX_API + '/init-seed', {
+            await authFetch(txUrl('/init-seed'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(getTxSeed())
             });
-            resp = await authFetch(TX_API);
+            resp = await authFetch(txUrl(''));
             data = await resp.json();
         }
         txBoard = normalizeBoard(data);
@@ -181,7 +221,7 @@ function txGetRowHeights() { return (txBoard && txBoard.meta && txBoard.meta.row
 async function txSaveMeta() {
     if (!txBoard) return;
     try {
-        await authFetch(TX_API + '/meta', {
+        await authFetch(txUrl('/meta'), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ colWidths: txBoard.meta.colWidths || null, rowHeights: txBoard.meta.rowHeights || {} })
@@ -1078,7 +1118,7 @@ async function addTxRow(gi) {
     if (!group) return;
     const cells = group.cols.map(() => '');
     try {
-        const resp = await authFetch(TX_API + '/row', {
+        const resp = await authFetch(txUrl('/row'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ groupId: group.id, cells })
@@ -1101,7 +1141,7 @@ async function txEnsureRowsUpTo(group, targetRow) {
     try {
         while (group.rows.length <= targetRow) {
             const cells = group.cols.map(() => '');
-            const resp = await authFetch(TX_API + '/row', {
+            const resp = await authFetch(txUrl('/row'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ groupId: group.id, cells })
@@ -1125,8 +1165,8 @@ async function resetTxBoard() {
         : confirm('确定恢复为初始数据吗？');
     if (!ok) return;
     try {
-        await authFetch(TX_API + '/reset', { method: 'POST' });
-        await authFetch(TX_API + '/init-seed', {
+        await authFetch(txUrl('/reset'), { method: 'POST' });
+        await authFetch(txUrl('/init-seed'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(getTxSeed())
@@ -1163,7 +1203,7 @@ function exportTxBoard() {
 // ===== 后端 API helpers =====
 async function txApiPatchCell(rowId, colIndex, value) {
     try {
-        await authFetch(TX_API + '/cell', {
+        await authFetch(txUrl('/cell'), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rowId, colIndex, value })
@@ -1172,7 +1212,7 @@ async function txApiPatchCell(rowId, colIndex, value) {
 }
 async function txApiPatchFill(rowId, colIndex, color) {
     try {
-        await authFetch(TX_API + '/fill', {
+        await authFetch(txUrl('/fill'), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rowId, colIndex, color })
@@ -1181,7 +1221,7 @@ async function txApiPatchFill(rowId, colIndex, color) {
 }
 async function txApiPatchAlign(rowId, colIndex, axis, value) {
     try {
-        await authFetch(TX_API + '/align', {
+        await authFetch(txUrl('/align'), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rowId, colIndex, axis, value })
@@ -1190,7 +1230,7 @@ async function txApiPatchAlign(rowId, colIndex, axis, value) {
 }
 async function txApiPatchGroup(groupId, payload) {
     try {
-        await authFetch(TX_API + '/group/' + groupId, {
+        await authFetch(txUrl('/group/' + groupId), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
