@@ -21,6 +21,15 @@ var _txLoading = false;
 
 const TX_API = (typeof API_BASE !== 'undefined' ? API_BASE : '/api') + '/tencent-board';
 
+// ===== Excel 式选区模型 =====
+// 选中的单元格集合：每项 { gi, r, ci }（仅含真实存在的格）
+var _txSelected = [];           // 当前选中的单元格列表
+var _txAnchor = null;           // 选区锚点 { gi, r, ci }（Shift/拖拽起点）
+var _txSelecting = false;       // 鼠标拖拽框选中
+var _txEditingCell = null;      // 当前正在「格内编辑」的 td（null=无格内编辑，仅选中态）
+// 单元格唯一 key
+function txKey(gi, r, ci) { return gi + ':' + r + ':' + ci; }
+
 // ===== 子 Tab 切换 =====
 function switchReportSubTab(subtab) {
     document.querySelectorAll('.report-sub-tab').forEach(b => {
@@ -238,8 +247,8 @@ function renderTxBoard() {
             g.cols.forEach((col, ci) => {
                 const rowHandle = (gi === 0 && ci === 0) ? rowHandleBase : '';
                 if (!row) {
-                    // ★ 空白格（该分组此行无数据）也支持单击编辑：自动为该分组补足空行后进入编辑
-                    tbody += `<td class="tx-editable tx-c-empty" data-g="${gi}" data-r="${r}" data-c="${ci}" onclick="startTxCellEdit(this)">${rowHandle}</td>`;
+                    // ★ 空白格（该分组此行无数据）：选中/双击编辑时自动为该分组补足空行
+                    tbody += `<td class="tx-editable tx-c-empty" data-g="${gi}" data-r="${r}" data-c="${ci}">${rowHandle}</td>`;
                     return;
                 }
                 const val = (row.cells && row.cells[ci]) || '';
@@ -248,7 +257,7 @@ function renderTxBoard() {
                 const cls = isNote ? 'tx-c-note' : (ci === 0 ? 'tx-c-name' : 'tx-c-plain');
                 const display = isNote ? txHighlight(val) : (txCellDisplay(val) || '<span style="color:#c0c4cc">—</span>');
                 const fillStyle = fill ? ` style="background:${escapeHtml(fill)}"` : '';
-                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle} onclick="startTxCellEdit(this)">${display}${rowHandle}</td>`;
+                tbody += `<td class="tx-editable ${cls}" data-g="${gi}" data-r="${r}" data-c="${ci}"${fillStyle}>${display}${rowHandle}</td>`;
             });
         });
         tbody += '</tr>';
@@ -265,6 +274,139 @@ function renderTxBoard() {
     table.style.width = totalW + 'px';
     table.style.minWidth = totalW + 'px';
     table.innerHTML = colgroup + thead + tbody;
+
+    // 绑定选区交互（一次性，事件委托在 table 上）
+    txBindSelectionOnce(table);
+    // 重渲染后恢复选区高亮 + 工具栏状态
+    txRefreshSelectionUI();
+}
+
+// ============================================================
+// Excel 式单元格选区交互（单击选中 / 拖拽框选 / Shift 连选 / 双击编辑）
+// ============================================================
+var _txSelBound = false;
+function txBindSelectionOnce(table) {
+    if (_txSelBound) return;
+    _txSelBound = true;
+    const container = table; // 委托在 table（每次 render 复用同一 table 节点）
+
+    // mousedown：开始选择（区分 resize 手柄、表头、追加行按钮）
+    container.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.tx-col-resize, .tx-row-resize, .tx-add-btn, thead, .tx-cell-rich')) return;
+        const td = e.target.closest('td.tx-editable');
+        if (!td) return;
+        // 正在格内编辑时，点其它格先结束编辑
+        if (_txEditingCell && _txEditingCell !== td) txFinishCellEdit(true);
+        if (_txEditingCell === td) return; // 正在编辑当前格，交给 contenteditable
+
+        const cell = { gi: +td.dataset.g, r: +td.dataset.r, ci: +td.dataset.c };
+        if (e.shiftKey && _txAnchor) {
+            txSelectRange(_txAnchor, cell);
+        } else if (e.ctrlKey || e.metaKey) {
+            txToggleCell(cell);
+            _txAnchor = cell;
+        } else {
+            _txAnchor = cell;
+            txSetSelection([cell]);
+            _txSelecting = true; // 允许拖拽框选
+        }
+        txRefreshFormatBarForSelection();
+    });
+
+    // mousemove：拖拽框选
+    container.addEventListener('mousemove', (e) => {
+        if (!_txSelecting || !_txAnchor) return;
+        const td = e.target.closest('td.tx-editable');
+        if (!td) return;
+        const cell = { gi: +td.dataset.g, r: +td.dataset.r, ci: +td.dataset.c };
+        txSelectRange(_txAnchor, cell);
+    });
+
+    // 双击：进入格内编辑
+    container.addEventListener('dblclick', (e) => {
+        const td = e.target.closest('td.tx-editable');
+        if (!td || e.target.closest('thead, .tx-col-resize, .tx-row-resize')) return;
+        txEnterCellEdit(td);
+    });
+}
+
+// 全局 mouseup 结束拖拽框选
+document.addEventListener('mouseup', () => { _txSelecting = false; });
+
+// 点击看板与工具栏之外 → 清空选区（结束批量模式）
+document.addEventListener('mousedown', (e) => {
+    if (!txBoard) return;
+    if (e.target.closest('#tx-board-table, #tx-format-bar, .tx-board-container')) return;
+    // 不在腾讯系看板子面板时不处理
+    const panel = document.getElementById('report-sub-tencent');
+    if (!panel || panel.style.display === 'none') return;
+    if (_txSelected.length) {
+        _txSelected = [];
+        _txAnchor = null;
+        txRefreshSelectionUI();
+        txRefreshFormatBarForSelection();
+    }
+}, true);
+
+// 设定选区
+function txSetSelection(cells) {
+    _txSelected = cells.slice();
+    txRefreshSelectionUI();
+}
+// 切换单个格
+function txToggleCell(cell) {
+    const k = txKey(cell.gi, cell.r, cell.ci);
+    const idx = _txSelected.findIndex(c => txKey(c.gi, c.r, c.ci) === k);
+    if (idx >= 0) _txSelected.splice(idx, 1);
+    else _txSelected.push(cell);
+    txRefreshSelectionUI();
+}
+// 矩形范围选择（anchor → focus），按可视行列矩形选中（跨分组按 leaf 列号）
+function txSelectRange(anchor, focus) {
+    // 用「可视列序号(leaf)」+「行号」做矩形
+    const aLeaf = txLeafIndex(anchor.gi, anchor.ci);
+    const fLeaf = txLeafIndex(focus.gi, focus.ci);
+    const c0 = Math.min(aLeaf, fLeaf), c1 = Math.max(aLeaf, fLeaf);
+    const r0 = Math.min(anchor.r, focus.r), r1 = Math.max(anchor.r, focus.r);
+    const cells = [];
+    for (let r = r0; r <= r1; r++) {
+        for (let leaf = c0; leaf <= c1; leaf++) {
+            const pos = txLeafToCell(leaf);
+            if (pos) cells.push({ gi: pos.gi, r: r, ci: pos.ci });
+        }
+    }
+    txSetSelection(cells);
+}
+// gi,ci → 全局 leaf 列号
+function txLeafIndex(gi, ci) {
+    let leaf = 0;
+    for (let g = 0; g < gi; g++) leaf += txBoard.groups[g].cols.length;
+    return leaf + ci;
+}
+// 全局 leaf 列号 → {gi, ci}
+function txLeafToCell(leaf) {
+    let acc = 0;
+    for (let g = 0; g < txBoard.groups.length; g++) {
+        const n = txBoard.groups[g].cols.length;
+        if (leaf < acc + n) return { gi: g, ci: leaf - acc };
+        acc += n;
+    }
+    return null;
+}
+
+// 刷新选区高亮（给选中的 td 加 .tx-selected）
+function txRefreshSelectionUI() {
+    const table = document.getElementById('tx-board-table');
+    if (!table) return;
+    table.querySelectorAll('td.tx-selected').forEach(td => td.classList.remove('tx-selected', 'tx-sel-anchor'));
+    _txSelected.forEach(c => {
+        const td = table.querySelector(`td.tx-editable[data-g="${c.gi}"][data-r="${c.r}"][data-c="${c.ci}"]`);
+        if (td) td.classList.add('tx-selected');
+    });
+    if (_txAnchor) {
+        const a = table.querySelector(`td.tx-editable[data-g="${_txAnchor.gi}"][data-r="${_txAnchor.r}"][data-c="${_txAnchor.ci}"]`);
+        if (a) a.classList.add('tx-sel-anchor');
+    }
 }
 
 // ===== 列宽拖拽（Excel 式：只改当前列，总宽同步）=====
@@ -450,6 +592,15 @@ function txDeactivateFormatBar() {
     _txFmtCtx = null;
 }
 
+// 仅根据「是否有选区」决定工具栏点亮（选中即可批量设格式，无需进编辑）
+function txRefreshFormatBarForSelection() {
+    const bar = document.getElementById('tx-format-bar');
+    if (!bar) return;
+    // 绑定一次
+    if (!_txFmtBound) { txBindFormatBar(bar); _txFmtBound = true; }
+    bar.classList.toggle('active', _txSelected.length > 0 || !!_txEditingCell);
+}
+
 // 常用颜色板
 var TX_PALETTE = [
     '#1f2329', '#5e6470', '#8a909c', '#bcc0c7', '#dfe2e6', '#ffffff',
@@ -462,12 +613,12 @@ var TX_PALETTE = [
 function txBindFormatBar(bar) {
     // 渲染颜色色板
     txRenderSwatches('tx-fmt-fore-swatches', (color) => {
-        txExecOnEditor(() => document.execCommand('foreColor', false, color));
+        txApplyFormat('foreColor', color);
         const ico = document.getElementById('tx-fmt-fore-ico');
         if (ico) ico.style.borderBottom = '3px solid ' + color;
         txCloseMenus();
     });
-    txRenderSwatches('tx-fmt-fill-swatches', (color) => { txApplyFill(color); txCloseMenus(); });
+    txRenderSwatches('tx-fmt-fill-swatches', (color) => { txApplyFormat('fill', color); txCloseMenus(); });
 
     // ★ mousedown 先保存选区（此刻编辑器尚未失焦），再阻止默认避免失焦
     bar.addEventListener('mousedown', (e) => {
@@ -484,19 +635,12 @@ function txBindFormatBar(bar) {
         setTimeout(() => { _txFmtInteracting = false; }, 0);
     });
 
-    // 直接命令按钮（B/I/U/S、撤销重做、清除格式）
+    // 直接命令按钮（B/I/U/S、撤销重做、清除格式、列表）
     bar.querySelectorAll('.tx-fmt-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const cmd = btn.dataset.cmd;
-            txExecOnEditor(() => {
-                if (cmd === 'removeFormat') {
-                    document.execCommand('removeFormat', false, null);
-                    document.execCommand('unlink', false, null);
-                } else {
-                    document.execCommand(cmd, false, null);
-                }
-            });
+            txApplyFormat(cmd, null);
             txSyncFmtState();
         });
     });
@@ -522,29 +666,26 @@ function txBindFormatBar(bar) {
         }
     });
 
-    // 下拉项点击（execCommand / 行距 / 字体字号回显）
+    // 下拉项点击（统一走 txApplyFormat：编辑态作用选中文字，选区态批量改格）
     bar.querySelectorAll('.tx-fmt-opt').forEach(opt => {
         opt.addEventListener('click', (e) => {
             e.preventDefault();
-            // 清除填充
-            if (opt.classList.contains('tx-fmt-clearfill')) { txApplyFill(''); txCloseMenus(); return; }
+            if (opt.classList.contains('tx-fmt-clearfill')) { txApplyFormat('fill', ''); txCloseMenus(); return; }
             const cmd = opt.dataset.cmd;
             const val = opt.dataset.val;
-            txExecOnEditor(() => {
-                if (cmd === 'fontName') {
-                    document.execCommand('fontName', false, val);
-                    const lbl = document.getElementById('tx-fmt-font-label');
-                    if (lbl) lbl.textContent = opt.textContent.trim();
-                } else if (cmd === 'fontSize') {
-                    txApplyFontSize(val);
-                    const lbl = document.getElementById('tx-fmt-size-label');
-                    if (lbl) lbl.textContent = opt.dataset.label || opt.textContent.trim();
-                } else if (cmd === 'lineHeight') {
-                    txApplyLineHeight(val);
-                } else if (cmd) {
-                    document.execCommand(cmd, false, null);
-                }
-            });
+            if (cmd === 'fontName') {
+                txApplyFormat('fontName', val);
+                const lbl = document.getElementById('tx-fmt-font-label');
+                if (lbl) lbl.textContent = opt.textContent.trim();
+            } else if (cmd === 'fontSize') {
+                txApplyFormat('fontSize', val);
+                const lbl = document.getElementById('tx-fmt-size-label');
+                if (lbl) lbl.textContent = opt.dataset.label || opt.textContent.trim();
+            } else if (cmd === 'lineHeight') {
+                txApplyFormat('lineHeight', val);
+            } else if (cmd) {
+                txApplyFormat(cmd, null);
+            }
             txCloseMenus();
         });
     });
@@ -552,14 +693,14 @@ function txBindFormatBar(bar) {
     // 文字颜色自定义
     const fore = document.getElementById('tx-fmt-fore');
     if (fore) fore.addEventListener('input', () => {
-        txExecOnEditor(() => document.execCommand('foreColor', false, fore.value));
+        txApplyFormat('foreColor', fore.value);
         const ico = document.getElementById('tx-fmt-fore-ico');
         if (ico) ico.style.borderBottom = '3px solid ' + fore.value;
     });
 
     // 单元格填充自定义
     const fill = document.getElementById('tx-fmt-fill');
-    if (fill) fill.addEventListener('input', () => txApplyFill(fill.value));
+    if (fill) fill.addEventListener('input', () => txApplyFormat('fill', fill.value));
 
     // 点工具栏外部关闭所有下拉（用 mousedown，与触发器同一阶段，避免 click 时序把刚开的菜单关掉）
     document.addEventListener('mousedown', (e) => {
@@ -611,59 +752,187 @@ function txPositionPop(trigger, pop) {
     pop.style.top = top + 'px';
 }
 
-// 应用单元格填充色（空字符串=清除）
-function txApplyFill(color) {
-    if (!_txFmtEd || !_txFmtCtx) return;
-    _txFmtEd.style.background = color || '';
-    _txFmtCtx.rowObj.fills = _txFmtCtx.rowObj.fills || [];
-    _txFmtCtx.rowObj.fills[_txFmtCtx.ci] = color || '';
-    txApiPatchFill(_txFmtCtx.rowObj.id, _txFmtCtx.ci, color || '');
-    const ico = document.getElementById('tx-fmt-fill-ico');
-    if (ico) ico.style.background = color || '#fff3a8';
-}
-
-// 在编辑器上下文执行格式命令（先恢复选区，再执行，确保命令作用在选中文字上）
-function txExecOnEditor(fn) {
-    if (!_txFmtEd) return;
-    // ★ 恢复点工具栏前保存的选区（否则 focus 会丢失选中文字 → 命令对空光标无效）
-    txRestoreSelection();
-    // ★ 用 CSS 内联样式实现格式（fontSize/foreColor 等用 styleWithCSS 才可靠生效）
-    try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
-    fn();
-    // 命令执行后选区可能变化，重新保存供连续操作
-    txSaveSelection();
-}
-
-// 字号：execCommand('fontSize') 只支持 1-7 档且生成 <font>，改用 CSS px 包裹选区
 var TX_SIZE_PX = { '1': '10px', '2': '13px', '3': '14px', '4': '16px', '5': '20px', '6': '24px', '7': '32px' };
-function txApplyFontSize(sizeKey) {
+
+// ============================================================
+// ★★★ 统一格式入口：两种模式 ★★★
+//   A) 正在格内编辑（_txEditingCell 有值）→ 作用于选中文字（execCommand）
+//   B) 仅选中态（_txSelected 有格，无编辑）→ 对所有选中格的整格内容批量套格式
+// ============================================================
+function txApplyFormat(type, value) {
+    if (_txEditingCell && _txFmtEd) {
+        // —— 模式A：格内编辑，作用于选中文字 ——
+        txApplyFormatInEditor(type, value);
+    } else if (_txSelected.length > 0) {
+        // —— 模式B：批量对选中格 ——
+        txApplyFormatToSelection(type, value);
+    }
+}
+
+// 模式A：在 contenteditable 内对选中文字执行
+function txApplyFormatInEditor(type, value) {
     if (!_txFmtEd) return;
     txRestoreSelection();
-    const px = TX_SIZE_PX[sizeKey] || '14px';
-    // 用 fontSize=7 做标记（styleWithCSS 下会生成 font-size:xxx-large 的 span/font），
-    // 再统一改写为目标 px，规避 execCommand fontSize 只能 1-7 档的限制
     try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
-    document.execCommand('fontSize', false, '7');
-    _txFmtEd.querySelectorAll('font[size], [style*="xxx-large"]').forEach(el => {
-        el.removeAttribute('size');
-        el.style.fontSize = px;
+    switch (type) {
+        case 'bold': case 'italic': case 'underline': case 'strikeThrough':
+        case 'undo': case 'redo':
+            document.execCommand(type, false, null); break;
+        case 'removeFormat':
+            document.execCommand('removeFormat', false, null);
+            document.execCommand('unlink', false, null);
+            _txFmtEd.style.lineHeight = '';
+            break;
+        case 'fontName': document.execCommand('fontName', false, value); break;
+        case 'foreColor': document.execCommand('foreColor', false, value); break;
+        case 'fontSize': {
+            const px = TX_SIZE_PX[value] || '14px';
+            document.execCommand('fontSize', false, '7');
+            _txFmtEd.querySelectorAll('font[size], [style*="xxx-large"]').forEach(el => {
+                el.removeAttribute('size'); el.style.fontSize = px;
+            });
+            break;
+        }
+        case 'lineHeight': _txFmtEd.style.lineHeight = value; break;
+        case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
+            document.execCommand(type, false, null); break;
+        case 'insertUnorderedList': txToggleList(_txFmtEd, 'ul'); break;
+        case 'insertOrderedList': txToggleList(_txFmtEd, 'ol'); break;
+        case 'fill':
+            _txFmtEd.style.background = value || '';
+            if (_txFmtCtx) {
+                _txFmtCtx.rowObj.fills = _txFmtCtx.rowObj.fills || [];
+                _txFmtCtx.rowObj.fills[_txFmtCtx.ci] = value || '';
+                txApiPatchFill(_txFmtCtx.rowObj.id, _txFmtCtx.ci, value || '');
+            }
+            const ico1 = document.getElementById('tx-fmt-fill-ico');
+            if (ico1) ico1.style.background = value || '#fff3a8';
+            break;
+    }
+    txSaveSelection();
+}
+
+// ★ 列表 toggle（修复重复生成 + 支持取消）：用 wrap/unwrap 整段，而非 execCommand
+//   execCommand('insertOrderedList') 在表格格内多次点会重复嵌套 → 改为自己控制
+function txToggleList(ed, listTag) {
+    // 已是该类型列表 → 取消（拆成纯文本行）
+    const existing = ed.querySelector(listTag);
+    if (existing && ed.children.length === 1 && ed.firstElementChild === existing) {
+        const items = Array.from(existing.querySelectorAll('li')).map(li => li.innerHTML);
+        ed.innerHTML = items.join('<br>');
+        return;
+    }
+    // 另一种列表 → 先清掉
+    ed.querySelectorAll('ul, ol').forEach(l => {
+        const items = Array.from(l.querySelectorAll('li')).map(li => li.innerHTML);
+        const frag = document.createElement('div');
+        frag.innerHTML = items.join('<br>');
+        l.replaceWith(frag);
+        while (frag.firstChild) frag.parentNode.insertBefore(frag.firstChild, frag);
+        frag.remove();
     });
-    txSaveSelection();
+    // 把当前内容按 <br>/块 切成行，包成列表
+    const html = ed.innerHTML.trim();
+    const lines = html.split(/<br\s*\/?>|<\/div>\s*<div>/i)
+        .map(s => s.replace(/<\/?div>/gi, '').trim())
+        .filter(s => s !== '' && s !== '<br>');
+    const list = document.createElement(listTag);
+    (lines.length ? lines : ['']).forEach(line => {
+        const li = document.createElement('li');
+        li.innerHTML = line || '<br>';
+        list.appendChild(li);
+    });
+    ed.innerHTML = '';
+    ed.appendChild(list);
 }
 
-// 行距：对选区所在块级元素设置 line-height（execCommand 无原生命令）
-function txApplyLineHeight(lh) {
-    if (!_txFmtEd) return;
-    txRestoreSelection();
-    // 单元格内容通常为一段 → 整个编辑器统一行距
-    _txFmtEd.style.lineHeight = lh;
-    txSaveSelection();
+// 模式B：对所有选中格的整格内容批量套用格式（包整段，存回 cells）
+async function txApplyFormatToSelection(type, value) {
+    const cells = _txSelected.slice();
+    if (!cells.length) return;
+    for (const c of cells) {
+        const group = txBoard.groups[c.gi];
+        if (!group) continue;
+        // 填充色不改文字，单独处理
+        if (type === 'fill') {
+            if (!group.rows[c.r]) { await txEnsureRowsUpTo(group, c.r); }
+            const rowObj = group.rows[c.r];
+            if (!rowObj) continue;
+            rowObj.fills = rowObj.fills || [];
+            rowObj.fills[c.ci] = value || '';
+            await txApiPatchFill(rowObj.id, c.ci, value || '');
+            continue;
+        }
+        const rowObj = group.rows[c.r];
+        if (!rowObj) continue; // 空白格不套文字格式（无内容）
+        const cur = (rowObj.cells && rowObj.cells[c.ci]) || '';
+        if (!cur && type !== 'lineHeight') continue; // 空内容跳过（行距除外）
+        const next = txWrapWholeCell(cur, type, value);
+        if (next !== cur) {
+            while (rowObj.cells.length <= c.ci) rowObj.cells.push('');
+            rowObj.cells[c.ci] = next;
+            await txApiPatchCell(rowObj.id, c.ci, next);
+        }
+    }
+    renderTxBoard();
+    if (typeof showToast === 'function') showToast('已应用到 ' + cells.length + ' 个单元格', 'success');
 }
 
-// 同步按钮 active 态（粗/斜/下划线等）
+// 把整格内容用一个 <span style> / 标签包裹（批量模式，作用于整格文字）
+function txWrapWholeCell(html, type, value) {
+    const inner = html || '';
+    const wrap = (style) => `<span style="${style}">${inner}</span>`;
+    switch (type) {
+        case 'bold': return txToggleWholeStyle(inner, 'font-weight', '700', html);
+        case 'italic': return txToggleWholeStyle(inner, 'font-style', 'italic', html);
+        case 'underline': return txToggleWholeDeco(inner, 'underline', html);
+        case 'strikeThrough': return txToggleWholeDeco(inner, 'line-through', html);
+        case 'fontName': return wrap('font-family:' + value);
+        case 'foreColor': return wrap('color:' + value);
+        case 'fontSize': return wrap('font-size:' + (TX_SIZE_PX[value] || '14px'));
+        case 'lineHeight': return `<div style="line-height:${value}">${inner}</div>`;
+        case 'justifyLeft': return `<div style="text-align:left">${inner}</div>`;
+        case 'justifyCenter': return `<div style="text-align:center">${inner}</div>`;
+        case 'justifyRight': return `<div style="text-align:right">${inner}</div>`;
+        case 'removeFormat': return txStripTags(inner);
+        case 'insertUnorderedList': return txCellToList(inner, 'ul');
+        case 'insertOrderedList': return txCellToList(inner, 'ol');
+        case 'undo': case 'redo': return html; // 批量模式不支持撤销重做
+        default: return html;
+    }
+}
+// 批量：整格 加粗/斜体 toggle（已有则去掉）
+function txToggleWholeStyle(inner, prop, val, original) {
+    const re = new RegExp('^<span style="' + prop + ':' + val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '">([\\s\\S]*)</span>$');
+    const m = original.match(re);
+    if (m) return m[1]; // 取消
+    return `<span style="${prop}:${val}">${inner}</span>`;
+}
+function txToggleWholeDeco(inner, deco, original) {
+    const re = new RegExp('^<span style="text-decoration:' + deco + '">([\\s\\S]*)</span>$');
+    const m = original.match(re);
+    if (m) return m[1];
+    return `<span style="text-decoration:${deco}">${inner}</span>`;
+}
+function txStripTags(html) {
+    const d = document.createElement('div'); d.innerHTML = html;
+    return d.textContent || '';
+}
+function txCellToList(inner, tag) {
+    const tmp = document.createElement('div'); tmp.innerHTML = inner;
+    // 已是该列表 → 取消
+    if (tmp.children.length === 1 && tmp.firstElementChild && tmp.firstElementChild.tagName.toLowerCase() === tag) {
+        return Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML).join('<br>');
+    }
+    const lines = inner.split(/<br\s*\/?>/i).map(s => s.trim()).filter(s => s && s !== '<br>');
+    const items = (lines.length ? lines : [inner]).map(l => `<li>${l || '<br>'}</li>`).join('');
+    return `<${tag}>${items}</${tag}>`;
+}
+
+// 同步按钮 active 态（仅格内编辑时有意义）
 function txSyncFmtState() {
     const bar = document.getElementById('tx-format-bar');
-    if (!bar) return;
+    if (!bar || !_txEditingCell) return;
     ['bold', 'italic', 'underline', 'strikeThrough'].forEach(cmd => {
         const btn = bar.querySelector(`.tx-fmt-btn[data-cmd="${cmd}"]`);
         if (!btn) return;
@@ -671,27 +940,26 @@ function txSyncFmtState() {
     });
 }
 
-// ===== 单元格单击编辑（→ PATCH /cell）=====
-async function startTxCellEdit(td) {
-    if (td.classList.contains('editing')) return;
-    // 忽略刚拖过列宽/行高的情况（拖拽后 mouseup 会触发一次 click）
+// ===== 双击进入「格内编辑」（Excel 式）=====
+var _txCellFinish = null;   // 当前编辑格的 finish 函数
+async function txEnterCellEdit(td) {
+    if (_txEditingCell === td) return;
     if (document.body.classList.contains('row-resizing') || document.body.classList.contains('col-resizing')) return;
+    // 先结束上一个编辑
+    if (_txEditingCell) txFinishCellEdit(true);
+
     const gi = +td.dataset.g, r = +td.dataset.r, ci = +td.dataset.c;
     const group = txBoard.groups[gi];
     if (!group) return;
 
-    // ★ 空白格：该分组在这一行还没有数据 → 先为其补足空行（含中间缺失的行）再编辑
+    // ★ 空白格：补足空行后重渲染，再进入新 td
     if (!group.rows[r]) {
         const created = await txEnsureRowsUpTo(group, r);
         if (!created) return;
-        // 行已创建并重渲染，DOM 中原 td 已失效，需重新取新的 td 继续编辑
         renderTxBoard();
         const newTd = document.querySelector(
             `#tx-board-table td.tx-editable[data-g="${gi}"][data-r="${r}"][data-c="${ci}"]`);
-        if (newTd && !newTd.classList.contains('editing')) {
-            // 递归一次：此时 group.rows[r] 已存在，会走到下面正常编辑分支
-            return startTxCellEdit(newTd);
-        }
+        if (newTd) return txEnterCellEdit(newTd);
         return;
     }
 
@@ -699,29 +967,29 @@ async function startTxCellEdit(td) {
     const cur = (rowObj.cells && rowObj.cells[ci]) || '';
 
     td.classList.add('editing');
-    // 富文本可编辑区（contenteditable）
+    _txEditingCell = td;
+    // 进入编辑时也确保该格被选中
+    txSetSelection([{ gi, r, ci }]);
+    _txAnchor = { gi, r, ci };
+
     const ed = document.createElement('div');
     ed.className = 'tx-cell-rich';
     ed.setAttribute('contenteditable', 'true');
     ed.innerHTML = txIsHtml(cur) ? cur : escapeHtml(cur).replace(/\n/g, '<br>');
     td.innerHTML = '';
     td.appendChild(ed);
-    // 应用已存的单元格填充色（若有）
     if (rowObj.fills && rowObj.fills[ci]) ed.style.background = rowObj.fills[ci];
     ed.focus();
     txPlaceCaretEnd(ed);
 
-    // 激活工具栏，绑定当前编辑器
+    // 激活工具栏（绑定到当前编辑器 → 格式作用于选中文字）
     txActivateFormatBar(ed, td, rowObj, ci);
-
-    // ★ 单击进入编辑后，编辑器内的点击/选择都会被 selectionchange 捕获保存；
-    //    阻止该 td 的 onclick 再次触发（contenteditable 已接管交互）
     ed.addEventListener('click', (ev) => ev.stopPropagation());
 
     let done = false;
-    const finish = async (save) => {
+    _txCellFinish = async (save) => {
         if (done) return; done = true;
-        txDeactivateFormatBar();
+        _txCellFinish = null;
         const html = txCleanHtml(ed.innerHTML);
         if (save && html !== cur) {
             while (rowObj.cells.length <= ci) rowObj.cells.push('');
@@ -730,18 +998,21 @@ async function startTxCellEdit(td) {
             if (typeof showToast === 'function') showToast('已保存', 'success');
         }
         td.classList.remove('editing');
+        _txEditingCell = null;
+        // 编辑结束 → 工具栏切回「选区批量模式」
+        _txFmtEd = null; _txFmtCtx = null;
         renderTxBoard();
     };
     ed.addEventListener('blur', () => {
-        // 延迟，避免点击工具栏按钮时误触发 blur 保存
-        setTimeout(() => { if (!_txFmtInteracting) finish(true); }, 150);
+        setTimeout(() => { if (!_txFmtInteracting && _txEditingCell === td) txFinishCellEdit(true); }, 150);
     });
     ed.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-        // Enter 默认换行（富文本多行）；Ctrl/Cmd+Enter 保存退出
-        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finish(true); }
+        if (e.key === 'Escape') { e.preventDefault(); txFinishCellEdit(false); }
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); txFinishCellEdit(true); }
     });
 }
+// 结束当前格内编辑
+function txFinishCellEdit(save) { if (_txCellFinish) _txCellFinish(save); }
 
 // 光标移到末尾
 function txPlaceCaretEnd(el) {
