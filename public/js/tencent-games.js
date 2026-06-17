@@ -917,39 +917,48 @@ async function txApplyFormatToSelection(type, value) {
     if (typeof showToast === 'function') showToast('已应用到 ' + cells.length + ' 个单元格', 'success');
 }
 
-// 把整格内容用一个 <span style> / 标签包裹（批量模式，作用于整格文字）
+// 把整格内容用统一容器 <div class="tx-cellfmt" style> 包裹（批量模式，作用于整格）
+//   ★ 所有「整格级」样式都设在这个 wrapper 的 style 上：
+//     - 它是最外层，CSS 层叠中作用于全部子内容；
+//     - toggle 只需读 wrapper.style[属性] 有无值，不靠脆弱的字符串正则；
+//     - 复用同一个 wrapper，多次设不同属性会叠加而非嵌套（修复"改完字体加粗又没了"）。
 function txWrapWholeCell(html, type, value) {
-    const inner = html || '';
-    const wrap = (style) => `<span style="${style}">${inner}</span>`;
+    // 解析出 wrapper（若已有则复用，否则新建并把原内容塞进去）
+    const tmp = document.createElement('div');
+    tmp.innerHTML = (html || '').trim();
+    let wrap = tmp.firstElementChild;
+    if (!(wrap && wrap.classList && wrap.classList.contains('tx-cellfmt') && tmp.children.length === 1)) {
+        wrap = document.createElement('div');
+        wrap.className = 'tx-cellfmt';
+        wrap.innerHTML = html || '';
+    }
+    const st = wrap.style;
     switch (type) {
-        case 'bold': return txToggleWholeStyle(inner, 'font-weight', '700', html);
-        case 'italic': return txToggleWholeStyle(inner, 'font-style', 'italic', html);
-        case 'underline': return txToggleWholeDeco(inner, 'underline', html);
-        case 'strikeThrough': return txToggleWholeDeco(inner, 'line-through', html);
-        case 'fontName': return wrap('font-family:' + value);
-        case 'foreColor': return wrap('color:' + value);
-        case 'fontSize': return wrap('font-size:' + (TX_SIZE_PX[value] || '14px'));
-        case 'lineHeight': return `<div style="line-height:${value}">${inner}</div>`;
-        // 对齐已在 txApplyFormatToSelection 里走 td 级 aligns/valigns，不在此嵌套 div（兜底返回原文）
+        case 'bold':         st.fontWeight = st.fontWeight === '700' ? '' : '700'; break;
+        case 'italic':       st.fontStyle = st.fontStyle === 'italic' ? '' : 'italic'; break;
+        case 'underline':    txToggleDeco(st, 'underline'); break;
+        case 'strikeThrough':txToggleDeco(st, 'line-through'); break;
+        case 'fontName':     st.fontFamily = value || ''; break;
+        case 'foreColor':    st.color = value || ''; break;
+        case 'fontSize':     st.fontSize = TX_SIZE_PX[value] || '14px'; break;
+        case 'lineHeight':   st.lineHeight = value || ''; break;
+        case 'removeFormat': return txStripTags(html); // 清除 → 回纯文本
+        // 对齐走 td 级 aligns/valigns，不在此处理
         case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
-        case 'alignTop': case 'alignMiddle': case 'alignBottom': return html;
-        case 'removeFormat': return txStripTags(inner);
-        case 'undo': case 'redo': return html; // 批量模式不支持撤销重做
+        case 'alignTop': case 'alignMiddle': case 'alignBottom':
+        case 'undo': case 'redo': return html;
         default: return html;
     }
+    // wrapper 没有任何 style 了 → 拆掉容器还原裸内容
+    if (!wrap.getAttribute('style')) return wrap.innerHTML;
+    return wrap.outerHTML;
 }
-// 批量：整格 加粗/斜体 toggle（已有则去掉）
-function txToggleWholeStyle(inner, prop, val, original) {
-    const re = new RegExp('^<span style="' + prop + ':' + val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '">([\\s\\S]*)</span>$');
-    const m = original.match(re);
-    if (m) return m[1]; // 取消
-    return `<span style="${prop}:${val}">${inner}</span>`;
-}
-function txToggleWholeDeco(inner, deco, original) {
-    const re = new RegExp('^<span style="text-decoration:' + deco + '">([\\s\\S]*)</span>$');
-    const m = original.match(re);
-    if (m) return m[1];
-    return `<span style="text-decoration:${deco}">${inner}</span>`;
+// text-decoration 可同时含 underline + line-through，需合并/移除单项
+function txToggleDeco(st, deco) {
+    const cur = (st.textDecoration || st.textDecorationLine || '').split(/\s+/).filter(Boolean);
+    const idx = cur.indexOf(deco);
+    if (idx >= 0) cur.splice(idx, 1); else cur.push(deco);
+    st.textDecoration = cur.join(' ');
 }
 function txStripTags(html) {
     const d = document.createElement('div'); d.innerHTML = html;

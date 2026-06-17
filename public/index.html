@@ -2523,6 +2523,8 @@
                         .tx-board-table td .tx-cell-rich { width:100%; min-width:120px; min-height:32px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; outline:none; box-sizing:border-box; font-family:inherit; background:#fff; overflow:auto; }
                         .tx-board-table td .tx-cell-rich:focus { border-color:#1677ff; box-shadow:0 0 0 2px rgba(22,119,255,0.12); }
                         .tx-board-table td .tx-cell-rich ul, .tx-board-table td .tx-cell-rich ol { margin:2px 0; padding-left:20px; }
+                        /* ★ 批量整格格式容器：作为块级承载整格内容，整格级字体/颜色/加粗等设在它身上 */
+                        .tx-board-table td .tx-cellfmt, .tx-cellfmt { display:block; }
                         /* ★ 单元格对齐：让 td 的对齐真正作用到块级子元素(ol/ul/div/p) —— 否则列表块撑满整格，text-align 看不出效果 */
                         .tx-board-table td[data-halign="center"] { text-align:center; }
                         .tx-board-table td[data-halign="right"]  { text-align:right; }
@@ -3530,7 +3532,7 @@
     <script src="js/issues-versions.js?v=20260617a"></script>
     <script src="js/social.js?v=20260617a"></script>
     <script src="js/reports.js?v=20260617a"></script>
-    <script src="js/tencent-games.js?v=20260617f"></script>
+    <script src="js/tencent-games.js?v=20260617g"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260617a"></script>
