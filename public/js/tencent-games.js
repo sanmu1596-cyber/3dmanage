@@ -796,8 +796,8 @@ function txApplyFormatInEditor(type, value) {
         case 'lineHeight': _txFmtEd.style.lineHeight = value; break;
         case 'justifyLeft': case 'justifyCenter': case 'justifyRight':
             document.execCommand(type, false, null); break;
-        case 'insertUnorderedList': txToggleList(_txFmtEd, 'ul'); break;
-        case 'insertOrderedList': txToggleList(_txFmtEd, 'ol'); break;
+        case 'insertUnorderedList': txExecList(_txFmtEd, 'insertUnorderedList'); break;
+        case 'insertOrderedList': txExecList(_txFmtEd, 'insertOrderedList'); break;
         case 'fill':
             _txFmtEd.style.background = value || '';
             if (_txFmtCtx) {
@@ -812,38 +812,18 @@ function txApplyFormatInEditor(type, value) {
     txSaveSelection();
 }
 
-// ★ 列表 toggle（修复重复生成 + 支持取消）：用 wrap/unwrap 整段，而非 execCommand
-//   execCommand('insertOrderedList') 在表格格内多次点会重复嵌套 → 改为自己控制
-function txToggleList(ed, listTag) {
-    // 已是该类型列表 → 取消（拆成纯文本行）
-    const existing = ed.querySelector(listTag);
-    if (existing && ed.children.length === 1 && ed.firstElementChild === existing) {
-        const items = Array.from(existing.querySelectorAll('li')).map(li => li.innerHTML);
-        ed.innerHTML = items.join('<br>');
-        return;
-    }
-    // 另一种列表 → 先清掉
-    ed.querySelectorAll('ul, ol').forEach(l => {
-        const items = Array.from(l.querySelectorAll('li')).map(li => li.innerHTML);
-        const frag = document.createElement('div');
-        frag.innerHTML = items.join('<br>');
-        l.replaceWith(frag);
-        while (frag.firstChild) frag.parentNode.insertBefore(frag.firstChild, frag);
-        frag.remove();
-    });
-    // 把当前内容按 <br>/块 切成行，包成列表
-    const html = ed.innerHTML.trim();
-    const lines = html.split(/<br\s*\/?>|<\/div>\s*<div>/i)
-        .map(s => s.replace(/<\/?div>/gi, '').trim())
-        .filter(s => s !== '' && s !== '<br>');
-    const list = document.createElement(listTag);
-    (lines.length ? lines : ['']).forEach(line => {
-        const li = document.createElement('li');
-        li.innerHTML = line || '<br>';
-        list.appendChild(li);
-    });
-    ed.innerHTML = '';
-    ed.appendChild(list);
+// ★ 列表 toggle（编辑态）：直接用浏览器原生 execCommand
+//   原生 insertOrderedList / insertUnorderedList 本身就是 toggle：
+//     - 选区不在列表中 → 把选中的段落包成列表
+//     - 选区已在该类型列表中 → 再点一次自动取消（拆回普通段落）
+//   且只作用于「当前选区」，不会重写整格 innerHTML，绝不会重复增生。
+//   之前手写拆行重组逻辑脆弱（对已是 <li> 的结构拆不开 → 整块塞进 1 个 li 且旧列表残留 → 累加），已废弃。
+function txExecList(ed, cmd) {
+    if (!ed) return;
+    ed.focus();
+    txRestoreSelection();
+    try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+    document.execCommand(cmd, false, null);
 }
 
 // 模式B：对所有选中格的整格内容批量套用格式（包整段，存回 cells）
