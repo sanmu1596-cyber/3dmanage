@@ -2620,95 +2620,6 @@ function _genericColumnPanel(moduleKey, getVisibleObj, doRender) {
     };
 }
 
-// ==================== 字段设置面板工厂组件 ====================
-/**
- * 一次性创建完整的字段设置面板（DOM + 逻辑 + 函数注册）
- * 新增模块只需调用此函数，无需手写 HTML 面板和逐个绑定函数
- *
- * @param {Object} config
- * @param {string} config.moduleKey    - 模块标识，如 'report' 'games' → 生成面板ID: '{key}-column-settings'
- * @param {string} config.title        - 面板标题，如 '选择要显示的列'
- * @param {Array}  config.columns      - 字段配置 [{value:'name', label:'游戏名称', defaultChecked:true}, ...]
- * @param {Function} config.getVisibleObj - 返回当前可见列配置对象的函数 () => visibleColumnsVar
- * @param {Function} config.doRender    - 应用设置后重新渲染的函数 () => renderXxx()
- * @param {HTMLElement|string} [config.insertAfter] - 插入位置：DOM元素或选择器。面板将插入到该元素之后。
- *                                                    默认自动查找当前 tab 下 .toolbar 后面、.table-container 前面
- * @returns {{panel: Object, el: HTMLElement}} 面板实例和 DOM 元素
- */
-function createColumnSettingsPanel(config) {
-    var moduleKey = config.moduleKey;
-    var panelId = moduleKey + '-column-settings';
-    var storageKey = moduleKey + 'VisibleColumns';
-
-    // 如果已存在则不重复创建
-    if (document.getElementById(panelId)) {
-        console.warn('[createColumnSettingsPanel] 面板 #' + panelId + ' 已存在，跳过创建');
-        return null;
-    }
-
-    // ===== 1. 生成面板 DOM =====
-    var panel = document.createElement('div');
-    panel.id = panelId;
-    panel.className = 'column-settings-panel';
-    panel.style.display = 'none';
-
-    var checkboxHtml = config.columns.map(function(col) {
-        var checked = col.defaultChecked !== false ? 'checked' : '';
-        return '<div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="' + col.value + '" ' + checked + '><span>' + col.label + '</span></label></div>';
-    }).join('');
-
-    panel.innerHTML =
-        '<div class="settings-header">' +
-            '<h3>' + (config.title || '选择要显示的列') + '</h3>' +
-            '<button class="settings-close-btn" onclick="' + 'close' + capitalize(moduleKey) + 'ColumnSettings()" title="收起">&times;</button>' +
-            '<div class="settings-actions">' +
-                '<button class="tool-btn" onclick="' + 'selectAll' + capitalize(moduleKey) + 'Columns()">全选</button>' +
-                '<button class="tool-btn" onclick="' + 'deselectAll' + capitalize(moduleKey) + 'Columns()">取消全选</button>' +
-                '<button class="tool-btn" onclick="' + 'cancel' + capitalize(moduleKey) + 'ColumnSettings()">取消</button>' +
-                '<button class="tool-btn tool-btn-primary" onclick="' + 'apply' + capitalize(moduleKey) + 'ColumnSettings()">应用</button>' +
-            '</div>' +
-        '</div>' +
-        '<div class="settings-content">' + checkboxHtml + '</div>';
-
-    // ===== 2. 确定插入位置 =====
-    if (config.insertAfter && typeof config.insertAfter === 'object') {
-        config.insertAfter.insertAdjacentElement('afterend', panel);
-    } else if (config.insertAfter && typeof config.insertAfter === 'string') {
-        var target = document.querySelector(config.insertAfter);
-        if (target) target.insertAdjacentElement('afterend', panel);
-        else console.warn('[createColumnSettingsPanel] 找不到插入目标:', config.insertAfter);
-    } else {
-        // 自动查找：在最近的 .toolbar 之后插入
-        // 由于面板通常在 HTML 中紧跟 toolbar 之后，这里不做自动查找
-        // 调用者必须明确指定 insertAfter 或自行管理 DOM 位置
-        console.warn('[createColumnSettingsPanel] 未指定 insertAfter，面板已创建但未插入 DOM。请手动处理或传入 insertAfter 参数。');
-    }
-
-    // ===== 3. 注册通用面板逻辑 =====
-    var panelInstance = _genericColumnPanel(moduleKey, config.getVisibleObj, config.doRender);
-
-    // ===== 4. 挂载全局函数（window.xxx）=====
-    var cap = capitalize(moduleKey);
-    window['toggle' + cap + 'ColumnSettings'] = function() { panelInstance.toggle(); };
-    window['close' + cap + 'ColumnSettings'] = function() { panelInstance.close(); };
-    window['cancel' + cap + 'ColumnSettings'] = function() { panelInstance.cancel(); };
-    window['selectAll' + cap + 'Columns'] = function() { panelInstance.selectAll(); };
-    window['deselectAll' + cap + 'Columns'] = function() { panelInstance.deselectAll(); };
-    window['apply' + cap + 'ColumnSettings'] = function() { panelInstance.apply(); };
-    window['load' + cap + 'ColumnSettings'] = function() { panelInstance.load(); };
-
-    // 暴露给外部引用
-    window[moduleKey + 'ColumnPanel'] = panelInstance;
-
-    return { panel: panelInstance, el: panel };
-}
-
-/** 首字母大写工具函数 */
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-
 // ===== 成员模块 =====
 var _memberPanel = _genericColumnPanel('member',
     function() { return typeof memberVisibleColumns !== 'undefined' ? memberVisibleColumns : null; },
@@ -2773,45 +2684,333 @@ function deselectAllPlanListColumns() { _planListPanel.deselectAll(); }
 function applyPlanListColumnSettings() { _planListPanel.apply(); }
 function loadPlanListColumnSettings() { _planListPanel.load(); }
 
-// ===== 报表模块（使用 createColumnSettingsPanel 工厂创建）=====
-// 面板 DOM 由工厂在 loadReports() 中动态生成并插入到 toolbar 后面
-// 全局函数（toggleReportColumnSettings 等）由工厂自动挂载到 window
-var _reportPanel = null;  // 工厂创建后赋值
-function loadReportColumnSettings() { if (_reportPanel && _reportPanel.load) _reportPanel.load(); }
+// ===== 报表模块 =====
+var _reportPanel = _genericColumnPanel('report',
+    function() { return typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null; },
+    function() { if (typeof renderReportTable === 'function') renderReportTable(); }
+);
+function toggleReportColumnSettings() { _reportPanel.toggle(); }
+function closeReportColumnSettings() { _reportPanel.close(); }
+function cancelReportColumnSettings() { _reportPanel.cancel(); }
+function selectAllReportColumns() { _reportPanel.selectAll(); }
+function deselectAllReportColumns() { _reportPanel.deselectAll(); }
+function applyReportColumnSettings() { _reportPanel.apply(); }
+function loadReportColumnSettings() { _reportPanel.load(); }
+
+// ==================== 通用游戏选择器组件（穿梭框）====================
+/**
+ * 可复用的游戏穿梭框选择器 — 复用 #game-select-modal DOM
+ * 用于：适配进展添加游戏、报表新增行、配置计划添加游戏 等
+ *
+ * 用法：
+ *   openGameSelector({
+ *       title: '选择要添加的游戏',
+ *       mode: 'single',              // 'single' | 'batch'
+ *       excludeIds: [],               // 排除的游戏ID（如已添加的）
+ *       onConfirm: function(games) {} // 确认回调，参数为选中游戏数组
+ *   });
+ *
+ * 内部管理：
+ *   - 统一用 authFetch 加载游戏数据（带认证）
+ *   - 共享 _gameSelectorCache 避免重复请求
+ *   - 源列表/目标列表状态隔离（不影响 plans.js 的全局变量）
+ */
+
+var _gameSelectorCache = null;          // 共享游戏数据缓存 [{id,name,platform,game_type}, ...]
+var _gameSelectorCallback = null;        // 当前确认回调
+var _gsSourceList = [];                  // 当前实例的源列表
+var _gstTargetList = [];                 // 当前实例的目标列表（注意变量名避免和plans.js冲突）
+var _gsExcludeIds = new Set();           // 当前排除ID集合
+
+/** 加载共享游戏数据（authFetch，带认证） */
+function loadSharedGameList(forceRefresh) {
+    if (_gameSelectorCache && !forceRefresh) return Promise.resolve(_gameSelectorCache);
+    if (typeof authFetch !== 'function') return Promise.resolve([]);
+
+    return authFetch(typeof API_BASE !== 'undefined' ? API_BASE + '/games' : '/api/games')
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            var data = result && result.data ? result.data : (Array.isArray(result) ? result : []);
+            _gameSelectorCache = data.map(function(g) {
+                return {
+                    id: g.id,
+                    name: g.name || '',
+                    platform: g.platform || '-',
+                    gameType: g.game_type || g.game_type || '-'
+                };
+            });
+            return _gameSelectorCache;
+        })
+        .catch(function(err) {
+            console.warn('[GameSelector] 加载游戏列表失败:', err);
+            return [];
+        });
+}
 
 /**
- * 初始化报表字段设置面板（在 loadReports() 中调用一次）
- * 用法：initReportColumnSettings() — 自动创建DOM + 注册逻辑 + 插入到toolbar后面
+ * 打开通用游戏选择器弹窗
+ * @param {Object} opts
+ * @param {string} [opts.title='选择游戏'] - 弹窗标题
+ * @param {string} [opts.mode='single'] - 'single' 单选 | 'batch' 多选
+ * @param {Array}  [opts.excludeIds=[]] - 要排除的游戏ID数组
+ * @param {Function} opts.onConfirm - 确认回调 function(selectedGames[])
  */
-function initReportColumnSettings() {
-    if (document.getElementById('report-column-settings')) return; // 已初始化
+function openGameSelector(opts) {
+    var title = (opts && opts.title) || '选择游戏';
+    var mode = (opts && opts.mode) || 'single';
+    var excludeIds = (opts && opts.excludeIds) || [];
+    _gameSelectorCallback = (opts && opts.onConfirm) || null;
+    _gsExcludeIds = new Set(excludeIds);
 
-    var result = createColumnSettingsPanel({
-        moduleKey: 'report',
-        title: '选择要显示的列',
-        columns: [
-            { value: 'seq',     label: '序号' },
-            { value: 'name',    label: '游戏名称' },
-            { value: 'status',  label: '适配状态' },
-            { value: 'platform', label: '平台' },
-            { value: 'notes',   label: '备注' },
-            { value: 'action',  label: '操作' }
-        ],
-        getVisibleObj: function() {
-            return typeof reportVisibleColumns !== 'undefined' ? reportVisibleColumns : null;
-        },
-        doRender: function() {
-            if (typeof renderReportTable === 'function') renderReportTable();
-        },
-        insertAfter: '#reports .toolbar'
+    // 设置标题和确认按钮文本
+    var titleEl = document.getElementById('game-select-modal-title');
+    if (titleEl) titleEl.textContent = title;
+
+    // 加载数据 → 过滤 → 渲染 → 显示
+    loadSharedGameList().then(function(allGames) {
+        // 过滤排除项
+        _gsSourceList = allGames.filter(function(g) {
+            return !_gsExcludeIds.has(g.id);
+        }).map(function(g) {
+            return { id: g.id, name: g.name, platform: g.platform, gameType: g.gameType, checked: false };
+        });
+        _gstTargetList = [];
+
+        // 渲染两列
+        _gsRenderSourceList('');
+        _gsRenderTargetList();
+
+        // 重置搜索和全选
+        var srcSearch = document.getElementById('game-select-search');
+        var tgtSearch = document.getElementById('target-select-search');
+        var srcAll = document.getElementById('select-all-games');
+        var tgtAll = document.getElementById('select-all-target');
+        if (srcSearch) srcSearch.value = '';
+        if (tgtSearch) tgtSearch.value = '';
+        if (srcAll) srcAll.checked = false;
+        if (tgtAll) tgtAll.checked = false;
+        _gsUpdateCounts();
+
+        // 显示弹窗 + 动态绑定确认按钮
+        var modal = document.getElementById('game-select-modal');
+        if (modal) {
+            // 重绑确认按钮到通用回调（plans.js走自己的confirmAddGamesToProgress，这里不影响）
+            var footerBtns = modal.querySelectorAll('.modal-footer .tool-btn-primary');
+            footerBtns.forEach(function(btn) {
+                btn.setAttribute('onclick', '_gsConfirm()');
+            });
+            modal.style.display = 'block';
+        }
     });
+}
 
-    if (result) {
-        _reportPanel = result.panel;
-        // 立即加载 localStorage 持久化设置
-        _reportPanel.load();
+/** 关闭游戏选择器 */
+function closeGameSelector() {
+    var modal = document.getElementById('game-select-modal');
+    if (modal) modal.style.display = 'none';
+    _gameSelectorCallback = null;
+}
+
+// ====== 内部渲染函数（_gs 前缀避免和 plans.js 全局变量冲突）======
+
+/** HTML转义 */
+function _gsEscape(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/** 渲染源列表 */
+function _gsRenderSourceList(filterText) {
+    var container = document.getElementById('source-game-list');
+    if (!container) return;
+    var items = _gsSourceList;
+    if (filterText) {
+        var kw = filterText.toLowerCase();
+        items = items.filter(function(g) { return g.name.toLowerCase().indexOf(kw) !== -1; });
+    }
+    if (items.length === 0) {
+        container.innerHTML = '<div class="game-select-empty">无可用游戏</div>';
+        return;
+    }
+    container.innerHTML = items.map(function(game, idx) {
+        var realIdx = _gsSourceList.indexOf(game);
+        return '<div class="game-select-item ' + (game.checked ? 'selected' : '') + '" onclick="_gsToggleCheck(' + realIdx + ')" ondblclick="event.stopPropagation(); _gsDblTransfer(' + realIdx + ')">' +
+            '<input type="checkbox" ' + (game.checked ? 'checked' : '') + ' onclick="event.stopPropagation(); _gsToggleCheck(' + realIdx + ')">' +
+            '<div class="game-select-item-info">' +
+                '<span class="game-select-item-name">' + _gsEscape(game.name) + '</span>' +
+                '<span class="game-select-item-meta">' + _gsEscape(game.platform) + ' &middot; ' + _gsEscape(game.gameType) + '</span>' +
+            '</div></div>';
+    }).join('');
+    _gsUpdateCounts();
+}
+
+/** 渲染目标列表 */
+function _gsRenderTargetList(filterText) {
+    var container = document.getElementById('target-game-list');
+    if (!container) return;
+    var items = _gstTargetList;
+    if (filterText) {
+        var kw = filterText.toLowerCase();
+        items = items.filter(function(g) { return g.name.toLowerCase().indexOf(kw) !== -1; });
+    }
+    if (items.length === 0) {
+        container.innerHTML = '<div class="game-select-empty">无数据</div>';
+        return;
+    }
+    container.innerHTML = items.map(function(game, idx) {
+        var realIdx = _gstTargetList.indexOf(game);
+        return '<div class="game-select-item selected" onclick="_gsToggleTargetCheck(' + realIdx + ')" ondblclick="event.stopPropagation(); _gsDblTransferBack(' + realIdx + ')">' +
+            '<input type="checkbox" checked onclick="event.stopPropagation(); _gsToggleTargetCheck(' + realIdx + ')">' +
+            '<div class="game-select-item-info">' +
+                '<span class="game-select-item-name">' + _gsEscape(game.name) + '</span>' +
+                '<span class="game-select-item-meta">' + _gsEscape(game.platform) + ' &middot; ' + _gsEscape(game.gameType) + '</span>' +
+            '</div></div>';
+    }).join('');
+    _gsUpdateCounts();
+}
+
+/** 切换源列表勾选 */
+function _gsToggleCheck(index) {
+    if (index >= 0 && index < _gsSourceList.length) {
+        _gsSourceList[index].checked = !_gsSourceList[index].checked;
+        _gsRenderSourceList(document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '');
     }
 }
+
+/** 切换目标列表勾选 */
+function _gsToggleTargetCheck(index) {
+    if (index >= 0 && index < _gstTargetList.length) {
+        // 目标列表始终视为checked（checkbox只是UI）
+    }
+}
+
+/** 双击源列表项 → 移到目标 */
+function _gsDblTransfer(index) {
+    if (index < 0 || index >= _gsSourceList.length) return;
+    var game = _gsSourceList.splice(index, 1)[0];
+    game.checked = false;
+    _gstTargetList.push(game);
+    _gsRenderSourceList(document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '');
+    _gsRenderTargetList(document.getElementById('target-select-search') ? document.getElementById('target-select-search').value : '');
+}
+
+/** 双击目标列表项 → 移回源 */
+function _gsDblTransferBack(index) {
+    if (index < 0 || index >= _gstTargetList.length) return;
+    var game = _gstTargetList.splice(index, 1)[0];
+    game.checked = false;
+    _gsSourceList.push(game);
+    _gsRenderSourceList(document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '');
+    _gsRenderTargetList(document.getElementById('target-select-search') ? document.getElementById('target-select-search').value : '');
+}
+
+/** 源列表搜索过滤 */
+function _gsFilterSource() {
+    var searchEl = document.getElementById('game-select-search');
+    _gsRenderSourceList(searchEl ? searchEl.value : '');
+}
+
+/** 目标列表搜索过滤 */
+function _gsFilterTarget() {
+    var searchEl = document.getElementById('target-select-search');
+    _gsRenderTargetList(searchEl ? searchEl.value : '');
+}
+
+/** 源列表全选/取消 */
+function _gsToggleSelectAll() {
+    var chk = document.getElementById('select-all-games');
+    if (!chk) return;
+    var filterText = document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '';
+    var kw = filterText ? filterText.toLowerCase() : '';
+    _gsSourceList.forEach(function(g) {
+        if (!kw || g.name.toLowerCase().indexOf(kw) !== -1) {
+            g.checked = chk.checked;
+        }
+    });
+    _gsRenderSourceList(filterText);
+}
+
+/** 目标列表全选/取消 */
+function _gsToggleSelectAllTarget() {
+    var chk = document.getElementById('select-all-target');
+    if (!chk) return;
+    // 目标列表的全选只做视觉反馈，实际逻辑不需要
+}
+
+/** 穿梭：源→目标（选中项） */
+function _gsTransferToTarget() {
+    var checked = _gsSourceList.filter(function(g) { return g.checked; });
+    checked.forEach(function(game) {
+        var idx = _gsSourceList.indexOf(game);
+        if (idx !== -1) {
+            _gsSourceList.splice(idx, 1);
+            game.checked = false;
+            _gstTargetList.push(game);
+        }
+    });
+    _gsRenderSourceList(document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '');
+    _gsRenderTargetList(document.getElementById('target-select-search') ? document.getElementById('target-select-search').value : '');
+}
+
+/** 穿梭：目标→源（选中项） */
+function _gsTransferFromTarget() {
+    // 从目标移回所有（目标列表没有多选checkbox区分，直接全部移回或按选中）
+    // 简化：将目标列表全部移回
+    _gstTargetList.forEach(function(game) {
+        game.checked = false;
+        _gsSourceList.push(game);
+    });
+    _gstTargetList = [];
+    _gsRenderSourceList(document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '');
+    _gsRenderTargetList('');
+}
+
+/** 更新计数显示 */
+function _gsUpdateCounts() {
+    var srcCount = document.getElementById('source-game-count');
+    var tgtCount = document.getElementById('target-game-count');
+    var srcChecked = _gsSourceList.filter(function(g) { return g.checked; }).length;
+    if (srcCount) srcCount.textContent = srcChecked + '/' + _gsSourceList.length;
+    if (tgtCount) tgtCount.textContent = _gstTargetList.length + '/' + _gstTargetList.length;
+
+    // 更新全选状态
+    var srcAll = document.getElementById('select-all-games');
+    var filterText = document.getElementById('game-select-search') ? document.getElementById('game-select-search').value : '';
+    var visibleItems = _gsSourceList;
+    if (filterText) {
+        var kw = filterText.toLowerCase();
+        visibleItems = _gsSourceList.filter(function(g) { return g.name.toLowerCase().indexOf(kw) !== -1; });
+    }
+    if (srcAll) srcAll.checked = visibleItems.length > 0 && srcChecked === visibleItems.length;
+}
+
+/** 确认选择 */
+function _gsConfirm() {
+    if (_gameSelectorCallback) {
+        // 返回完整游戏对象数组（不含内部checked字段）
+        var selected = _gstTargetList.map(function(g) {
+            return { id: g.id, name: g.name, platform: g.platform, gameType: g.gameType };
+        });
+        _gameSelectorCallback(selected);
+    }
+    closeGameSelector();
+}
+
+// 将 _gs 函数挂载到 window（HTML onclick 需要）
+window._gsToggleCheck = _gsToggleCheck;
+window._gsToggleTargetCheck = _gsToggleTargetCheck;
+window._gsDblTransfer = _gsDblTransfer;
+window._gsDblTransferBack = _gsDblTransferBack;
+window._gsFilterSource = _gsFilterSource;
+window._gsFilterTarget = _gsFilterTarget;
+window._gsToggleSelectAll = _gsToggleSelectAll;
+window._gsToggleSelectAllTarget = _gsToggleSelectAllTarget;
+window._gsTransferToTarget = _gsTransferToTarget;
+window._gsTransferFromTarget = _gsTransferFromTarget;
+window._gsConfirm = _gsConfirm;
+// 兼容旧名称
+window.closeGameSelectModal = closeGameSelector;
+
 
 // ==================== 通用表格列排序功能 ====================
 

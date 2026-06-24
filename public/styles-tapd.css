@@ -6344,3 +6344,403 @@ mark.search-highlight {
 [data-theme="dark"] .draggable-row.dragging {
     background: #1a2a3a !important;
 }
+
+/* ==================== 近期关注事项（故事墙） ==================== */
+
+#focus-items-section {
+    margin-top: 24px;
+}
+
+.focus-header {
+    margin-bottom: 16px;
+}
+
+.focus-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.focus-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary, #18191c);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.focus-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.focus-filter-group {
+    display: flex;
+    gap: 4px;
+    background: #f0f1f3;
+    border-radius: 20px;
+    padding: 3px;
+}
+
+.focus-filter-btn {
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 13px;
+    padding: 5px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.focus-filter-btn:hover { color: #374151; }
+.focus-filter-btn.active {
+    background: #fff;
+    color: #18191c;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-weight: 600;
+}
+
+/* 故事墙布局 */
+.focus-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    min-height: 60px;
+}
+
+/* 大事卡片 */
+.focus-card {
+    background: #fff;
+    border: 1px solid #e4e6eb;
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    transition: all 0.25s ease;
+    cursor: grab;
+}
+.focus-card:hover {
+    border-color: #86b7fe;
+    box-shadow: 0 4px 16px rgba(38,132,255,0.10);
+    transform: translateY(-2px);
+}
+.focus-card.dragging { opacity: 0.5; transform: rotate(3deg) scale(1.02); z-index: 100; }
+
+/* 已结束置灰 */
+.focus-card.status-done {
+    opacity: 0.55;
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+.focus-card.status-done .focus-card-content,
+.focus-card.status-done .focus-module-tag { color: #9ca3af; }
+.focus-card.status-done:hover { opacity: 0.7; }
+
+/* 卡片头部：模块标签 + 状态 + 日期 */
+.focus-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.focus-module-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+.focus-module-tag.mod-游戏 { background: #fef3c7; color: #d97706; }
+.focus-module-tag.mod-交织 { background: #dbeafe; color: #2563eb; }
+.focus-module-tag.mod-客户端 { background: #dcfce7; color: #16a34a; }
+.focus-module-tag.mod-硬件 { background: #f3e8ff; color: #7c3aed; }
+
+.focus-status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.focus-status-badge.st-new { background: #eff6ff; color: #3b82f6; }
+.focus-status-badge.st-progress { background: #fffbeb; color: #f59e0b; }
+.focus-status-badge.st-done { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+
+/* 卡片内容 */
+.focus-card-body {
+    margin-bottom: 12px;
+}
+.focus-card-content {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-primary, #374151);
+    word-break: break-word;
+    /* 支持富文本中的图片 */
+}
+.focus-card-content img {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 6px 0;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+.focus-card-content img:hover { transform: scale(1.02); }
+
+.focus-card-date {
+    font-size: 11px;
+    color: #b0b3b8;
+    margin-bottom: 10px;
+}
+
+/* 卡片操作栏 */
+.focus-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #f0f1f3;
+    padding-top: 10px;
+    gap: 8px;
+}
+.focus-card-left-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.focus-card-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.focus-action-btn {
+    background: none;
+    border: none;
+    font-size: 13px;
+    color: #8b9099;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 5px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.focus-action-btn:hover { background: #f0f1f3; color: #374151; }
+.focus-action-btn.danger:hover { color: #ef4444; background: #fef2f2; }
+
+/* 拖拽手柄 */
+.focus-drag-handle {
+    cursor: grab;
+    color: #c4c7ce;
+    font-size: 14px;
+    user-select: none;
+}
+.focus-drag-handle:active { cursor: grabbing; }
+
+/* ====== 评论区（收起/展开） ====== */
+.focus-comments-section {
+    margin-top: 10px;
+    border-top: 1px dashed #eaecf0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s ease, margin 0.35s ease;
+    margin-top: 0;
+}
+.focus-comments-section.expanded {
+    max-height: 800px;
+    margin-top: 10px;
+}
+
+.focus-comments-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 8px 0 0;
+    text-align: left;
+    font-size: 13px;
+    color: #86909c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.15s;
+}
+.focus-comments-toggle:hover { color: #374151; }
+.focus-comments-toggle .toggle-arrow {
+    display: inline-block;
+    transition: transform 0.25s;
+    font-size: 11px;
+}
+.focus-comments-toggle.expanded .toggle-arrow { transform: rotate(180deg); }
+
+.focus-comment-list {
+    padding: 8px 0 4px;
+}
+.focus-comment-item {
+    background: #f8f9fb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+:focus-comment-item:last-child { margin-bottom: 0; }
+
+.focus-comment-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.focus-comment-author {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+.focus-comment-time {
+    font-size: 11px;
+    color: #b0b3b8;
+}
+:focus-comment-text {
+    font-size: 13px;
+    color: #4e525a;
+    line-height: 1.55;
+    word-break: break-word;
+}
+:focus-comment-text img { max-width: 100%; border-radius: 4px; margin: 4px 0; }
+
+/* 评论输入区 */
+.focus-comment-input-area {
+    margin-top: 8px;
+    display: none;
+}
+.focus-comment-input-area.visible { display: block; }
+
+.focus-comment-textarea {
+    width: 100%;
+    min-height: 50px;
+    max-height: 120px;
+    border: 1px solid #e4e6eb;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+.focus-comment-textarea:focus { border-color: #86b7fe; }
+
+:focus-comment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+/* ====== 编辑器弹窗 ====== */
+.focus-editor-box {
+    min-width: 520px;
+    max-width: 640px;
+    background: #fff;
+}
+.focus-rich-editor {
+    min-height: 140px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e4e6eb;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.65;
+    outline: none;
+    transition: border-color 0.2s;
+    color: #374151;
+    background: #fff;
+}
+.focus-rich-editor:focus { border-color: #86b7fe; box-shadow: 0 0 0 3px rgba(134,183,254,0.15); }
+.focus-rich-editor:empty::before {
+    content: attr(data-placeholder);
+    color: #b0b3b8;
+    pointer-events: none;
+}
+.focus-rich-editor img { max-width: 100%; border-radius: 6px; margin: 6px 0; }
+
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+}
+.toolbar-hint {
+    font-size: 12px;
+    color: #b0b3b8;
+}
+.btn-sm {
+    font-size: 12px;
+    padding: 4px 10px;
+}
+
+.form-inline-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* 图片预览弹窗 */
+.focus-image-preview-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+}
+.focus-image-preview-overlay img {
+    max-width: 85vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* 暗色模式适配 */
+[data-theme="dark"] #focus-items-section { margin-top: 24px; }
+[data-theme="dark"] .focus-title { color: #e5e7eb; }
+[data-theme="dark"] .focus-filter-group { background: #2d333b; }
+[data-theme="dark"] .focus-filter-btn { color: #9ca3af; }
+[data-theme="dark"] .focus-filter-btn:hover { color: #e5e7eb; }
+[data-theme="dark"] .focus-filter-btn.active { background: #373e47; color: #f3f4f6; }
+[data-theme="dark"] .focus-card {
+    background: #262b33;
+    border-color: #363c46;
+}
+[data-theme="dark"] .focus-card:hover { border-color: #4dacff; box-shadow: 0 4px 16px rgba(77,172,255,0.08); }
+[data-theme="dark"] .focus-card.status-done { background: #1e2228; border-color: #2d333b; }
+[data-theme="dark"] .focus-card-content { color: #c9cdd4; }
+[data-theme="dark"] .focus-comments-section { border-top-color: #363c46; }
+[data-theme="dark"] .focus-comment-item { background: #1e2228; }
+[data-theme="dark"] .focus-comment-author { color: #c9cdd4; }
+[data-theme="dark"] .focus-comment-text { color: #9ca3af; }
+[data-theme="dark"] .focus-rich-editor {
+    background: #1e2228;
+    border-color: #363c46;
+    color: #c9cdd4;
+}
+[data-theme="dark"] .focus-rich-editor:focus { border-color: #4dacff; }
+[data-theme="dark"] .focus-comment-textarea {
+    background: #1e2228;
+    border-color: #363c46;
+    color: #c9cdd4;
+}
+[data-theme="dark"] .focus-action-btn { color: #6b7280; }
+[data-theme="dark"] .focus-action-btn:hover { background: #2d333b; color: #e5e7eb; }
