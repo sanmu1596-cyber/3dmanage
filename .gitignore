@@ -30,4 +30,6 @@ npm-debug.log*
 # WorkBuddy internal
 .workbuddy/
 backups/
-*.png
+
+# 调试截图(仅根目录临时文件，不影响 public 下的项目图片)
+/_*.png
