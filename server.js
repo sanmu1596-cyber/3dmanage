@@ -859,7 +859,7 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
           ]), 11],
           // 缺陷管理
           ['bug_status', '缺陷状态', '缺陷管理', JSON.stringify([
-            {value:'open',label:'待处理'},{value:'in_progress',label:'处理中'},{value:'fixed',label:'已修复'},{value:'closed',label:'已关闭'},{value:'reopened',label:'重新打开'}
+            {value:'new',label:'待处理'},{value:'in_progress',label:'处理中'},{value:'fixed',label:'已修复'},{value:'verified',label:'已验证'},{value:'closed',label:'已关闭'},{value:'wontfix',label:'不修复'},{value:'reopened',label:'重新打开'}
           ]), 12],
           ['bug_priority', '缺陷优先级', '缺陷管理', JSON.stringify([
             {value:'low',label:'低'},{value:'medium',label:'中'},{value:'high',label:'高'},{value:'urgent',label:'紧急'}
@@ -3139,6 +3139,42 @@ try {
     }
 } catch(e) {
     console.error('[数据迁移] 适配状态选项迁移失败:', e.message);
+}
+
+// 3. bug_status「缺陷状态」存量脏数据 + field_options 统一
+//    权威枚举: new/in_progress/fixed/verified/closed/wontfix/reopened
+//    历史脏值映射: open→new, 处理中→in_progress, 已验证→verified, 空/null→new
+//    幂等执行，确保线上 git pull + pm2 restart 后自动生效
+try {
+    const bugMap = [
+        { old: 'open', new: 'new' },
+        { old: '待处理', new: 'new' },
+        { old: '处理中', new: 'in_progress' },
+        { old: '已修复', new: 'fixed' },
+        { old: '已验证', new: 'verified' },
+        { old: '已关闭', new: 'closed' },
+        { old: '重新打开', new: 'reopened' }
+    ];
+    let bugMigrated = 0;
+    bugMap.forEach(m => {
+        const r = db.prepare("UPDATE bugs SET bug_status = ? WHERE bug_status = ?").run(m.new, m.old);
+        if (r.changes > 0) { bugMigrated += r.changes; console.log(`[数据迁移] 缺陷状态 ${m.old}→${m.new}: ${r.changes}条`); }
+    });
+    const bugEmpty = db.prepare("UPDATE bugs SET bug_status = 'new' WHERE bug_status = '' OR bug_status IS NULL").run();
+    if (bugEmpty.changes > 0) { bugMigrated += bugEmpty.changes; console.log(`[数据迁移] 缺陷状态 空/NULL→new: ${bugEmpty.changes}条`); }
+    if (bugMigrated > 0) console.log(`[数据迁移] 缺陷状态(值)共迁移 ${bugMigrated} 条记录`);
+
+    const bugStatusOptions = JSON.stringify([
+        {value:'new',label:'待处理'},{value:'in_progress',label:'处理中'},{value:'fixed',label:'已修复'},
+        {value:'verified',label:'已验证'},{value:'closed',label:'已关闭'},{value:'wontfix',label:'不修复'},{value:'reopened',label:'重新打开'}
+    ]);
+    const bsRow = db.prepare("SELECT options FROM field_options WHERE field_key = 'bug_status'").get();
+    if (bsRow && bsRow.options !== bugStatusOptions) {
+        db.prepare("UPDATE field_options SET options = ? WHERE field_key = 'bug_status'").run(bugStatusOptions);
+        console.log(`[数据迁移] 缺陷状态下拉选项已统一为7项: 待处理/处理中/已修复/已验证/已关闭/不修复/重新打开`);
+    }
+} catch(e) {
+    console.error('[数据迁移] 缺陷状态迁移失败:', e.message);
 }
 
 // 启动服务器 (监听所有网络接口，支持外网访问)

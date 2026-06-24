@@ -2890,10 +2890,13 @@ function getBugStatusText(status) {
     const dynamic = getFieldOptionLabel('bug_status', status);
     if (dynamic !== status) return dynamic;
     const statusMap = {
-        'open': '待处理',
+        'new': '待处理',
+        'open': '待处理',        // 兼容历史脏数据
         'in_progress': '处理中',
         'fixed': '已修复',
+        'verified': '已验证',
         'closed': '已关闭',
+        'wontfix': '不修复',
         'reopened': '重新打开'
     };
     return statusMap[status] || status;
