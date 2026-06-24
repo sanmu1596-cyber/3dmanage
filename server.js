@@ -729,7 +729,7 @@ bugsRouter.get('/', auth.checkPermission('bugs', 'view'), (req, res) => {
 
 bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
   validate({
-    device_name: rules.name(100),
+    device_name: rules.optional(100),
     priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
     bug_status: rules.statusEnum(['new','in_progress','fixed','verified','closed','wontfix','reopened']),
     description: rules.textArea(2000),
@@ -767,7 +767,7 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
 
 bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'),
   validate({
-    device_name: rules.name(100),
+    device_name: rules.optional(100),
     priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
     bug_status: rules.statusEnum(['new','in_progress','fixed','verified','closed','wontfix','reopened']),
     description: rules.textArea(2000),

@@ -2363,17 +2363,38 @@ async function deleteTest(id) {
     });
 }
 
-// P0-1: 从缺陷点击「关联游戏」→跳转游戏列表并按名称筛选高亮
+// P0-1/P1: 从缺陷点击「关联游戏」→跳转游戏列表并【精确定位】只显示该游戏一条
+// 游戏列表筛选入口是 filterGames()(用 search-input 搜索框 + filteredGamesData 分页渲染)。
+// 精确定位 = name 完全相等过滤(只显示该游戏)，同时把游戏名填进搜索框让用户可见可清除。
 function jumpToGameByName(gameName) {
     if (!gameName) return;
+    const target = String(gameName).trim();
     if (typeof switchTab === 'function') switchTab('games');
     setTimeout(function () {
-        const search = document.getElementById('games-search');
-        if (search) {
-            search.value = gameName;
-            if (typeof filterModule === 'function') filterModule('games');
+        if (typeof allGamesData === 'undefined' || !Array.isArray(allGamesData)) return;
+        const exact = target.toLowerCase();
+        // 优先精确匹配 name；匹配不到时退回包含匹配，保证总能定位
+        let matched = allGamesData.filter(g => (g.name || '').toLowerCase().trim() === exact);
+        if (matched.length === 0) {
+            matched = allGamesData.filter(g => (g.name || '').toLowerCase().includes(exact));
         }
-        if (typeof showToast === 'function') showToast(`已定位到游戏「${gameName}」`, 'info');
+        // 把游戏名填进搜索框：用户可见，且手动清空即可恢复全部列表(走 filterGames)
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = target;
+        // 清空其他筛选，避免精确结果被平台/类型/状态过滤掉
+        ['platform-filter', 'type-filter', 'status-filter'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        filteredGamesData = matched;
+        if (typeof currentPage !== 'undefined') currentPage = 1;  // 回到第1页避免落在空页
+        if (typeof setSearchKeyword === 'function') setSearchKeyword('games-table', target);  // 高亮游戏名
+        if (typeof renderGamesPage === 'function') renderGamesPage();
+        if (typeof showToast === 'function') {
+            showToast(matched.length === 1
+                ? `已精确定位到游戏「${target}」，清空搜索框可恢复全部`
+                : `已定位到「${target}」相关游戏 ${matched.length} 条`, 'info');
+        }
     }, 120);
 }
 
