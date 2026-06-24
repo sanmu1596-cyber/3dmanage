@@ -2422,14 +2422,14 @@ function jumpToCustomerByName(name) {
 }
 
 // P0-1: 打开「添加缺陷」弹窗（先填充下拉再打开）
-function openBugModal() {
+async function openBugModal() {
     if (typeof resetForm === 'function') resetForm('bug-form');
     document.getElementById('bug-id').value = '';
-    populateBugModalSelects();
+    openModal('bug-modal');
+    await populateBugModalSelects();
     const scopeSel = document.getElementById('bug-impact-scope');
     if (scopeSel) scopeSel.value = 'single';
     onBugScopeChange();
-    openModal('bug-modal');
 }
 
 // P1-2: 影响范围切换 —— 选「影响所有客户」时禁用并清空客户选择
@@ -2450,7 +2450,25 @@ function onBugScopeChange() {
 
 // P0-1: 填充缺陷弹窗的「游戏名称」「客户名称」下拉
 // 游戏名 value=游戏名文本(重名用平台后缀在label区分); 客户名 value=manufacturer(客户名)
-function populateBugModalSelects() {
+// 修复: 用户未先访问游戏/客户列表时, allGamesData/allDevicesData 为空 -> 下拉只有「未关联」。
+//       这里按需直接拉接口兜底, 不依赖全局数组是否已预热。
+async function populateBugModalSelects() {
+    // 兜底: 全局数组为空时直接拉取
+    try {
+        if (typeof allGamesData === 'undefined' || !Array.isArray(allGamesData) || allGamesData.length === 0) {
+            const gr = await authFetch(`${API_BASE}/games`);
+            const gj = await gr.json();
+            allGamesData = gj.data || [];
+        }
+    } catch (e) { console.error('缺陷弹窗加载游戏数据失败:', e); }
+    try {
+        if (typeof allDevicesData === 'undefined' || !Array.isArray(allDevicesData) || allDevicesData.length === 0) {
+            const dr = await authFetch(`${API_BASE}/devices`);
+            const dj = await dr.json();
+            allDevicesData = dj.data || [];
+        }
+    } catch (e) { console.error('缺陷弹窗加载客户数据失败:', e); }
+
     const gameSel = document.getElementById('bug-game-name');
     const devSel = document.getElementById('bug-device-name');
     if (gameSel && typeof allGamesData !== 'undefined' && Array.isArray(allGamesData)) {
@@ -2489,7 +2507,7 @@ async function editBug(id) {
         const bug = result.data.find(b => b.id === id);
 
         if (bug) {
-            populateBugModalSelects();
+            await populateBugModalSelects();
             document.getElementById('bug-id').value = bug.id;
             document.getElementById('bug-versions').value = bug.versions || '';
             document.getElementById('bug-game-name').value = bug.game_name || '';
