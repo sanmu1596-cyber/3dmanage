@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260624c">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260624d">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
     <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -942,6 +942,7 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_name" checked><span>关联游戏</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="versions" checked><span>涉及版本</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>客户名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="impact_scope" checked><span>影响范围</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="discovery_time" checked><span>发现时间</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="bug_status" checked><span>缺陷状态</span></label></div>
@@ -959,6 +960,7 @@
                                     <th data-field="game_name">关联游戏</th>
                                     <th data-field="versions">涉及版本</th>
                                     <th data-field="device_name">客户名称</th>
+                                    <th data-field="impact_scope">影响范围</th>
                                     <th data-field="discovery_time">发现时间</th>
                                     <th data-field="owner">负责人</th>
                                     <th data-field="bug_status">缺陷状态</th>
@@ -3373,7 +3375,8 @@
                 <input type="hidden" id="bug-id">
                 <div class="form-grid">
                     <div class="form-group"><label>游戏名称</label><select id="bug-game-name"><option value="">未关联</option></select></div>
-                    <div class="form-group"><label>客户名称</label><select id="bug-device-name"><option value="">未关联</option></select></div>
+                    <div class="form-group"><label>影响范围</label><select id="bug-impact-scope" onchange="onBugScopeChange()"><option value="single">仅影响该客户</option><option value="all">影响所有客户</option></select></div>
+                    <div class="form-group" id="bug-device-group"><label>客户名称</label><select id="bug-device-name"><option value="">未关联</option></select></div>
                     <div class="form-group"><label>涉及版本</label><input type="text" id="bug-versions"></div>
                     <div class="form-group"><label>发现时间</label><input type="date" id="bug-discovery-time"></div>
                     <div class="form-group"><label>负责人</label><input type="text" id="bug-owner"></div>
@@ -3518,7 +3521,7 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260624c"></script>
+    <script src="js/core.js?v=20260624d"></script>
     <script src="js/auth.js?v=20260624c"></script>
     <!-- ★ 通用UI组件 -->
     <script src="js/components/searchable-select.js?v=20260624c"></script>
@@ -3528,7 +3531,7 @@
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
     <script src="js/router.js?v=20260624c"></script>
-    <script src="js/entities.js?v=20260624c"></script>
+    <script src="js/entities.js?v=20260624d"></script>
     <script src="js/plans.js?v=20260624c"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
     <script src="js/ui-features.js?v=20260624c"></script>

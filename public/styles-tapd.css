@@ -7403,3 +7403,25 @@ mark.search-highlight {
 }
 [data-theme="dark"] .link-cell { color: #60a5fa; }
 [data-theme="dark"] .link-cell:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+
+/* P1-2: 缺陷影响范围徽标 */
+.scope-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+}
+.scope-badge.scope-all {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+}
+.scope-badge.scope-single {
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+}
+[data-theme="dark"] .scope-badge.scope-all { color: #fca5a5; background: rgba(185,28,28,.18); border-color: rgba(252,165,165,.3); }
+[data-theme="dark"] .scope-badge.scope-single { color: #cbd5e1; background: rgba(148,163,184,.15); border-color: rgba(203,213,225,.2); }

@@ -227,6 +227,26 @@ db.all("PRAGMA table_info(adaptation_records)", [], (err, columns) => {
   }
 });
 
+// 兼容旧库：确保 bugs 表有 game_name / impact_scope 列（P0-1 + P1-2）
+db.all("PRAGMA table_info(bugs)", [], (err, columns) => {
+  if (err || !columns) return;
+  const hasGameName = columns.some(c => c.name === 'game_name');
+  if (!hasGameName) {
+    db.run("ALTER TABLE bugs ADD COLUMN game_name TEXT", (e) => {
+      if (e) console.error('  [启动] bugs添加game_name失败:', e.message);
+      else console.log('  [启动] bugs表已添加game_name列');
+    });
+  }
+  // P1-2: 影响范围 single=仅该客户 / all=影响所有客户
+  const hasImpactScope = columns.some(c => c.name === 'impact_scope');
+  if (!hasImpactScope) {
+    db.run("ALTER TABLE bugs ADD COLUMN impact_scope TEXT DEFAULT 'single'", (e) => {
+      if (e) console.error('  [启动] bugs添加impact_scope失败:', e.message);
+      else console.log('  [启动] bugs表已添加impact_scope列');
+    });
+  }
+});
+
 // 记录操作日志的辅助函数（增强版：req可选，传入时记录用户信息+IP审计）
 function logActivity(action, resourceType, resourceId, resourceName, changesJson, req) {
   const userName = (req && req.user) ? (req.user.real_name || req.user.username) : 'system';
@@ -716,12 +736,15 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
     steps: rules.textArea(3000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, impact_scope, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
+  const scope = (impact_scope === 'all') ? 'all' : 'single';
+  // 影响所有客户时不绑定具体客户名
+  const deviceNameVal = (scope === 'all') ? '' : device_name;
+  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, game_name, impact_scope, discovery_time,
                                 owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, deviceNameVal, game_name, scope, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -750,13 +773,15 @@ bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'),
     description: rules.textArea(2000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, impact_scope, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?, game_name = ?,
+  const scope = (impact_scope === 'all') ? 'all' : 'single';
+  const deviceNameVal = (scope === 'all') ? '' : device_name;
+  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?, game_name = ?, impact_scope = ?,
                             discovery_time = ?, owner = ?, bug_status = ?, priority = ?, problem_type = ?,
                             description = ?, steps = ?, test_id = ?, assignee_id = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, deviceNameVal, game_name, scope, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id, req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });

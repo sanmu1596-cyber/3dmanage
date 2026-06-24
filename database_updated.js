@@ -106,6 +106,7 @@ function initDatabase() {
       actual_fix_time DATE,
       planned_fix_time DATE,
       device_name TEXT,
+      impact_scope TEXT DEFAULT 'single',
       discovery_time DATE,
       owner TEXT,
       bug_status TEXT,

@@ -234,6 +234,7 @@ var bugVisibleColumns = {
     game_name: true,
     versions: true,
     device_name: true,
+    impact_scope: true,
     discovery_time: true,
     owner: true,
     bug_status: true,

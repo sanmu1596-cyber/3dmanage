@@ -91,7 +91,7 @@ registerColumnConfig('tests-table',
 
 // 缺陷模块列顺序
 registerColumnConfig('bugs-table',
-    ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
+    ['game_name', 'versions', 'device_name', 'impact_scope', 'discovery_time', 'owner', 'bug_status',
      'priority', 'problem_type', 'description'],
     'bugsColumnOrder'
 );
@@ -1028,9 +1028,13 @@ const exportConfigs = {
     },
     bugs: {
         sheetName: '缺陷列表',
-        getData: () => allBugsData,
+        getData: () => (allBugsData || []).map(b => Object.assign({}, b, {
+            impact_scope: (b.impact_scope === 'all') ? '影响所有客户' : '仅该客户',
+            device_name: (b.impact_scope === 'all') ? '全部客户' : (b.device_name || '')
+        })),
         columns: [
-            { key: 'versions', label: '涉及版本' }, { key: 'device_name', label: '设备名称' },
+            { key: 'versions', label: '涉及版本' }, { key: 'device_name', label: '客户名称' },
+            { key: 'impact_scope', label: '影响范围' },
             { key: 'discovery_time', label: '发现时间' }, { key: 'owner', label: '负责人' },
             { key: 'bug_status', label: '缺陷状态' }, { key: 'priority', label: '优先级' },
             { key: 'problem_type', label: '问题类型' }, { key: 'description', label: '描述' },
@@ -1315,7 +1319,7 @@ function renderBugsTable(data) {
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('bugs-table') :
-            ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
+            ['game_name', 'versions', 'device_name', 'impact_scope', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
 
         tbody.innerHTML = data.map((bug, index) => {
             // ★ 第一列：复选框（与thead的.batch-th对齐）
@@ -1336,10 +1340,19 @@ function renderBugsTable(data) {
                         rowHtml += `<td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>`;
                         break;
                     case 'device_name':
-                        if (bug.device_name) {
+                        if (bug.impact_scope === 'all') {
+                            rowHtml += `<td><span class="scope-badge scope-all" title="该缺陷影响所有客户">全部客户</span></td>`;
+                        } else if (bug.device_name) {
                             rowHtml += `<td><a class="link-cell" onclick="jumpToCustomerByName('${escapeHtml(bug.device_name).replace(/'/g, "\\'")}')" title="点击查看该客户">${highlightSearch(bug.device_name, 'bugs-table')}</a></td>`;
                         } else {
                             rowHtml += `<td>-</td>`;
+                        }
+                        break;
+                    case 'impact_scope':
+                        if (bug.impact_scope === 'all') {
+                            rowHtml += `<td class="text-center"><span class="scope-badge scope-all">影响所有客户</span></td>`;
+                        } else {
+                            rowHtml += `<td class="text-center"><span class="scope-badge scope-single">仅该客户</span></td>`;
                         }
                         break;
                     case 'discovery_time':
@@ -1424,7 +1437,7 @@ function filterModule(moduleName) {
         },
         bugs: {
             source: () => allBugsData,
-            searchFields: ['description', 'device_name', 'owner', 'problem_type', 'versions'],
+            searchFields: ['description', 'game_name', 'device_name', 'owner', 'problem_type', 'versions'],
             statusField: 'bug_status',
             render: renderBugsTable,
             filteredVar: 'filteredBugsData'
@@ -1867,6 +1880,7 @@ function initForms() {
         const data = {
             versions: document.getElementById('bug-versions').value,
             game_name: document.getElementById('bug-game-name').value,
+            impact_scope: (document.getElementById('bug-impact-scope') || {}).value || 'single',
             device_name: document.getElementById('bug-device-name').value,
             discovery_time: document.getElementById('bug-discovery-time').value,
             owner: document.getElementById('bug-owner').value,
@@ -2391,7 +2405,26 @@ function openBugModal() {
     if (typeof resetForm === 'function') resetForm('bug-form');
     document.getElementById('bug-id').value = '';
     populateBugModalSelects();
+    const scopeSel = document.getElementById('bug-impact-scope');
+    if (scopeSel) scopeSel.value = 'single';
+    onBugScopeChange();
     openModal('bug-modal');
+}
+
+// P1-2: 影响范围切换 —— 选「影响所有客户」时禁用并清空客户选择
+function onBugScopeChange() {
+    const scopeSel = document.getElementById('bug-impact-scope');
+    const devSel = document.getElementById('bug-device-name');
+    const devGroup = document.getElementById('bug-device-group');
+    if (!scopeSel || !devSel) return;
+    if (scopeSel.value === 'all') {
+        devSel.value = '';
+        devSel.disabled = true;
+        if (devGroup) devGroup.style.opacity = '0.5';
+    } else {
+        devSel.disabled = false;
+        if (devGroup) devGroup.style.opacity = '';
+    }
 }
 
 // P0-1: 填充缺陷弹窗的「游戏名称」「客户名称」下拉
@@ -2439,7 +2472,10 @@ async function editBug(id) {
             document.getElementById('bug-id').value = bug.id;
             document.getElementById('bug-versions').value = bug.versions || '';
             document.getElementById('bug-game-name').value = bug.game_name || '';
+            const scopeSel = document.getElementById('bug-impact-scope');
+            if (scopeSel) scopeSel.value = (bug.impact_scope === 'all') ? 'all' : 'single';
             document.getElementById('bug-device-name').value = bug.device_name || '';
+            onBugScopeChange();
             document.getElementById('bug-discovery-time').value = bug.discovery_time || '';
             document.getElementById('bug-owner').value = bug.owner || '';
             document.getElementById('bug-status').value = bug.bug_status;
