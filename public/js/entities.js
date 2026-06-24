@@ -990,7 +990,7 @@ const exportConfigs = {
             { key: 'developer', label: '开发商' }, { key: 'operator', label: '运营商' },
             { key: 'release_date', label: '上线日期' }, { key: 'config_path', label: '配置路径' },
             { key: 'adapter_progress', label: '适配进度' }, { key: 'owner_name', label: '负责人' },
-            { key: 'online_status', label: 'hook开发状态' }, { key: 'quality', label: '品质' },
+            { key: 'online_status', label: '适配状态' }, { key: 'quality', label: '品质' },
             { key: 'game_account', label: '游戏账号' }, { key: 'storage_location', label: '存储位置' }
         ]
     },
@@ -1169,7 +1169,7 @@ function handleExcelUpload(event) {
                             release_date: row['上线日期'] || row['release_date'] || '',
                             config_path: row['配置路径'] || row['config_path'] || '',
                             adapter_progress: row['适配进度'] || row['adapter_progress'] || '',
-                            online_status: row['hook开发状态'] || row['online_status'] || 'undeveloped',
+                            online_status: row['适配状态'] || row['hook开发状态'] || row['online_status'] || 'undeveloped',
                             quality: row['品质'] || row['quality'] || 'normal',
                             game_account: row['游戏账号'] || row['game_account'] || '',
                             storage_location: row['存储位置'] || row['storage_location'] || ''
@@ -1512,7 +1512,7 @@ function updateGamesModuleStats() {
     // 上线状态统计
     const onlineStatusMap = {};
     try { getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label); } catch(e) {}
-    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已完成','developing':'开发中','undeveloped':'未开发','anticheat':'反外挂','not_applicable':'不适用'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const onlineCounts = {};
     data.forEach(g => {
@@ -1618,7 +1618,7 @@ function updateProgressModuleStats(deviceIndex) {
     // 上线状态统计
     const onlineStatusMap = {};
     try { getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label); } catch(e) {}
-    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已完成','developing':'开发中','undeveloped':'未开发','anticheat':'反外挂','not_applicable':'不适用'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const statusCounts = {};
     games.forEach(g => {
@@ -1771,7 +1771,6 @@ function initForms() {
             adapter_progress: document.getElementById('game-adapter-progress').value,
             version: document.getElementById('game-version').value,
             package_size: document.getElementById('game-package-size').value,
-            adaptation_status: document.getElementById('game-adaptation-status').value,
             adaptation_notes: document.getElementById('game-adaptation-notes').value,
             owner_id: document.getElementById('game-owner').value,
             online_status: document.getElementById('game-online-status').value,
@@ -2262,7 +2261,6 @@ async function editGame(id) {
             document.getElementById('game-adapter-progress').value = game.adapter_progress || '';
             document.getElementById('game-version').value = game.version || '';
             document.getElementById('game-package-size').value = game.package_size || '';
-            document.getElementById('game-adaptation-status').value = game.adaptation_status || '';
             document.getElementById('game-adaptation-notes').value = game.adaptation_notes || '';
             document.getElementById('game-owner').value = game.owner_id || '';
             document.getElementById('game-online-status').value = game.online_status || 'undeveloped';

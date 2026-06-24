@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260617a">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260618b">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260617a">
+    <link rel="stylesheet" href="design-system.css?v=20260618b">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -221,7 +221,7 @@
                                 <canvas id="chart-platform" height="260"></canvas>
                             </div>
                             <div class="chart-card">
-                                <div class="chart-card-header">hook开发状态分布</div>
+                                <div class="chart-card-header">适配状态分布</div>
                                 <canvas id="chart-online-status" height="260"></canvas>
                             </div>
                             <div class="chart-card">
@@ -412,7 +412,7 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="config_path" checked><span>配置路径</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_progress" checked><span>适配进度</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>hook开发状态</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>适配状态</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quality" checked><span>品质</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_account" checked><span>游戏账号</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="storage_location" checked><span>存储位置</span></label></div>
@@ -439,7 +439,7 @@
                                     <th data-field="config_path">配置路径</th>
                                     <th data-field="adapter_progress">适配进度</th>
                                     <th data-field="owner">负责人</th>
-                                    <th data-field="online_status">hook开发状态</th>
+                                    <th data-field="online_status">适配状态</th>
                                     <th data-field="quality">品质</th>
                                     <th data-field="game_account">游戏账号</th>
                                     <th data-field="storage_location">存储位置</th>
@@ -779,7 +779,7 @@
                                     <th>游戏平台</th>
                                     <th>游戏类型</th>
                                     <th>负责人</th>
-                                    <th>hook开发状态</th>
+                                    <th>适配状态</th>
                                     <th>品质</th>
                                     <th>问题备注</th>
                                     <th>更新日期</th>
@@ -3322,9 +3322,8 @@
                     <div class="form-group"><label>适配进度</label><input type="text" id="game-adapter-progress" placeholder="例如：80%"></div>
                     <div class="form-group"><label>游戏版本</label><input type="text" id="game-version"></div>
                     <div class="form-group"><label>安装包大小</label><input type="text" id="game-package-size" placeholder="例如：500MB"></div>
-                    <div class="form-group"><label>适配状态</label><select id="game-adaptation-status"><option value="pending">待适配</option><option value="in_progress">适配中</option><option value="completed">已完成</option><option value="failed">失败</option></select></div>
                     <div class="form-group"><label>负责人</label><select id="game-owner"><option value="">未分配</option></select></div>
-                    <div class="form-group"><label>hook开发状态</label><select id="game-online-status"><option value="completed">已完成</option><option value="developing">开发中</option><option value="undeveloped">未开发</option><option value="anticheat">反外挂</option><option value="not_applicable">不适用</option></select></div>
+                    <div class="form-group"><label>适配状态</label><select id="game-online-status"><option value="undeveloped">未开始</option><option value="developing">开发中</option><option value="completed">已发布</option><option value="anticheat">反外挂</option><option value="not_applicable">不适用</option></select></div>
                     <div class="form-group"><label>品质</label><select id="game-quality"><option value="normal">一般</option><option value="recommended">推荐</option></select></div>
                     <div class="form-group"><label>游戏账号</label><textarea id="game-account" rows="2" placeholder="每行一个账号，支持多账号"></textarea></div>
                     <div class="form-group"><label>存储位置</label><select id="game-storage-location"><option value="硬盘1号">硬盘1号</option><option value="硬盘2号">硬盘2号</option><option value="硬盘3号">硬盘3号</option><option value="硬盘4号">硬盘4号</option><option value="硬盘5号">硬盘5号</option><option value="硬盘6号">硬盘6号</option><option value="硬盘7号">硬盘7号</option><option value="硬盘8号">硬盘8号</option><option value="硬盘9号">硬盘9号</option><option value="硬盘10号">硬盘10号</option></select></div>
@@ -3516,29 +3515,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260617a"></script>
-    <script src="js/auth.js?v=20260617a"></script>
+    <script src="js/core.js?v=20260618b"></script>
+    <script src="js/auth.js?v=20260618b"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260617a"></script>
-    <script src="js/components/media-viewer.js?v=20260617a"></script>
-    <script src="js/components/tooltip.js?v=20260617a"></script>
-    <script src="js/components/ui-dialog.js?v=20260617a"></script>
-    <script src="js/components/a11y.js?v=20260617a"></script>
-    <script src="js/crud-module.js?v=20260617a"></script>
-    <script src="js/router.js?v=20260617i"></script>
-    <script src="js/entities.js?v=20260617a"></script>
-    <script src="js/plans.js?v=20260617a"></script>
-    <script src="js/dashboard.js?v=20260617a"></script>
-    <script src="js/ui-features.js?v=20260617a"></script>
-    <script src="js/admin.js?v=20260617a"></script>
-    <script src="js/requirements.js?v=20260617a"></script>
-    <script src="js/testcases.js?v=20260617a"></script>
-    <script src="js/issues-versions.js?v=20260617a"></script>
-    <script src="js/social.js?v=20260617a"></script>
-    <script src="js/reports.js?v=20260617a"></script>
-    <script src="js/tencent-games.js?v=20260617i"></script>
+    <script src="js/components/searchable-select.js?v=20260618b"></script>
+    <script src="js/components/media-viewer.js?v=20260618b"></script>
+    <script src="js/components/tooltip.js?v=20260618b"></script>
+    <script src="js/components/ui-dialog.js?v=20260618b"></script>
+    <script src="js/components/a11y.js?v=20260618b"></script>
+    <script src="js/crud-module.js?v=20260618b"></script>
+    <script src="js/router.js?v=20260618b"></script>
+    <script src="js/entities.js?v=20260618b"></script>
+    <script src="js/plans.js?v=20260618b"></script>
+    <script src="js/dashboard.js?v=20260618b"></script>
+    <script src="js/ui-features.js?v=20260618b"></script>
+    <script src="js/admin.js?v=20260618b"></script>
+    <script src="js/requirements.js?v=20260618b"></script>
+    <script src="js/testcases.js?v=20260618b"></script>
+    <script src="js/issues-versions.js?v=20260618b"></script>
+    <script src="js/social.js?v=20260618b"></script>
+    <script src="js/reports.js?v=20260618b"></script>
+    <script src="js/tencent-games.js?v=20260618b"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260617a"></script>
+    <script src="modules-extra.js?v=20260618b"></script>
 </body>
 </html>

@@ -816,8 +816,8 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
           ['adaptation_status', '适配状态', '游戏管理', JSON.stringify([
             {value:'pending',label:'待适配'},{value:'in_progress',label:'适配中'},{value:'completed',label:'已完成'},{value:'failed',label:'失败'}
           ]), 6],
-          ['online_status', 'hook开发状态', '游戏管理', JSON.stringify([
-            {value:'completed',label:'已完成'},{value:'developing',label:'开发中'},{value:'undeveloped',label:'未开发'},{value:'anticheat',label:'反外挂'},{value:'not_applicable',label:'不适用'}
+          ['online_status', '适配状态', '游戏管理', JSON.stringify([
+            {value:'undeveloped',label:'未开始'},{value:'developing',label:'开发中'},{value:'completed',label:'已发布'},{value:'anticheat',label:'反外挂'},{value:'not_applicable',label:'不适用'}
           ]), 7],
           ['quality', '品质', '游戏管理', JSON.stringify([
             {value:'normal',label:'一般'},{value:'recommended',label:'推荐'}
@@ -857,6 +857,7 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
         console.log('字段选项默认数据初始化完成');
       }
     });
+    // 注：online_status「适配状态」的字段名与选项迁移统一在文件末尾的数据迁移段执行（单一数据源）
   }
 });
 
@@ -3003,24 +3004,27 @@ try {
     console.error('[数据迁移] hook开发状态值迁移失败:', e.message);
 }
 
-// 2. 更新 field_options 表中的下拉选项（旧选项→新5项）
+// 2. 更新 field_options 表中的「适配状态」(online_status) 字段名 + 下拉选项
+//    value 不变（completed/developing/undeveloped/anticheat/not_applicable），仅改显示名：
+//    completed: 已完成→已发布；undeveloped: 未开发→未开始；field_label: hook开发状态→适配状态
+//    幂等执行，确保线上 git pull + pm2 restart 后自动生效（单一数据源，勿在别处重复迁移）
 try {
     const newOptions = JSON.stringify([
-        {value:'completed',label:'已完成'},
+        {value:'undeveloped',label:'未开始'},
         {value:'developing',label:'开发中'},
-        {value:'undeveloped',label:'未开发'},
+        {value:'completed',label:'已发布'},
         {value:'anticheat',label:'反外挂'},
         {value:'not_applicable',label:'不适用'}
     ]);
-    const row = db.prepare("SELECT options FROM field_options WHERE field_key = 'online_status'").get();
-    if (row && row.options !== newOptions) {
-        const result = db.prepare("UPDATE field_options SET options = ? WHERE field_key = 'online_status'").run(newOptions);
+    const row = db.prepare("SELECT field_label, options FROM field_options WHERE field_key = 'online_status'").get();
+    if (row && (row.options !== newOptions || row.field_label !== '适配状态')) {
+        const result = db.prepare("UPDATE field_options SET field_label = '适配状态', options = ? WHERE field_key = 'online_status'").run(newOptions);
         if (result.changes > 0) {
-            console.log(`[数据迁移] hook开发状态(下拉选项)已更新为新的5项`);
+            console.log(`[数据迁移] 适配状态(online_status)字段名+下拉选项已统一为: 未开始/开发中/已发布/反外挂/不适用`);
         }
     }
 } catch(e) {
-    console.error('[数据迁移] hook开发状态选项迁移失败:', e.message);
+    console.error('[数据迁移] 适配状态选项迁移失败:', e.message);
 }
 
 // 启动服务器 (监听所有网络接口，支持外网访问)

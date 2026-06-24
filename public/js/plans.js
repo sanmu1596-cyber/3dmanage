@@ -206,7 +206,7 @@ function renderProgressTable(deviceIndex) {
     const onlineStatusMap = {};
     getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label);
     // fallback
-    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已完成','developing':'开发中','undeveloped':'未开发','anticheat':'反外挂','not_applicable':'不适用'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const qualityMap = {};
     getFieldOptionsByKey('quality').forEach(o => qualityMap[o.value] = o.label);
@@ -442,7 +442,7 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     } else if (field === 'onlineStatus') {
         // 上线状态（从字段设置动态获取）
         let statuses = getFieldOptionsByKey('online_status').map(o => ({ value: o.value, text: o.label }));
-        if (statuses.length === 0) statuses = [{value:'completed',text:'已完成'},{value:'developing',text:'开发中'},{value:'undeveloped',text:'未开发'},{value:'anticheat',text:'反外挂'},{value:'not_applicable',text:'不适用'}];
+        if (statuses.length === 0) statuses = [{value:'undeveloped',text:'未开始'},{value:'developing',text:'开发中'},{value:'completed',text:'已发布'},{value:'anticheat',text:'反外挂'},{value:'not_applicable',text:'不适用'}];
         statuses.forEach(status => {
             const option = document.createElement('option');
             option.value = status.value;
@@ -2796,9 +2796,7 @@ function refreshAllSelectsFromFieldOptions() {
     // 设备管理 - 状态
     populateSelectFromFieldOptions('device-status', 'device_status', 'available');
     
-    // 游戏管理 - 适配状态
-    populateSelectFromFieldOptions('game-adaptation-status', 'adaptation_status', 'pending');
-    // 游戏管理 - 上线状态
+    // 游戏管理 - 适配状态（弹窗用 online_status，旧的 adaptation_status 已移除）
     populateSelectFromFieldOptions('game-online-status', 'online_status', 'undeveloped');
     // 游戏管理 - 品质
     populateSelectFromFieldOptions('game-quality', 'quality', 'normal');
