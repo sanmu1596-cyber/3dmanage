@@ -361,8 +361,9 @@ body {
 /* ========== 右侧内容区域 ========== */
 .content-area {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* ★ 改为 hidden + min-height:0，让内部 .table-container 成为唯一滚动容器（sticky 生效） */
+    overflow: hidden;
+    min-height: 0;
     background: transparent;
     display: flex;
     flex-direction: column;
@@ -373,7 +374,9 @@ body {
     display: none;
     flex: 1;
     flex-direction: column;
-    overflow: visible;
+    /* ★ 改为 hidden，让内部 .table-container 成为唯一滚动容器，确保 sticky 表头生效 */
+    overflow: hidden;
+    min-height: 0;
     padding: 16px;
     background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(2px);
@@ -1010,6 +1013,8 @@ body {
 .table-container {
     flex: 1;
     overflow: auto;
+    /* ★ 关键：必须设置最小高度为0，否则 flex 容器内 overflow 不会触发滚动条 → sticky 失效 */
+    min-height: 0;
     position: relative;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(8px);
@@ -1076,26 +1081,33 @@ body {
     z-index: 10;
 }
 
-/* TAPD 风格表头 - 半透明 + 深色文字 */
+/* TAPD 风格表头 - 不透明背景（粘性定位需要不透明，否则下方行内容会透出） */
 .data-table th {
     padding: 12px 14px;
     text-align: left;
     font-family: var(--font-title);
     font-weight: 600;
     color: var(--text-secondary);
-    background: rgba(245, 245, 245, 0.7);
-    backdrop-filter: blur(4px);
+    background: #f5f5f5;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
     font-size: 13px;
     position: relative;
+    /* ★ 粘性表头需要每个 th 都明确粘住顶部 */
+}
+
+/* ★ 粘性表头：滚动时表头始终可见 */
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 11;
 }
 
 .data-table th:last-child {
     border-right: none;
 }
 
-/* 列宽拖拽手柄 - 常驻可见 */
+/* 列宽拖拽手柄 - hover表头时才显示，更聚焦 */
 .col-resize-handle {
     position: absolute;
     right: -1px;
@@ -1104,13 +1116,22 @@ body {
     width: 3px;
     cursor: col-resize;
     z-index: 20;
-    background: var(--border-light, #e5e6eb);
+    background: transparent;
     border-radius: 2px;
-    transition: background 0.15s, width 0.1s;
+    transition: background 0.15s, opacity 0.15s, width 0.1s;
+    opacity: 0;
 }
 
+/* hover 表头时显示 handle，方便用户发现 */
+.data-table thead th:hover .col-resize-handle {
+    opacity: 1;
+    background: var(--border, #d4d8dc);
+}
+
+/* hover handle 自身 - 主色高亮 */
 .col-resize-handle:hover {
-    background: var(--primary);
+    opacity: 1 !important;
+    background: var(--primary) !important;
     width: 4px;
     right: -1.5px;
     top: 2px;
@@ -1118,7 +1139,8 @@ body {
 }
 
 .col-resize-handle.resizing {
-    background: var(--primary);
+    opacity: 1 !important;
+    background: var(--primary) !important;
     width: 4px;
     right: -1.5px;
     top: 0;
@@ -1135,14 +1157,21 @@ body.col-resizing * {
 }
 
 /* ========== 表头拖拽排序 - TAPD风格 ========== */
-/* 可拖拽表头样式 */
+/* 可拖拽表头样式 — 默认指针（单击=排序），长按才出现抓取光标 */
 .data-table th[data-field] {
-    cursor: grab;
+    cursor: pointer;
     user-select: none;
 }
 
-.data-table th[data-field]:active {
-    cursor: grabbing;
+/* 长按过程中显示抓手光标 */
+.data-table th[data-field].press-hint {
+    cursor: grab;
+}
+
+/* 正在拖拽时 */
+.data-table th[data-field]:active,
+.data-table th.dragging-source {
+    cursor: grabbing !important;
 }
 
 /* 拖拽中的表头 */
@@ -1436,15 +1465,29 @@ body.col-resizing * {
     background: transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.2s;
-    opacity: 0.4; /* 默认更淡，强调操作区域 */
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+    opacity: 0; /* ★ 默认完全隐藏，行hover时才淡入 */
+    pointer-events: none;
 }
 
-/* P1.2优化：行悬停时操作按钮更加明显 */
+/* ★ TAPD 风格：行 hover 时操作按钮淡入显示 */
 tr:hover .action-icon-btn {
-    opacity: 0.9; /* 悬停时几乎可见 */
-    background: var(--bg-elevated);
-    transform: scale(1.05); /* 轻微放大 */
+    opacity: 0.85;
+    pointer-events: auto;
+}
+
+/* hover 单个按钮时高亮 */
+tr:hover .action-icon-btn:hover {
+    opacity: 1 !important;
+    background: var(--primary-light) !important;
+    transform: scale(1.08);
+}
+
+/* 选中行始终显示按钮 */
+.data-table tbody tr.selected .action-icon-btn,
+.data-table tbody tr.row-selected .action-icon-btn {
+    opacity: 0.85 !important;
+    pointer-events: auto;
 }
 
 tr:hover .action-icon-btn:hover {
@@ -1516,6 +1559,509 @@ tr:hover .action-icon-btn:hover {
     background: #ffebee;
 }
 
+/* ========== MediaViewer 图片/视频查看器 ========== */
+.media-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+.media-viewer .mv-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(2px);
+    cursor: zoom-out;
+}
+.media-viewer .mv-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+}
+.media-viewer .mv-canvas {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 90vw;
+    max-height: 85vh;
+}
+.media-viewer .mv-img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+    cursor: zoom-in;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.media-viewer .mv-video {
+    max-width: 90vw;
+    max-height: 85vh;
+    border-radius: 4px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+    background: #000;
+}
+.media-viewer .mv-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.15s;
+    backdrop-filter: blur(8px);
+    z-index: 2;
+}
+.media-viewer .mv-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: translateY(-50%) scale(1.06);
+}
+.media-viewer .mv-btn-prev { left: 24px; }
+.media-viewer .mv-btn-next { right: 24px; }
+.media-viewer .mv-toolbar {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    backdrop-filter: blur(10px);
+    z-index: 2;
+}
+.media-viewer .mv-tool {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+}
+.media-viewer .mv-tool:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+.media-viewer .mv-zoom-info {
+    color: #fff;
+    font-size: 13px;
+    min-width: 48px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.media-viewer .mv-counter {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 13px;
+    margin: 0 6px 0 12px;
+    font-variant-numeric: tabular-nums;
+}
+.media-viewer .mv-close {
+    margin-left: 4px;
+}
+@media (max-width: 640px) {
+    .media-viewer .mv-btn { width: 40px; height: 40px; font-size: 24px; }
+    .media-viewer .mv-btn-prev { left: 12px; }
+    .media-viewer .mv-btn-next { right: 12px; }
+    .media-viewer .mv-toolbar { bottom: 16px; padding: 6px 10px; }
+    .media-viewer .mv-tool { width: 30px; height: 30px; font-size: 14px; }
+}
+/* 富文本中的图片：鼠标提示可点击放大 */
+.rich-paste-editor img,
+.gi-detail-section .rich-paste-editor img,
+.focus-rich-editor img,
+.rich-cell img {
+    cursor: zoom-in;
+    transition: opacity 0.15s;
+}
+.rich-paste-editor img:hover,
+.gi-detail-section .rich-paste-editor img:hover,
+.focus-rich-editor img:hover {
+    opacity: 0.92;
+}
+
+/* ========== 游戏问题详情弹窗 ========== */
+.gi-detail-body label {
+    display: block;
+    color: var(--text-secondary, #666);
+    font-size: 13px;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.gi-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.gi-detail-row .gi-detail-value {
+    padding: 7px 10px;
+    background: rgba(0,0,0,0.03);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-primary, #1f2329);
+    min-height: 32px;
+    box-sizing: border-box;
+}
+.gi-inline-select {
+    padding: 7px 10px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 13px;
+    color: var(--text-primary, #1f2329);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.gi-inline-select:focus {
+    outline: none;
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+}
+.gi-detail-section .rich-paste-editor {
+    min-height: 120px;
+}
+.gi-detail-section .rich-paste-editor img {
+    cursor: zoom-in;
+}
+[data-theme="dark"] .gi-detail-row .gi-detail-value {
+    background: rgba(255,255,255,0.05);
+    color: #e8eaed;
+}
+[data-theme="dark"] .gi-inline-select {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+.btn.btn-sm {
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border, #d4d8dc);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn.btn-sm:hover {
+    background: var(--primary, #1677ff);
+    color: #fff;
+    border-color: var(--primary, #1677ff);
+}
+/* 列表中游戏名称链接 */
+.game-name-link:hover {
+    text-decoration: underline !important;
+    color: var(--primary-hover, #4096ff) !important;
+}
+
+/* ========== 可搜索下拉框（searchable select）— 学习 TAPD ========== */
+.searchable-select {
+    position: relative;
+    width: 100%;
+}
+.searchable-select-input {
+    width: 100%;
+    padding: 0 32px 0 12px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    color: var(--text-primary, #1f2329);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+    box-sizing: border-box;
+    height: 36px;
+    line-height: 34px; /* ★ 等于 height-2px(border)，确保文字垂直居中且不被裁切 */
+}
+.searchable-select-input:focus,
+.searchable-select.open .searchable-select-input {
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+    cursor: text;
+}
+.searchable-select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary, #999);
+    font-size: 12px;
+    pointer-events: none;
+    transition: transform 0.18s;
+}
+.searchable-select.open .searchable-select-arrow {
+    transform: translateY(-50%) rotate(180deg);
+}
+.searchable-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    z-index: 100;
+    display: none;
+    padding: 4px 0;
+}
+.searchable-select.open .searchable-select-dropdown {
+    display: block;
+}
+.searchable-select-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary, #1f2329);
+    transition: background 0.12s;
+    display: block;
+    word-break: break-word;
+}
+.searchable-select-option:hover,
+.searchable-select-option.highlighted {
+    background: rgba(22,119,255,0.08);
+}
+.searchable-select-option.selected {
+    background: rgba(22,119,255,0.12);
+    color: var(--primary, #1677ff);
+    font-weight: 500;
+}
+.searchable-select-option mark {
+    background: #fff3a8;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+}
+.searchable-select-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-tertiary, #999);
+    font-size: 13px;
+}
+/* 副标题（item.sub） */
+.searchable-select-option .ssel-sub {
+    color: var(--text-tertiary, #999);
+    font-size: 12px;
+    margin-left: 8px;
+}
+/* 清空按钮 */
+.searchable-select-clear {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 50%;
+    color: var(--text-tertiary, #999);
+    font-size: 11px;
+    cursor: pointer;
+    background: rgba(0,0,0,0.05);
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.searchable-select:hover .searchable-select-clear,
+.searchable-select.open .searchable-select-clear {
+    opacity: 1;
+}
+.searchable-select-clear:hover {
+    background: rgba(0,0,0,0.12);
+    color: var(--text-primary, #1f2329);
+}
+[data-theme="dark"] .searchable-select-input {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+[data-theme="dark"] .searchable-select-dropdown {
+    background: var(--bg-elevated, #1c2330);
+    border-color: var(--border, #2a3140);
+}
+[data-theme="dark"] .searchable-select-option {
+    color: #e8eaed;
+}
+[data-theme="dark"] .searchable-select-option:hover,
+[data-theme="dark"] .searchable-select-option.highlighted {
+    background: rgba(22,119,255,0.18);
+}
+[data-theme="dark"] .searchable-select-option mark {
+    background: #5a4500;
+    color: #ffe072;
+}
+
+/* ========== 游戏问题弹窗：居中、占视口约1/4-1/3 ========== */
+.modal-container.modal-game-issue {
+    width: 50vw;
+    min-width: 560px;
+    max-width: 900px;
+    max-height: 85vh;
+    margin: auto;
+}
+.modal-container.modal-game-issue .modal-content {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 无底色关闭按钮（覆盖默认 .modal-close 的灰色圆背景） */
+.modal-close.modal-close-plain {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-tertiary, #999);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close.modal-close-plain:hover {
+    background: rgba(0,0,0,0.06) !important;
+    color: var(--text-primary, #1f2329);
+}
+[data-theme="dark"] .modal-close.modal-close-plain:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: #e8eaed;
+}
+
+/* 富文本粘贴编辑器 */
+.rich-paste-editor {
+    min-height: 140px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #d4d8dc);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #1f2329);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+}
+.rich-paste-editor:focus {
+    border-color: var(--primary, #1677ff);
+    box-shadow: 0 0 0 2px rgba(22,119,255,0.1);
+}
+.rich-paste-editor.drag-over {
+    border-color: var(--primary, #1677ff);
+    background: rgba(22,119,255,0.04);
+}
+/* 占位符：empty 状态显示 data-placeholder */
+.rich-paste-editor:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-tertiary, #b3b9c2);
+    pointer-events: none;
+}
+.rich-paste-editor img,
+.rich-paste-editor video {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 6px 0;
+    display: block;
+}
+[data-theme="dark"] .rich-paste-editor {
+    background: var(--bg-input, #1c2330);
+    color: #e8eaed;
+    border-color: var(--border, #2a3140);
+}
+
+/* 表格中富文本单元格：图片视频缩小预览 */
+.data-table td.rich-cell img,
+.data-table td.rich-cell video {
+    max-width: 80px;
+    max-height: 50px;
+    margin: 2px 4px 2px 0;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+
+[data-theme="dark"] .tapd-toast {
+    background: #1f2329 !important;
+    color: #e8eaed !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+
+/* ========== 批量选择列样式（静态化，消除布局抖动） ========== */
+/* 表头 batch-th 和数据行 batch-td 都固定36px宽，不受可见列变化影响 */
+.batch-th,
+.batch-td {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    text-align: center !important;
+    padding: 4px 2px !important;
+    overflow: hidden;
+    text-overflow: clip;
+}
+.batch-th .row-checkbox-all,
+.batch-td .row-checkbox {
+    cursor: pointer;
+    margin: 0;
+    vertical-align: middle;
+}
+/* 避免 batch-th 触发列拖拽/排序的视觉效果 */
+.batch-th.no-sort {
+    cursor: default !important;
+}
+.batch-th.no-sort .sort-arrow,
+.batch-th.no-sort .sort-indicator {
+    display: none !important;
+}
+
+/* ★★★ 占位符：编辑态时撑住 td 的原几何尺寸，避免列重排 */
+.inline-edit-placeholder {
+    visibility: hidden !important;
+    display: block !important;
+    pointer-events: none;
+    /* 保留原内容 white-space 习惯 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 编辑态本身：让 td 作为定位锚点，但不改变其尺寸 */
+.editable-cell.editing {
+    background: inherit !important;
+    padding: 0 !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
 /* ========== 行内编辑样式 ========== */
 .editable-cell {
     cursor: pointer;
@@ -1525,17 +2071,42 @@ tr:hover .action-icon-btn:hover {
 .editable-cell:hover {
     background: var(--primary-light) !important;
 }
+/* hover时右上角显示编辑图标 */
+.editable-cell:hover::after {
+    content: '✏️';
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+}
 
-.editable-cell.editing {
-    background: inherit !important;
-    padding: 0 !important;
+/* ★ 浮层式编辑框：absolute 定位浮在单元格上方，不撑大表格列 */
+.inline-edit-overlay {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: #fff !important;
+    border: 2px solid var(--primary) !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+}
+[data-theme="dark"] .inline-edit-overlay {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .inline-edit-input,
 .inline-edit-textarea,
 .inline-edit-select,
 .edit-select {
-    width: 100% !important;
+    /* 不再强制 width:100%，由 JS 控制尺寸以支持放大效果 */
+    min-width: 120px;
     box-sizing: border-box !important;
     padding: 6px 10px !important;
     margin: 0 !important;
@@ -1550,7 +2121,8 @@ tr:hover .action-icon-btn:hover {
 
 .inline-edit-textarea {
     resize: none;
-    min-height: 32px;
+    min-height: 60px;
+    line-height: 1.5;
 }
 
 .inline-edit-select,
@@ -1825,6 +2397,69 @@ tr:hover .action-icon-btn:hover {
 @keyframes slideIn {
     from { transform: translateY(-20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
+}
+
+/* ============================================================
+   ★ 弹窗结构统一兼容层（2026-06-11 大神）
+   项目历史遗留 3 种弹窗结构，统一收敛到"游戏列表"基准视觉：
+   - 基准A：.modal > .modal-content（margin:5% auto 居中，.modal 自带蒙版）
+   - 变体C：.modal > .modal-overlay + .modal-container > .modal-content
+     （游戏问题/交织问题/客户端问题等新弹窗）
+   下面让变体C 表现与基准A 完全一致：消除双蒙版 + 居中
+   ============================================================ */
+
+/* 1) 当 .modal 内含 .modal-container 时，用 flex 居中（替代 margin:auto） */
+.modal:has(.modal-container) {
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+}
+.modal:has(.modal-container)[style*="block"],
+.modal:has(.modal-container)[style*="flex"] {
+    display: flex !important;
+}
+
+/* 2) 消除内层 .modal-overlay 的第二层蒙版（.modal 已自带蒙版）
+   只保留它作为点击关闭的透明热区 */
+.modal > .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: transparent !important;   /* ← 关键：去掉第二层灰色蒙版 */
+    backdrop-filter: none !important;
+    z-index: 0;
+}
+
+/* 3) .modal-container 居中浮在蒙版上方，对齐基准A 的尺寸 */
+.modal > .modal-container {
+    position: relative;
+    z-index: 1;
+    margin: 5vh auto;          /* 顶部留白，水平居中（flex 已居中，这里做垂直留白） */
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.2s;
+}
+/* 游戏问题弹窗保持其自定义宽度 */
+.modal > .modal-container.modal-game-issue {
+    max-width: 720px;
+}
+/* 变体C 内的 .modal-content：去掉自己的 margin/蒙版相关，由 container 接管 */
+.modal > .modal-container > .modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.modal > .modal-container > .modal-content > form,
+.modal > .modal-container > .modal-content > .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .modal-header {
@@ -5389,6 +6024,9 @@ tr:hover .action-icon-btn:hover {
 [data-theme="dark"] .editable-cell:hover {
     background: rgba(24, 144, 255, 0.08) !important;
 }
+[data-theme="dark"] .editable-cell:hover::after {
+    opacity: 0.5;
+}
 
 /* 游戏问题模块样式 */
 .desc-cell, .remarks-cell {
@@ -5699,6 +6337,15 @@ tr:hover .action-icon-btn:hover {
 }
 
 /* ========== 表格列排序样式 ========== */
+
+/* ★ 排序文字标签：只有这个区域可点击排序 */
+.sort-label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .sort-arrow {
     display: inline-flex;
     align-items: center;
@@ -5713,30 +6360,27 @@ tr:hover .action-icon-btn:hover {
     font-size: 10px;
     line-height: 1;
     transition: color 0.15s ease, opacity 0.15s ease;
+    opacity: 0;
 }
 
-th.sort-asc .sort-indicator {
-    color: var(--primary);
-    opacity: 1 !important;
-}
-
+th.sort-asc .sort-indicator,
 th.sort-desc .sort-indicator {
     color: var(--primary);
     opacity: 1 !important;
 }
 
-th[data-field]:hover .sort-indicator {
+/* ★ 鼠标悬停在文字上时显示排序箭头（空白区域不触发） */
+.sort-label:hover .sort-indicator {
     opacity: 0.7 !important;
 }
 
-/* 排序表头悬停效果 */
-th[data-field] {
-    transition: background-color 0.15s ease;
-}
-th[data-field]:hover {
+/* 排序表头悬停效果 — 仅文字区域 */
+.sort-label:hover {
     background: var(--bg-hover, rgba(0,0,0,0.04));
+    border-radius: 4px;
+    padding: 0 2px;
 }
-[data-theme="dark"] th[data-field]:hover {
+[data-theme="dark"] .sort-label:hover {
     background: var(--bg-hover, rgba(255,255,255,0.06));
 }
 
@@ -6744,3 +7388,18 @@ mark.search-highlight {
 }
 [data-theme="dark"] .focus-action-btn { color: #6b7280; }
 [data-theme="dark"] .focus-action-btn:hover { background: #2d333b; color: #e5e7eb; }
+
+/* P0-1: 缺陷列表可点击关联（游戏/客户）跳转链接 */
+.link-cell {
+    color: #2563eb;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px dashed transparent;
+    transition: border-color .15s, color .15s;
+}
+.link-cell:hover {
+    color: #1d4ed8;
+    border-bottom-color: #1d4ed8;
+}
+[data-theme="dark"] .link-cell { color: #60a5fa; }
+[data-theme="dark"] .link-cell:hover { color: #93c5fd; border-bottom-color: #93c5fd; }

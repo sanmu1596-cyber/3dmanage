@@ -172,12 +172,8 @@ function startTcTextEdit(td, tcId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高，避免列宽重排
+    td.style.position = 'relative';
 
     const tc = allTestCasesData.find(t => t.id === tcId);
     const originalValue = tc ? (tc[field] || '') : '';
@@ -217,7 +213,7 @@ function startTcTextEdit(td, tcId, field) {
         if (newValue === originalValue) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
             return;
         }
         try {
@@ -244,7 +240,7 @@ function startTcTextEdit(td, tcId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     input.addEventListener('blur', save);
@@ -255,7 +251,7 @@ function startTcTextEdit(td, tcId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
         }
     });
 }
@@ -267,12 +263,8 @@ function startTcDropdownEdit(td, tcId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 不再锁定 td 宽高，避免列宽重排
+    td.style.position = 'relative';
 
     const tc = allTestCasesData.find(t => t.id === tcId);
     const originalHtml = td.innerHTML;
@@ -329,7 +321,7 @@ function startTcDropdownEdit(td, tcId, field) {
         if (newValue === currentVal) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
             return;
         }
 
@@ -371,7 +363,7 @@ function startTcDropdownEdit(td, tcId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = '';
     };
 
     select.addEventListener('change', save);
@@ -380,7 +372,7 @@ function startTcDropdownEdit(td, tcId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = '';
         }
     });
 }
@@ -1623,9 +1615,11 @@ function renderDetailContent(type, data) {
 // 渲染游戏详情
 function renderGameDetail(game) {
     const statusMap = {
-        online: { text: '已上线', class: 'status-online' },
-        adapting: { text: '适配中', class: 'status-in_progress' },
-        pending: { text: '待上线', class: 'status-pending' }
+        completed: { text: '已发布', class: 'status-online' },
+        developing: { text: '开发中', class: 'status-in_progress' },
+        undeveloped: { text: '未开始', class: 'status-pending' },
+        anticheat: { text: '反外挂', class: 'status-paused' },
+        not_applicable: { text: '不适用', class: '' }
     };
     const qualityMap = {
         high: { text: '高', class: 'priority-high' },
@@ -1655,7 +1649,7 @@ function renderGameDetail(game) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">适配状态</div>
-            ${detailField('上线状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
+            ${detailField('适配状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
             ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`, true)}
             ${detailField('适配进度', game.adapter_progress ? game.adapter_progress + '%' : '-')}
             ${detailField('负责人', game.owner_name || '-')}
@@ -1685,7 +1679,7 @@ function renderDeviceDetail(device) {
             <div class="detail-section-title">设备信息</div>
             ${detailField('设备名称', device.name)}
             ${detailField('设备类型', device.device_type)}
-            ${detailField('厂商', device.manufacturer)}
+            ${detailField('客户名称', device.manufacturer)}
             ${detailField('型号', device.model)}
             ${detailField('操作系统', device.os_version)}
         </div>
@@ -1762,7 +1756,7 @@ function renderBugDetail(bug) {
             <div class="detail-section-title">缺陷信息</div>
             ${detailField('标题', bug.title)}
             ${detailField('关联游戏', bug.game_name || '-')}
-            ${detailField('关联设备', bug.device_name || '-')}
+            ${detailField('关联客户', bug.device_name || '-')}
             ${detailField('涉及版本', bug.affected_version)}
         </div>
         <div class="detail-section">

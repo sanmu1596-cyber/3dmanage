@@ -65,6 +65,9 @@ async function loadDashboard() {
         
         // 加载最近活动
         loadRecentActivity();
+
+        // 加载近期关注事项
+        if (typeof loadFocusItems === 'function') loadFocusItems();
     } catch (error) {
         console.error('加载 Dashboard 数据失败:', error);
         // 网络异常时也自动重试
@@ -116,8 +119,8 @@ function renderOnlineStatusChart(data) {
     const ctx = document.getElementById('chart-online-status');
     if (!ctx || typeof Chart === 'undefined') return;
     if (dashboardCharts.onlineStatus) dashboardCharts.onlineStatus.destroy();
-    const statusLabels = { pending: '待上线', in_progress: '适配中', paused: '暂停适配', online: '已上线' };
-    const statusColors = { pending: '#2f7fbb', in_progress: '#d4880f', paused: '#8c96a8', online: '#2e9e5a' };
+    const statusLabels = { completed: '已发布', developing: '开发中', undeveloped: '未开始', anticheat: '反外挂', not_applicable: '不适用' };
+    const statusColors = { completed: '#2e9e5a', developing: '#d4880f', undeveloped: '#8c96a8', anticheat: '#e53e3e', not_applicable: '#a0aec0' };
     dashboardCharts.onlineStatus = new Chart(ctx, {
         type: 'doughnut',
         data: {

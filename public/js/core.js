@@ -36,65 +36,113 @@ function updateThemeIcon(theme) {
 // 页面加载时初始化主题
 document.addEventListener('DOMContentLoaded', initTheme);
 
+// ========== 统一确认弹窗 helper ==========
+// 优先用 UIDialog.confirm（统一弹窗），未加载时回退原生 confirm，保证健壮
+// 用法：if (await uiConfirm('确定删除？', { danger:true, okText:'删除' })) {...}
+async function uiConfirm(message, opts = {}) {
+    if (window.UIDialog && typeof UIDialog.confirm === 'function') {
+        return await UIDialog.confirm(Object.assign({ message }, opts));
+    }
+    return window.confirm(message);
+}
+// 统一提示弹窗（替代 alert）
+async function uiAlert(message, opts = {}) {
+    if (window.UIDialog && typeof UIDialog.alert === 'function') {
+        return await UIDialog.alert(Object.assign({ message }, opts));
+    }
+    window.alert(message);
+}
+
 // ========== Toast 通知 ==========
-function showToast(message, type = 'info', duration = 3000) {
+// ========== Toast 通知 — TAPD 风格（顶部居中淡入淡出） ==========
+function showToast(message, type = 'info', duration = 2400) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.style.cssText = 'position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+        // ★ 顶部居中容器
+        container.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:10000;display:flex;flex-direction:column;gap:10px;pointer-events:none;align-items:center;';
         document.body.appendChild(container);
     }
-    const colors = {
-        success: { bg: 'rgba(46,158,90,0.95)', icon: '✅' },
-        danger:  { bg: 'rgba(212,64,64,0.95)', icon: '❌' },
-        warning: { bg: 'rgba(212,136,15,0.95)', icon: '⚠️' },
-        info:    { bg: 'rgba(47,127,187,0.95)', icon: 'ℹ️' }
+    // TAPD 风格颜色 — 柔和饱和度
+    const styles = {
+        success: { color: '#52c41a', icon: '✓' },
+        danger:  { color: '#ff4d4f', icon: '✕' },
+        warning: { color: '#faad14', icon: '!' },
+        info:    { color: '#1677ff', icon: 'i' }
     };
-    const c = colors[type] || colors.info;
+    const s = styles[type] || styles.info;
     const toast = document.createElement('div');
-    toast.style.cssText = `background:${c.bg};color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px;pointer-events:auto;animation:slideInRight 0.3s ease;max-width:360px;`;
-    toast.innerHTML = `<span>${c.icon}</span><span>${escapeHtml(message)}</span>`;
+    toast.className = 'tapd-toast';
+    // 卡片样式：白底 + 彩色左边线 + 柔和阴影
+    toast.style.cssText = `
+        background:#ffffff;
+        color:#1f2329;
+        padding:12px 20px 12px 16px;
+        border-radius:8px;
+        border-left:4px solid ${s.color};
+        font-size:13px;
+        line-height:1.5;
+        box-shadow:0 6px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
+        display:flex;
+        align-items:center;
+        gap:10px;
+        pointer-events:auto;
+        max-width:480px;
+        min-width:200px;
+        opacity:0;
+        transform:translateY(-20px);
+        transition:opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+    toast.innerHTML = `
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${s.color};color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">${s.icon}</span>
+        <span style="flex:1;word-break:break-word;">${escapeHtml(message)}</span>
+    `;
     container.appendChild(toast);
+    // 淡入
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+    // 淡出
     setTimeout(() => {
-        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         toast.style.opacity = '0';
-        toast.style.transform = 'translateX(20px)';
+        toast.style.transform = 'translateY(-12px)';
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }
 
 // ========== 自定义确认弹窗 ==========
-function showConfirm(message, onConfirm, onCancel) {
-    // 创建遮罩和弹窗
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--bg-input);border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);animation:slideIn 0.2s ease;';
-    box.innerHTML = `
-        <div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:20px;white-space:pre-line;">${escapeHtml(message)}</div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;">
-            <button class="btn btn-secondary confirm-cancel-btn" style="padding:6px 20px;cursor:pointer;">取消</button>
-            <button class="tool-btn tool-btn-primary confirm-ok-btn" style="padding:6px 20px;cursor:pointer;">确定</button>
-        </div>
-    `;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    const close = () => { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 200); };
-    box.querySelector('.confirm-cancel-btn').onclick = () => { close(); if (onCancel) onCancel(); };
-    box.querySelector('.confirm-ok-btn').onclick = () => { close(); if (onConfirm) onConfirm(); };
-    overlay.onclick = (e) => { if (e.target === overlay) { close(); if (onCancel) onCancel(); } };
+// ★ 统一到 UIDialog（替代原来散落的内联弹窗实现）
+// 双模式兼容：
+//   - 回调式：showConfirm(msg, onConfirm, onCancel)
+//   - Promise式：await showConfirm(msg) / await showConfirm(msg, '标题')
+function showConfirm(message, arg2, onCancel) {
+    // 判断第二参是回调还是标题
+    const isCallback = typeof arg2 === 'function';
+    const title = (!isCallback && typeof arg2 === 'string') ? arg2 : '确认操作';
+    const opts = { message, title };
+    const p = (window.UIDialog && typeof UIDialog.confirm === 'function')
+        ? UIDialog.confirm(opts)
+        : Promise.resolve(window.confirm(message));
+    if (isCallback) {
+        // 回调式：保持旧用法兼容
+        p.then(ok => { if (ok) { if (arg2) arg2(); } else { if (onCancel) onCancel(); } });
+        return;
+    }
+    // Promise式：返回 boolean
+    return p;
 }
 
 // 游戏分页状态
-let currentPage = 1;
-let pageSize = 20;
-let allGamesData = [];
-let filteredGamesData = []; // 筛选后的数据
+// ★ 必须用 var，让其挂载到 window，方便其他 JS 文件做 typeof / window.xxx 判空
+var currentPage = 1;
+var pageSize = 20;
+var allGamesData = [];
+var filteredGamesData = []; // 筛选后的数据
 
 // 游戏账号数据映射
-let gameAccountsMap = {};
+var gameAccountsMap = {};
 
 // 加载游戏账号数据
 function loadGameAccounts() {
@@ -124,7 +172,8 @@ function getGameAccount(gameName) {
 }
 
 // 游戏列表显示列配置
-let visibleColumns = {
+// ★ 必须用 var：跨文件引用 window.visibleColumns 时 let 不挂 window
+var visibleColumns = {
     name: true,
     english_name: true,
     platform: true,
@@ -182,6 +231,7 @@ var testVisibleColumns = {
 
 // 缺陷列表显示列配置
 var bugVisibleColumns = {
+    game_name: true,
     versions: true,
     device_name: true,
     discovery_time: true,
@@ -206,13 +256,14 @@ var planListVisibleColumns = {
 };
 
 // 适配进展状态
-let allDevicesData = [];
-let allGamesForProgress = [];
-let allMembersData = []; // 存储成员数据,用于适配进展中的负责人
-let allTestsData = [];   // P0: 存储测试数据,支持前端筛选
-let allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
-let currentDeviceId = null;
-let progressData = []; // 存储各设备的游戏适配数据
+// ★ 必须用 var：跨文件 window.xxx 引用要求挂在 window 对象上
+var allDevicesData = [];
+var allGamesForProgress = [];
+var allMembersData = []; // 存储成员数据,用于适配进展中的负责人
+var allTestsData = [];   // P0: 存储测试数据,支持前端筛选
+var allBugsData = [];    // P0: 存储缺陷数据,支持前端筛选
+var currentDeviceId = null;
+var progressData = []; // 存储各设备的游戏适配数据
 
 // ==================== 数据刷新指示器 ====================
 
@@ -810,6 +861,53 @@ function renderModuleFilterChips(moduleId, filters, options = {}) {
             }
         }
     };
+}
+
+// ========== 通用：生成带省略号的页码序列 ==========
+/**
+ * 计算分页要显示的页码（中间页过多时用省略号 '...' 折叠）
+ * 规则：始终显示首页/末页 + 当前页前后各 1 页 + 省略号
+ * @param {number} current 当前页
+ * @param {number} total 总页数
+ * @returns {Array<number|'...'>}
+ * 示例：buildPageSequence(7, 20) => [1, '...', 6, 7, 8, '...', 20]
+ */
+function buildPageSequence(current, total) {
+    if (total <= 7) {
+        // 页数少，全部显示
+        const arr = [];
+        for (let i = 1; i <= total; i++) arr.push(i);
+        return arr;
+    }
+    const pages = new Set([1, total, current, current - 1, current + 1]);
+    // 首尾相邻也补上，避免出现只省略一个的尴尬（如 1 ... 3）
+    if (current <= 4) { pages.add(2); pages.add(3); pages.add(4); pages.add(5); }
+    if (current >= total - 3) { for (let i = total - 4; i < total; i++) pages.add(i); }
+    const sorted = Array.from(pages).filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+    const result = [];
+    let prev = 0;
+    sorted.forEach(p => {
+        if (prev && p - prev > 1) result.push('...');
+        result.push(p);
+        prev = p;
+    });
+    return result;
+}
+
+/**
+ * 渲染页码按钮 HTML（带省略号），各模块通用
+ * @param {number} current 当前页
+ * @param {number} total 总页数
+ * @param {string} onClickFn 点击调用的函数名，接收页码参数，如 'goToPage'
+ * @returns {string} HTML
+ */
+function renderPageButtons(current, total, onClickFn) {
+    if (total <= 1) return '';
+    return buildPageSequence(current, total).map(p => {
+        if (p === '...') return '<span class="page-ellipsis">···</span>';
+        const active = p === current ? ' active' : '';
+        return `<button class="btn btn-small page-number${active}" onclick="${onClickFn}(${p})">${p}</button>`;
+    }).join('');
 }
 
 // ========== P1.7: 通用分页增强函数 ==========

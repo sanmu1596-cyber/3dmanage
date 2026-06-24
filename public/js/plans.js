@@ -82,7 +82,7 @@ async function loadAdaptationRecords() {
                 gameType: r.game_type || '-',
                 adapterProgress: r.adapter_progress || 0,
                 ownerName: r.owner_name || '-',
-                onlineStatus: r.online_status || 'pending',
+                onlineStatus: r.online_status || 'undeveloped',
                 quality: r.quality || 'normal',
                 issueNotes: r.issue_notes || '',
                 updatedAt: r.updated_at || null
@@ -206,7 +206,7 @@ function renderProgressTable(deviceIndex) {
     const onlineStatusMap = {};
     getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label);
     // fallback
-    if (!onlineStatusMap['pending']) Object.assign(onlineStatusMap, {'pending':'待上线','in_progress':'适配中','paused':'暂停适配','online':'已上线'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const qualityMap = {};
     getFieldOptionsByKey('quality').forEach(o => qualityMap[o.value] = o.label);
@@ -442,7 +442,7 @@ function showEditDropdown(cell, field, rowIndex, deviceIndex) {
     } else if (field === 'onlineStatus') {
         // 上线状态（从字段设置动态获取）
         let statuses = getFieldOptionsByKey('online_status').map(o => ({ value: o.value, text: o.label }));
-        if (statuses.length === 0) statuses = [{value:'pending',text:'待上线'},{value:'in_progress',text:'适配中'},{value:'paused',text:'暂停适配'},{value:'online',text:'已上线'}];
+        if (statuses.length === 0) statuses = [{value:'undeveloped',text:'未开始'},{value:'developing',text:'开发中'},{value:'completed',text:'已发布'},{value:'anticheat',text:'反外挂'},{value:'not_applicable',text:'不适用'}];
         statuses.forEach(status => {
             const option = document.createElement('option');
             option.value = status.value;
@@ -900,7 +900,7 @@ async function confirmAddGamesToProgress() {
         game_id: game.id,
         adapter_progress: 0,
         owner_name: '-',
-        online_status: 'pending',
+        online_status: 'undeveloped',
         quality: 'normal'
     }));
 
@@ -928,7 +928,7 @@ async function confirmAddGamesToProgress() {
                 gameType: r.game_type || '-',
                 adapterProgress: r.adapter_progress || 0,
                 ownerName: r.owner_name || '-',
-                onlineStatus: r.online_status || 'pending',
+                onlineStatus: r.online_status || 'undeveloped',
                 quality: r.quality || 'normal'
             }));
 
@@ -2796,10 +2796,8 @@ function refreshAllSelectsFromFieldOptions() {
     // 设备管理 - 状态
     populateSelectFromFieldOptions('device-status', 'device_status', 'available');
     
-    // 游戏管理 - 适配状态
-    populateSelectFromFieldOptions('game-adaptation-status', 'adaptation_status', 'pending');
-    // 游戏管理 - 上线状态
-    populateSelectFromFieldOptions('game-online-status', 'online_status', 'pending');
+    // 游戏管理 - 适配状态（弹窗用 online_status，旧的 adaptation_status 已移除）
+    populateSelectFromFieldOptions('game-online-status', 'online_status', 'undeveloped');
     // 游戏管理 - 品质
     populateSelectFromFieldOptions('game-quality', 'quality', 'normal');
     // 游戏管理 - 存储位置
@@ -3104,35 +3102,48 @@ function resetColumnLock(tableOrContainer) {
 }
 
 // 用 MutationObserver 自动监测表格变化，补全 resize 手柄（防抖合并）
-// 当 tbody 内容变化时，需重置列宽锁定再重新初始化
+// ★ 关键修复：只在"数据完全刷新"（首行变化）时才重置列宽锁定
+// 双击编辑、复选框注入等局部变化不应该解锁列宽，否则会触发 fixed→auto→fixed 抖动
 let _resizeTimer = null;
 const _resizeObserver = new MutationObserver((mutations) => {
-    clearTimeout(_resizeTimer);
-    // 检查是否有 tbody 子节点变化（数据刷新），需重置锁定
+    // ★ 检查是否真的是"整表数据刷新"——必须是 tbody 直接子节点（tr）发生 add/remove
+    // 排除：编辑态(.editing添加/移除)、单元格内部变化、batch-td注入等
+    let isFullDataRefresh = false;
     for (const m of mutations) {
-        if (m.target.tagName === 'TBODY' || (m.target.closest && m.target.closest('tbody'))) {
-            const table = m.target.closest('.data-table');
-            if (table && table.dataset.colLocked) {
-                delete table.dataset.colLocked;
-                table.style.tableLayout = '';
-                table.style.width = '';
-                table.querySelectorAll('thead th').forEach(th => {
-                    if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
-                        th.style.width = '';
-                        th.style.minWidth = '';
-                    }
-                });
-                table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+        if (m.target.tagName === 'TBODY' && (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
+            // 进一步确认：被加/删的是 TR，且数量足以认为是整表刷新
+            const addedTrs = Array.from(m.addedNodes).filter(n => n.nodeName === 'TR');
+            const removedTrs = Array.from(m.removedNodes).filter(n => n.nodeName === 'TR');
+            // 只有添加/移除多个TR才认为是整表刷新（单行编辑/删除不解锁）
+            if (addedTrs.length >= 2 || removedTrs.length >= 2) {
+                isFullDataRefresh = true;
+                const table = m.target.closest('.data-table');
+                if (table && table.dataset.colLocked) {
+                    delete table.dataset.colLocked;
+                    table.style.tableLayout = '';
+                    table.style.width = '';
+                    table.querySelectorAll('thead th').forEach(th => {
+                        if (!th.classList.contains('batch-th') && th.textContent.trim() !== '序号') {
+                            th.style.width = '';
+                            th.style.minWidth = '';
+                        }
+                    });
+                    table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+                }
+                break;
             }
-            break;
         }
     }
-    _resizeTimer = setTimeout(initColumnResize, 80);
+    // 只有数据真刷新时才重新锁定，编辑态变化不触发
+    if (isFullDataRefresh) {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(initColumnResize, 80);
+    }
 });
 
 // 在 DOM 加载完成后启动 observer
 document.addEventListener('DOMContentLoaded', () => {
-    // 初始化一次
+    // 初始化一次（兜底）
     setTimeout(initColumnResize, 300);
 
     // 监测所有 table-container 区域的子树变化

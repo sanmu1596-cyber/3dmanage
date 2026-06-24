@@ -13,6 +13,7 @@ const gameVersionsRouter = require('./game-versions');
 const interlaceIssuesRouter = require('./interlace-issues');
 const interlaceVersionsRouter = require('./interlace-versions');
 const clientIssuesRouter = require('./client-issues');
+const tencentBoardRouter = require('./tencent-board');
 const { validate, rules } = require('./validator');
 
 const app = express();
@@ -23,7 +24,7 @@ app.use(compression()); // gzip压缩：~13MB静态资源压缩后约2-3MB
 app.use(cors());
 app.use(cookieParser()); // 解析Cookie（用于开发者密钥验证）
 
-app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.json({ limit: '30mb' })); // 30MB 上限：支持游戏问题/评论里的 base64 图片视频
 // 静态文件：开发阶段禁用缓存，确保每次加载最新；生产环境可改回 maxAge: '1d'
 app.use(express.static('public', {
   maxAge: 0,
@@ -108,18 +109,85 @@ const newModuleTables = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // 腾讯系游戏开发进展 看板（分组 + 行 + 配置）
+  `CREATE TABLE IF NOT EXISTS tx_board_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board TEXT DEFAULT 'tencent',
+    group_key TEXT,
+    title TEXT,
+    cols TEXT DEFAULT '[]',
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS tx_board_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    cells TEXT DEFAULT '[]',
+    fills TEXT DEFAULT '[]',
+    aligns TEXT DEFAULT '[]',
+    valigns TEXT DEFAULT '[]',
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS tx_board_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
   // 索引
   'CREATE INDEX IF NOT EXISTS idx_game_versions_game ON game_versions(game_id)',
   'CREATE INDEX IF NOT EXISTS idx_game_versions_status ON game_versions(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_issues_status ON interlace_issues(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_versions_status ON interlace_versions(status)',
-  'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)'
+  'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)',
+  'CREATE INDEX IF NOT EXISTS idx_tx_board_rows_group ON tx_board_rows(group_id)'
 ];
 newModuleTables.forEach((sql, i) => {
   db.run(sql, (err) => {
     if (err) console.error(`  [启动] 新模块建表 ${i+1} 失败:`, err.message);
   });
 });
+
+// 兼容旧库：确保 tx_board_rows 表有 fills / aligns / valigns 列（JSON 数组）
+db.all("PRAGMA table_info(tx_board_rows)", [], (err, columns) => {
+  if (err || !columns) return;
+  if (!columns.some(c => c.name === 'fills')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN fills TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加fills失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加fills列');
+    });
+  }
+  if (!columns.some(c => c.name === 'aligns')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN aligns TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加aligns失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加aligns列（水平对齐）');
+    });
+  }
+  if (!columns.some(c => c.name === 'valigns')) {
+    db.run("ALTER TABLE tx_board_rows ADD COLUMN valigns TEXT DEFAULT '[]'", (e) => {
+      if (e) console.error('  [启动] tx_board_rows添加valigns失败:', e.message);
+      else console.log('  [启动] tx_board_rows表已添加valigns列（垂直对齐）');
+    });
+  }
+});
+
+// 兼容旧库：确保 tx_board_groups 表有 board 列（多看板区分，旧数据归入 'tencent'）
+db.all("PRAGMA table_info(tx_board_groups)", [], (err, columns) => {
+  if (err || !columns) return;
+  if (!columns.some(c => c.name === 'board')) {
+    db.run("ALTER TABLE tx_board_groups ADD COLUMN board TEXT DEFAULT 'tencent'", (e) => {
+      if (e) console.error('  [启动] tx_board_groups添加board失败:', e.message);
+      else {
+        db.run("UPDATE tx_board_groups SET board = 'tencent' WHERE board IS NULL OR board = ''");
+        console.log('  [启动] tx_board_groups表已添加board列（多看板区分）');
+      }
+    });
+  }
+});
+
+// 兼容旧库：旧的 meta key='board' 迁移为 key='board:tencent'
+db.run("UPDATE tx_board_meta SET key = 'board:tencent' WHERE key = 'board'", () => {});
 
 // 兼容旧库：确保 devices 表有 sort_order 列
 db.all("PRAGMA table_info(devices)", [], (err, columns) => {
@@ -514,7 +582,13 @@ gamesRouter.put('/:id', auth.checkPermission('games', 'edit'),
 
 // 单字段行内编辑（PATCH）
 gamesRouter.patch('/:id', auth.checkPermission('games', 'edit'), (req, res) => {
-  const allowedFields = ['description', 'game_account', 'platform', 'game_type', 'owner_id', 'quality', 'storage_location', 'game_engine'];
+  // ★ 与游戏列表所有可编辑字段保持一致（昨天新增了 online_status 等9个可双击编辑的字段，必须同步白名单）
+  const allowedFields = [
+    'name', 'english_name', 'platform', 'game_id', 'game_type',
+    'description', 'developer', 'operator', 'release_date', 'config_path',
+    'adapter_progress', 'owner_id', 'online_status', 'quality',
+    'game_account', 'storage_location', 'game_engine'
+  ];
   const updates = [];
   const values = [];
   for (const [key, val] of Object.entries(req.body)) {
@@ -642,12 +716,12 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
     steps: rules.textArea(3000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                                 owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -676,13 +750,13 @@ bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'),
     description: rules.textArea(2000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?,
+  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?, game_name = ?,
                             discovery_time = ?, owner = ?, bug_status = ?, priority = ?, problem_type = ?,
                             description = ?, steps = ?, test_id = ?, assignee_id = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id, req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -742,8 +816,8 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
           ['adaptation_status', '适配状态', '游戏管理', JSON.stringify([
             {value:'pending',label:'待适配'},{value:'in_progress',label:'适配中'},{value:'completed',label:'已完成'},{value:'failed',label:'失败'}
           ]), 6],
-          ['online_status', '上线状态', '游戏管理', JSON.stringify([
-            {value:'pending',label:'待上线'},{value:'in_progress',label:'适配中'},{value:'paused',label:'暂停适配'},{value:'online',label:'已上线'}
+          ['online_status', '适配状态', '游戏管理', JSON.stringify([
+            {value:'undeveloped',label:'未开始'},{value:'developing',label:'开发中'},{value:'completed',label:'已发布'},{value:'anticheat',label:'反外挂'},{value:'not_applicable',label:'不适用'}
           ]), 7],
           ['quality', '品质', '游戏管理', JSON.stringify([
             {value:'normal',label:'一般'},{value:'recommended',label:'推荐'}
@@ -783,6 +857,7 @@ db.run(`CREATE TABLE IF NOT EXISTS field_options (
         console.log('字段选项默认数据初始化完成');
       }
     });
+    // 注：online_status「适配状态」的字段名与选项迁移统一在文件末尾的数据迁移段执行（单一数据源）
   }
 });
 
@@ -2001,6 +2076,155 @@ notificationsRouter.delete('/:id', (req, res) => {
   });
 });
 
+// ==================== 近期关注事项（大事）API ====================
+
+// 建表：大事
+db.run(`CREATE TABLE IF NOT EXISTS focus_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  module TEXT NOT NULL DEFAULT '游戏',
+  content TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'new',
+  sort_order INTEGER DEFAULT 0,
+  created_by TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+// 建表：评论
+db.run(`CREATE TABLE IF NOT EXISTS focus_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  images TEXT DEFAULT '[]',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (item_id) REFERENCES focus_items(id) ON DELETE CASCADE
+)`);
+
+// 索引
+db.run('CREATE INDEX IF NOT EXISTS idx_focus_items_status ON focus_items(status)');
+db.run('CREATE INDEX IF NOT EXISTS idx_focus_comments_item ON focus_comments(item_id)');
+
+const focusItemsRouter = express.Router();
+focusItemsRouter.use(auth.verifyToken);
+
+// GET /api/focus-items — 列表（含评论数）
+focusItemsRouter.get('/', (req, res) => {
+  const sql = `SELECT fi.*,
+    (SELECT COUNT(*) FROM focus_comments fc WHERE fc.item_id = fi.id) as comment_count
+    FROM focus_items fi ORDER BY fi.sort_order ASC, fi.id DESC`;
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, data: rows || [] });
+  });
+});
+
+// POST /api/focus-items — 新建大事
+focusItemsRouter.post('/', (req, res) => {
+  const { module, content, status } = req.body;
+  if (!module || !content) {
+    return res.status(400).json({ error: '模块和内容不能为空' });
+  }
+  // 获取最大 sort_order
+  db.get('SELECT COALESCE(MAX(sort_order), -1) as max_order FROM focus_items', [], (err, row) => {
+    const nextOrder = row ? row.max_order + 1 : 0;
+    const sql = `INSERT INTO focus_items (module, content, status, sort_order, created_by)
+                 VALUES (?, ?, ?, ?, ?)`;
+    const author = req.user?.real_name || req.user?.username || '';
+    db.run(sql, [module || '游戏', content, status || 'new', nextOrder, author], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, id: this.lastID });
+    });
+  });
+});
+
+// PUT /api/focus-items/:id — 更新大事
+focusItemsRouter.put('/:id', (req, res) => {
+  const { id } = req.params;
+  const { module, content, status } = req.body;
+  const sets = [];
+  const params = [];
+
+  if (module !== undefined) { sets.push('module = ?'); params.push(module); }
+  if (content !== undefined) { sets.push('content = ?'); params.push(content); }
+  if (status !== undefined) { sets.push('status = ?'); params.push(status); }
+
+  if (sets.length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+
+  sets.push("updated_at = datetime('now','localtime')");
+  params.push(id);
+
+  const sql = `UPDATE focus_items SET ${sets.join(', ')} WHERE id = ?`;
+  db.run(sql, params, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, changes: this.changes });
+  });
+});
+
+// DELETE /api/focus-items/:id — 删除大事（级联删除评论）
+focusItemsRouter.delete('/:id', (req, res) => {
+  db.run('DELETE FROM focus_items WHERE id = ?', [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// PUT /api/focus-items/reorder — 拖拽排序（批量更新 sort_order）
+focusItemsRouter.put('/reorder', (req, res) => {
+  const { order } = req.body; // [{id: 5}, {id: 3}, {id: 1}]
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order 必须是数组' });
+
+  let completed = 0;
+  order.forEach((item, index) => {
+    db.run('UPDATE focus_items SET sort_order = ? WHERE id = ?', [index, item.id], (err) => {
+      if (err) console.error('Reorder error:', err);
+      completed++;
+      if (completed === order.length) {
+        res.json({ success: true });
+      }
+    });
+  });
+
+  if (order.length === 0) res.json({ success: true });
+});
+
+// GET /api/focus-items/:id/comments — 某条大事的评论列表
+focusItemsRouter.get('/:id/comments', (req, res) => {
+  const sql = `SELECT * FROM focus_comments WHERE item_id = ? ORDER BY id ASC`;
+  db.all(sql, [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // 解析 images JSON
+    const comments = (rows || []).map(r => ({
+      ...r,
+      imageList: r.images && r.images !== '[]' ? JSON.parse(r.images) : []
+    }));
+    res.json({ success: true, data: comments });
+  });
+});
+
+// POST /api/focus-items/:id/comments — 新增评论
+focusItemsRouter.post('/:id/comments', (req, res) => {
+  const { content, images } = req.body;
+  if (!content) return res.status(400).json({ error: '评论内容不能为空' });
+
+  const author = req.user?.real_name || req.user?.username || '';
+  const imagesJson = Array.isArray(images) ? JSON.stringify(images) : '[]';
+  const sql = `INSERT INTO focus_comments (item_id, author, content, images) VALUES (?, ?, ?, ?)`;
+
+  db.run(sql, [req.params.id, author, content, imagesJson], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+// DELETE /api/focus-comments/:id — 删除评论
+focusItemsRouter.delete('/comments/:commentId', (req, res) => {
+  db.run('DELETE FROM focus_comments WHERE id = ?', [req.params.commentId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 // 创建通知的辅助函数
 function createNotification(userId, type, title, content, relatedType = null, relatedId = null) {
   db.run(
@@ -2413,6 +2637,8 @@ app.use('/api/game-versions', gameVersionsRouter);
 app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
+app.use('/api/tencent-board', tencentBoardRouter);
+app.use('/api/focus-items', focusItemsRouter);
 
 // ==================== 汇报报表 API ====================
 const reportsRouter = express.Router();
@@ -2747,6 +2973,59 @@ setInterval(() => {
     }
   });
 }, 60 * 60 * 1000);
+
+// ========== 数据迁移：hook开发状态旧值 → 新值 ==========
+// 1. 迁移 games 表中的遗留值
+const hookStatusMigrations = [
+    { old: 'pending',      new: 'developing', label: '待上线→开发中' },
+    { old: 'pending_dev',  new: 'developing', label: 'pending_dev→开发中' },
+    { old: 'online',       new: 'developing', label: '已上线→开发中' },
+    { old: 'fixing',       new: 'developing', label: '待修复→开发中' },
+];
+try {
+    let totalMigrated = 0;
+    for (const m of hookStatusMigrations) {
+        const result = db.prepare("UPDATE games SET online_status = ? WHERE online_status = ?").run(m.new, m.old);
+        if (result.changes > 0) {
+            console.log(`[数据迁移] ${m.label}: ${result.changes}条`);
+            totalMigrated += result.changes;
+        }
+    }
+    // 空值/NULL
+    const emptyResult = db.prepare("UPDATE games SET online_status = 'developing' WHERE online_status = '' OR online_status IS NULL").run();
+    if (emptyResult.changes > 0) {
+        console.log(`[数据迁移] 空/NULL→开发中: ${emptyResult.changes}条`);
+        totalMigrated += emptyResult.changes;
+    }
+    if (totalMigrated > 0) {
+        console.log(`[数据迁移] hook开发状态(值)共迁移 ${totalMigrated} 条记录`);
+    }
+} catch(e) {
+    console.error('[数据迁移] hook开发状态值迁移失败:', e.message);
+}
+
+// 2. 更新 field_options 表中的「适配状态」(online_status) 字段名 + 下拉选项
+//    value 不变（completed/developing/undeveloped/anticheat/not_applicable），仅改显示名：
+//    completed: 已完成→已发布；undeveloped: 未开发→未开始；field_label: hook开发状态→适配状态
+//    幂等执行，确保线上 git pull + pm2 restart 后自动生效（单一数据源，勿在别处重复迁移）
+try {
+    const newOptions = JSON.stringify([
+        {value:'undeveloped',label:'未开始'},
+        {value:'developing',label:'开发中'},
+        {value:'completed',label:'已发布'},
+        {value:'anticheat',label:'反外挂'},
+        {value:'not_applicable',label:'不适用'}
+    ]);
+    const row = db.prepare("SELECT field_label, options FROM field_options WHERE field_key = 'online_status'").get();
+    if (row && (row.options !== newOptions || row.field_label !== '适配状态')) {
+        const result = db.prepare("UPDATE field_options SET field_label = '适配状态', options = ? WHERE field_key = 'online_status'").run(newOptions);
+        if (result.changes > 0) {
+            console.log(`[数据迁移] 适配状态(online_status)字段名+下拉选项已统一为: 未开始/开发中/已发布/反外挂/不适用`);
+        }
+    }
+} catch(e) {
+    console.error('[数据迁移] 适配状态选项迁移失败:', e.message);
+}
 
 // 启动服务器 (监听所有网络接口，支持外网访问)
 const HOST = process.env.HOST || '0.0.0.0';

@@ -91,7 +91,7 @@ registerColumnConfig('tests-table',
 
 // 缺陷模块列顺序
 registerColumnConfig('bugs-table',
-    ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
+    ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
      'priority', 'problem_type', 'description'],
     'bugsColumnOrder'
 );
@@ -127,18 +127,16 @@ function startInlineEdit(td, deviceId, field, inputType) {
 
     const currentValue = td.textContent.trim();
     const displayValue = currentValue === '-' ? '' : currentValue;
+    // ★ 保留原 innerHTML 作为不可见占位符撑住td尺寸
+    const originalHtml = td.innerHTML;
 
     td.classList.add('editing');
     // P1.1: 记录当前编辑的td，用于外部点击判断
     _inlineEditCurrentTd = td;
 
-    // 锁定单元格宽高，防止编辑态撑开引起抖动
-    const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    // ★ 关键修复：不再设置 td.style.width/maxWidth/height（避免列宽重排）
+    // 改用 position:relative + 占位符 + absolute 浮层
+    td.style.position = 'relative';
 
     // 保管者：下拉选择（从成员列表获取）
     if (field === 'keeper') {
@@ -239,30 +237,21 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
             if (device) device[field] = body[field];
             // 只恢复当前单元格显示（不整表重渲染，避免抖动）
             td.textContent = trimmed || '-';
-            // 解除宽高锁定
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            // ★ 清除 position（不再有 width/maxWidth/height 内联样式）
+            td.style.position = '';
             // 异步刷新关联模块缓存（适配进展中的设备信息可能变化）
             if (['keeper', 'notes', 'requirements', 'quantity'].includes(field)) {
                 window._progressDataStale = true; // 标记适配进展数据需刷新
             }
         } else {
             td.textContent = trimmed || '-';
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            td.style.position = '';
             showToast('保存失败', 'danger');
         }
     } catch (error) {
         console.error('行内编辑保存失败:', error);
         td.textContent = trimmed || '-';
-        td.style.width = '';
-        td.style.minWidth = '';
-        td.style.maxWidth = '';
-        td.style.height = '';
+        td.style.position = '';
         showToast('保存失败', 'danger');
     }
 }
@@ -272,11 +261,8 @@ async function saveInlineEdit(td, deviceId, field, newValue) {
  */
 function cancelInlineEdit(td, originalValue) {
     td.classList.remove('editing');
-    // 解除宽高锁定
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    // ★ 清除 position
+    td.style.position = '';
     td.textContent = originalValue;
 }
 
@@ -364,7 +350,9 @@ function renderGamesPage() {
     if (gamesToShow.length > 0) {
         tbody.innerHTML = gamesToShow.map((game, index) => {
             const globalIndex = pageSize === -1 ? index + 1 : (currentPage - 1) * pageSize + index + 1;
-            let rowHtml = `<td class="text-center"><strong>${globalIndex}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐，render时同步输出，避免后续MutationObserver异步插入引发列错位抖动）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${game.id}" data-resource="games" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${globalIndex}</strong></td>`;
 
             // 根据columnOrder顺序生成单元格
             getColumnOrder('games-table').forEach(field => {
@@ -372,16 +360,16 @@ function renderGamesPage() {
                 
                 switch (field) {
                     case 'name':
-                        rowHtml += `<td class="cell-game-name">${highlightSearch(game.name, 'games-table')}</td>`;
+                        rowHtml += `<td class="cell-game-name editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'name')" title="双击编辑">${highlightSearch(game.name, 'games-table')}</td>`;
                         break;
                     case 'english_name':
-                        rowHtml += `<td class="cell-game-name">${highlightSearch(game.english_name || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="cell-game-name editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'english_name')" title="双击编辑">${highlightSearch(game.english_name || '-', 'games-table')}</td>`;
                         break;
                     case 'platform':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'platform', 'game_platform')" title="点击选择">${escapeHtml(game.platform || '-')}</td>`;
                         break;
                     case 'game_id':
-                        rowHtml += `<td>${highlightSearch(game.game_id || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'game_id')" title="双击编辑">${highlightSearch(game.game_id || '-', 'games-table')}</td>`;
                         break;
                     case 'game_type':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'game_type', 'game_type')" title="点击选择">${highlightSearch(game.game_type || '-', 'games-table')}</td>`;
@@ -390,25 +378,25 @@ function renderGamesPage() {
                         rowHtml += `<td class="cell-description editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'description')" title="双击编辑">${highlightSearch(game.description || '-', 'games-table')}</td>`;
                         break;
                     case 'developer':
-                        rowHtml += `<td>${highlightSearch(game.developer || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'developer')" title="双击编辑">${highlightSearch(game.developer || '-', 'games-table')}</td>`;
                         break;
                     case 'operator':
-                        rowHtml += `<td>${highlightSearch(game.operator || '-', 'games-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'operator')" title="双击编辑">${highlightSearch(game.operator || '-', 'games-table')}</td>`;
                         break;
                     case 'release_date':
-                        rowHtml += `<td>${escapeHtml(game.release_date || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'release_date')" title="双击编辑">${escapeHtml(game.release_date || '-')}</td>`;
                         break;
                     case 'config_path':
-                        rowHtml += `<td>${escapeHtml(game.config_path || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'config_path')" title="双击编辑">${escapeHtml(game.config_path || '-')}</td>`;
                         break;
                     case 'adapter_progress':
-                        rowHtml += `<td>${escapeHtml(game.adapter_progress || '0%')}</td>`;
+                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'adapter_progress')" title="双击编辑">${escapeHtml(game.adapter_progress || '0%')}</td>`;
                         break;
                     case 'owner':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
                         break;
                     case 'online_status':
-                        rowHtml += `<td>${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'online_status', 'online_status')" title="点击选择">${escapeHtml(getFieldOptionLabel('online_status', game.online_status) || '-')}</td>`;
                         break;
                     case 'quality':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'quality', 'quality', '${escapeHtml(game.quality || '')}')" title="点击选择">${escapeHtml(getFieldOptionLabel('quality', game.quality) || '-')}</td>`;
@@ -429,8 +417,8 @@ function renderGamesPage() {
 
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editGame(${game.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteGame(${game.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editGame(${game.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteGame(${game.id})">删除</button>
                 </td>
             `;
 
@@ -460,9 +448,77 @@ function renderGamesPage() {
     applyCellTooltips('games-table');
     // P0: 初始化表头排序
     initTableSort('games-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') {
+        // 用 rAF 等本帧渲染完成再锁定，确保拿到正确列宽
+        requestAnimationFrame(() => initColumnResize());
+    }
     // 注意：批量选择checkbox由 ui-features.js 的 MutationObserver 自动注入（injectBatchCheckboxes）
     // 不再在此调用 initBatchSelect，避免重复插入复选框列
 }
+
+// 🐛 DEBUG: 表格状态采样器（用于排查列表抖动）
+window._tableSnap = function(label) {
+    try {
+        const tbody = document.getElementById('games-table');
+        const tbl = tbody?.closest('table');
+        if (!tbl) return null;
+        const ths = tbl.querySelectorAll('thead th');
+        const firstRow = tbody.querySelector('tr');
+        const tds = firstRow?.children || [];
+        const snap = {
+            label: label || 'snap',
+            time: Date.now(),
+            tableScrollWidth: tbl.scrollWidth,
+            tableClientWidth: tbl.clientWidth,
+            tableLayout: getComputedStyle(tbl).tableLayout,
+            theadColCount: ths.length,
+            tbodyFirstRowColCount: tds.length,
+            theadWidths: Array.from(ths).map(th => ({ field: th.dataset.field || th.className || '-', w: th.offsetWidth })),
+            tbodyFirstRowWidths: Array.from(tds).map(td => ({ cls: td.className || '-', w: td.offsetWidth }))
+        };
+        if (!window._tableSnaps) window._tableSnaps = [];
+        window._tableSnaps.push(snap);
+        console.log(`📸 [${label}] tableW=${snap.tableScrollWidth}px thead=${snap.theadColCount}列 tbody=${snap.tbodyFirstRowColCount}列 layout=${snap.tableLayout}`);
+        return snap;
+    } catch(e) { console.error('snap error:', e); }
+};
+
+// 自动捕获：每500ms采样一次表格状态，连续记录前后变化
+window._startTableMonitor = function() {
+    if (window._tableMonitorTimer) {
+        clearInterval(window._tableMonitorTimer);
+        console.log('🔴 已停止旧监控');
+    }
+    window._tableSnaps = [];
+    let lastWidth = -1;
+    let counter = 0;
+    window._tableMonitorTimer = setInterval(() => {
+        const tbody = document.getElementById('games-table');
+        const tbl = tbody?.closest('table');
+        if (!tbl) return;
+        const w = tbl.scrollWidth;
+        // 只在宽度变化时记录，避免太多无用日志
+        if (w !== lastWidth) {
+            window._tableSnap(`auto#${++counter}`);
+            lastWidth = w;
+        }
+    }, 100);
+    console.log('🟢 表格监控已启动 (每100ms采样)，调用 _stopTableMonitor() 停止，_dumpSnaps() 查看记录');
+};
+window._stopTableMonitor = function() {
+    clearInterval(window._tableMonitorTimer);
+    console.log('🔴 监控已停止，共记录', (window._tableSnaps||[]).length, '个变化点');
+};
+window._dumpSnaps = function() {
+    console.log('=== 所有采样 ===');
+    (window._tableSnaps||[]).forEach((s, i) => {
+        console.log(`#${i} [${s.label}] @${new Date(s.time).toISOString().slice(11,23)} tableW=${s.tableScrollWidth} thead=${s.theadColCount} tbody=${s.tbodyFirstRowColCount} layout=${s.tableLayout}`);
+        console.log('  thead:', s.theadWidths.map(x => `${x.field}=${x.w}`).join(' | '));
+        console.log('  tbody:', s.tbodyFirstRowWidths.map(x => `${x.cls}=${x.w}`).join(' | '));
+    });
+    return window._tableSnaps;
+};
 
 // ========== 游戏列表行内编辑 ==========
 
@@ -471,34 +527,46 @@ function startGameTextEdit(td, gameId, field) {
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
+    // ★ 关键：保留单元格原宽度，编辑框用 absolute 浮在单元格上方，不影响表格列布局
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    const originalHtml = td.innerHTML;
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
+
+    // 不改变 td 的宽度！只设置 position:relative 让 input 可以 absolute 定位
+    td.style.position = 'relative';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalValue = game ? (game[field] || '') : '';
-    const originalHtml = td.innerHTML;
 
     // 游戏账号用 textarea（多行），简介用 input
     let input;
     if (field === 'game_account') {
         input = document.createElement('textarea');
-        input.className = 'inline-edit-textarea';
+        input.className = 'inline-edit-textarea inline-edit-overlay';
         input.value = originalValue;
-        input.rows = 2;
+        input.rows = 3;
+        // ★ absolute 定位浮在单元格上方，不影响表格列宽
+        input.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth, 280)}px;min-height:${Math.max(originalHeight, 70)}px;z-index:100;`;
     } else {
         input = document.createElement('input');
         input.type = 'text';
-        input.className = 'inline-edit-input';
+        input.className = 'inline-edit-input inline-edit-overlay';
         input.value = originalValue;
+        // ★ absolute 定位，宽度可以超出单元格不挤压表格
+        input.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth * 1.5, 200)}px;height:${originalHeight}px;z-index:100;`;
     }
 
+    // ★★★ 关键修复：保留原内容作为不可见占位符，撑住td的几何尺寸
+    // 否则 input 是 absolute 不占空间 → td 塌缩 → 整张表 reflow → 视觉抖动
+    const placeholder = document.createElement('span');
+    placeholder.className = 'inline-edit-placeholder';
+    placeholder.style.cssText = 'visibility:hidden;display:block;';
+    placeholder.innerHTML = originalHtml;
+
     td.innerHTML = '';
-    td.appendChild(input);
+    td.appendChild(placeholder);  // 占位符保持原宽高
+    td.appendChild(input);         // 浮层编辑框
     input.focus();
     // 光标定位到句尾，不全选
     if (input.tagName === 'TEXTAREA') {
@@ -516,7 +584,7 @@ function startGameTextEdit(td, gameId, field) {
         if (newValue === originalValue) {
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
             return;
         }
         try {
@@ -543,7 +611,7 @@ function startGameTextEdit(td, gameId, field) {
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
     };
 
     input.addEventListener('blur', save);
@@ -553,7 +621,7 @@ function startGameTextEdit(td, gameId, field) {
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
         }
     });
 }
@@ -563,19 +631,21 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
-    // 锁定宽高防抖动
+    // ★ 关键：保留原宽度，select 用 absolute 浮在单元格上方，不影响表格列布局
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
+
+    // 不改变 td 的宽度！只设置 position:relative 让 select 可以 absolute 定位
+    td.style.position = 'relative';
 
     const game = allGamesData.find(g => g.id === gameId);
     const originalHtml = td.innerHTML;
 
     const select = document.createElement('select');
-    select.className = 'inline-edit-select';
+    select.className = 'inline-edit-select inline-edit-overlay';
+    // ★ absolute 定位浮在单元格上方
+    select.style.cssText = `position:absolute;left:0;top:0;width:${Math.max(originalWidth * 1.3, 160)}px;height:${originalHeight}px;z-index:100;`;
 
     // 空选项
     const emptyOpt = document.createElement('option');
@@ -606,7 +676,14 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
         });
     }
 
+    // ★★★ 关键修复：保留原内容作为不可见占位符，撑住td的几何尺寸
+    const placeholder = document.createElement('span');
+    placeholder.className = 'inline-edit-placeholder';
+    placeholder.style.cssText = 'visibility:hidden;display:block;';
+    placeholder.innerHTML = originalHtml;
+
     td.innerHTML = '';
+    td.appendChild(placeholder);
     td.appendChild(select);
     select.focus();
 
@@ -631,10 +708,8 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
                     const memberName = result.owner_name || '-';
                     if (game) game.owner_name = memberName;
                     td.textContent = memberName;
-                } else if (optionSource === 'quality') {
-                    td.textContent = getFieldOptionLabel('quality', newValue) || '-';
                 } else {
-                    td.textContent = newValue || '-';
+                    td.textContent = getFieldOptionLabel(optionSource, newValue) || newValue || '-';
                 }
             } else {
                 td.innerHTML = originalHtml;
@@ -645,7 +720,7 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
             showToast('保存失败', 'danger');
         }
         td.classList.remove('editing');
-        td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+        td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
     };
 
     select.addEventListener('change', save);
@@ -655,7 +730,7 @@ function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue)
             saved = true;
             td.classList.remove('editing');
             td.innerHTML = originalHtml;
-            td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
+            td.style.position = ''; td.style.width = ''; td.style.minWidth = ''; td.style.maxWidth = ''; td.style.height = '';
         }
     });
 }
@@ -689,12 +764,16 @@ function updatePaginationControls() {
         return;
     }
 
-    // 生成页码按钮
-    let pageNumbersHTML = '';
-    for (let i = 1; i <= totalPages; i++) {
-        const isActive = i === currentPage ? 'active' : '';
-        pageNumbersHTML += `<button class="btn btn-small page-number ${isActive}" onclick="goToPage(${i})">${i}</button>`;
-    }
+    // 生成页码按钮（带省略号，避免页数多时溢出）
+    const pageNumbersHTML = (typeof renderPageButtons === 'function')
+        ? renderPageButtons(currentPage, totalPages, 'goToPage')
+        : (function () {
+            let h = '';
+            for (let i = 1; i <= totalPages; i++) {
+                h += `<button class="btn btn-small page-number ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            return h;
+        })();
     pageNumbersDiv.innerHTML = pageNumbersHTML + buildPaginationExtras(totalPages);
 }
 
@@ -911,7 +990,7 @@ const exportConfigs = {
             { key: 'developer', label: '开发商' }, { key: 'operator', label: '运营商' },
             { key: 'release_date', label: '上线日期' }, { key: 'config_path', label: '配置路径' },
             { key: 'adapter_progress', label: '适配进度' }, { key: 'owner_name', label: '负责人' },
-            { key: 'online_status', label: '上线状态' }, { key: 'quality', label: '品质' },
+            { key: 'online_status', label: '适配状态' }, { key: 'quality', label: '品质' },
             { key: 'game_account', label: '游戏账号' }, { key: 'storage_location', label: '存储位置' }
         ]
     },
@@ -925,10 +1004,10 @@ const exportConfigs = {
         ]
     },
     devices: {
-        sheetName: '设备列表',
+        sheetName: '客户列表',
         getData: () => allDevicesData,
         columns: [
-            { key: 'manufacturer', label: '厂商' }, { key: 'device_type', label: '设备类型' },
+            { key: 'manufacturer', label: '客户名称' }, { key: 'device_type', label: '设备类型' },
             { key: 'name', label: '设备名称' }, { key: 'requirements', label: '设备需求' },
             { key: 'quantity', label: '数量' }, { key: 'keeper', label: '保管者' },
             { key: 'notes', label: '备注' }, { key: 'adapter_completion_rate', label: '适配完成率' },
@@ -1090,7 +1169,7 @@ function handleExcelUpload(event) {
                             release_date: row['上线日期'] || row['release_date'] || '',
                             config_path: row['配置路径'] || row['config_path'] || '',
                             adapter_progress: row['适配进度'] || row['adapter_progress'] || '',
-                            online_status: row['上线状态'] || row['online_status'] || 'pending',
+                            online_status: row['适配状态'] || row['hook开发状态'] || row['online_status'] || 'undeveloped',
                             quality: row['品质'] || row['quality'] || 'normal',
                             game_account: row['游戏账号'] || row['game_account'] || '',
                             storage_location: row['存储位置'] || row['storage_location'] || ''
@@ -1139,13 +1218,17 @@ function renderTestsTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('tests-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('tests-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('tests-table') :
             ['name', 'game_name', 'device_name', 'tester_name', 'test_date', 'status', 'priority', 'bugs_count'];
 
         tbody.innerHTML = data.map((test, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${test.id}" data-resource="tests" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 if (typeof testVisibleColumns !== 'undefined' && !testVisibleColumns[field]) return;
@@ -1227,22 +1310,37 @@ function renderBugsTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('bugs-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('bugs-table');
+    // ★ 列宽锁定+resize手柄（同步执行，避免tab切换时handle消失）
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('bugs-table') :
-            ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
+            ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
 
         tbody.innerHTML = data.map((bug, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${bug.id}" data-resource="bugs" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 if (typeof bugVisibleColumns !== 'undefined' && !bugVisibleColumns[field]) return;
                 switch (field) {
+                    case 'game_name':
+                        if (bug.game_name) {
+                            rowHtml += `<td><a class="link-cell" onclick="jumpToGameByName('${escapeHtml(bug.game_name).replace(/'/g, "\\'")}')" title="点击查看该游戏">${highlightSearch(bug.game_name, 'bugs-table')}</a></td>`;
+                        } else {
+                            rowHtml += `<td>-</td>`;
+                        }
+                        break;
                     case 'versions':
                         rowHtml += `<td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>`;
                         break;
                     case 'device_name':
-                        rowHtml += `<td>${highlightSearch(bug.device_name || '-', 'bugs-table')}</td>`;
+                        if (bug.device_name) {
+                            rowHtml += `<td><a class="link-cell" onclick="jumpToCustomerByName('${escapeHtml(bug.device_name).replace(/'/g, "\\'")}')" title="点击查看该客户">${highlightSearch(bug.device_name, 'bugs-table')}</a></td>`;
+                        } else {
+                            rowHtml += `<td>-</td>`;
+                        }
                         break;
                     case 'discovery_time':
                         rowHtml += `<td>${escapeHtml(bug.discovery_time || '-')}</td>`;
@@ -1283,7 +1381,7 @@ function renderBugsTable(data) {
                     <div class="empty-text">暂无缺陷记录</div>
                     <div class="empty-sub">测试过程中发现的问题会记录在这里</div>
                     <div class="empty-action">
-                        <button class="btn btn-primary" onclick="openModal('bug-modal')">➕ 报告一个缺陷</button>
+                        <button class="btn btn-primary" onclick="openBugModal()">➕ 报告一个缺陷</button>
                     </div>
                 </td>
             </tr>
@@ -1425,11 +1523,11 @@ function updateGamesModuleStats() {
     // 上线状态统计
     const onlineStatusMap = {};
     try { getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label); } catch(e) {}
-    if (!onlineStatusMap['online']) Object.assign(onlineStatusMap, {'pending':'待上线','in_progress':'适配中','paused':'暂停适配','online':'已上线'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const onlineCounts = {};
     data.forEach(g => {
-        const s = g.online_status || 'pending';
+        const s = g.online_status || 'undeveloped';
         const label = onlineStatusMap[s] || s;
         onlineCounts[label] = (onlineCounts[label] || 0) + 1;
     });
@@ -1531,7 +1629,7 @@ function updateProgressModuleStats(deviceIndex) {
     // 上线状态统计
     const onlineStatusMap = {};
     try { getFieldOptionsByKey('online_status').forEach(o => onlineStatusMap[o.value] = o.label); } catch(e) {}
-    if (!onlineStatusMap['online']) Object.assign(onlineStatusMap, {'pending':'待上线','in_progress':'适配中','paused':'暂停适配','online':'已上线'});
+    if (!onlineStatusMap['completed']) Object.assign(onlineStatusMap, {'completed':'已发布','developing':'开发中','undeveloped':'未开始','anticheat':'反外挂','not_applicable':'不适用'});
 
     const statusCounts = {};
     games.forEach(g => {
@@ -1684,7 +1782,6 @@ function initForms() {
             adapter_progress: document.getElementById('game-adapter-progress').value,
             version: document.getElementById('game-version').value,
             package_size: document.getElementById('game-package-size').value,
-            adaptation_status: document.getElementById('game-adaptation-status').value,
             adaptation_notes: document.getElementById('game-adaptation-notes').value,
             owner_id: document.getElementById('game-owner').value,
             online_status: document.getElementById('game-online-status').value,
@@ -1769,6 +1866,7 @@ function initForms() {
         const id = document.getElementById('bug-id').value;
         const data = {
             versions: document.getElementById('bug-versions').value,
+            game_name: document.getElementById('bug-game-name').value,
             device_name: document.getElementById('bug-device-name').value,
             discovery_time: document.getElementById('bug-discovery-time').value,
             owner: document.getElementById('bug-owner').value,
@@ -1887,16 +1985,17 @@ function startMemberInlineEdit(td, memberId, field, inputType) {
 
     const currentValue = td.textContent.trim();
     const displayValue = currentValue === '-' ? '' : currentValue;
+    // ★ 保留原 innerHTML，作为不可见占位符撑住td尺寸（消除编辑抖动）
+    const originalHtml = td.innerHTML;
 
     td.classList.add('editing');
 
-    // 锁定单元格宽高，防止编辑态撑开引起抖动
+    // ★ 关键修复：不再设置 td.style.width/maxWidth（避免触发列宽重排）
+    // 改为 position:relative + 不可见占位符 + absolute 浮层编辑框
     const rect = td.getBoundingClientRect();
-    td.style.width = rect.width + 'px';
-    td.style.minWidth = rect.width + 'px';
-    td.style.maxWidth = rect.width + 'px';
-    td.style.height = rect.height + 'px';
-    td.style.boxSizing = 'border-box';
+    const originalWidth = rect.width;
+    const originalHeight = rect.height;
+    td.style.position = 'relative';
 
     // 角色：下拉选择（从字段选项获取）
     if (field === 'role') {
@@ -2022,11 +2121,8 @@ async function saveMemberInlineEdit(td, memberId, field, newValue) {
                 td.textContent = trimmed || '-';
             }
 
-            // 解除宽高锁定
-            td.style.width = '';
-            td.style.minWidth = '';
-            td.style.maxWidth = '';
-            td.style.height = '';
+            // ★ 清除 td 的 position（不再有内联width/maxWidth/height了）
+            td.style.position = '';
 
             showToast('已保存', 'success');
         } else {
@@ -2052,10 +2148,7 @@ function cancelMemberInlineEdit(td, memberId, field, originalValue) {
     } else {
         td.textContent = originalValue || '-';
     }
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    td.style.position = '';
 }
 
 /**
@@ -2069,10 +2162,7 @@ function cancelMemberInlineEditRestore(td, memberId, field) {
     } else {
         td.textContent = member ? (member[field] || '-') : '-';
     }
-    td.style.width = '';
-    td.style.minWidth = '';
-    td.style.maxWidth = '';
-    td.style.height = '';
+    td.style.position = '';
 }
 
 // 编辑成员
@@ -2183,10 +2273,9 @@ async function editGame(id) {
             document.getElementById('game-adapter-progress').value = game.adapter_progress || '';
             document.getElementById('game-version').value = game.version || '';
             document.getElementById('game-package-size').value = game.package_size || '';
-            document.getElementById('game-adaptation-status').value = game.adaptation_status || '';
             document.getElementById('game-adaptation-notes').value = game.adaptation_notes || '';
             document.getElementById('game-owner').value = game.owner_id || '';
-            document.getElementById('game-online-status').value = game.online_status || 'pending';
+            document.getElementById('game-online-status').value = game.online_status || 'undeveloped';
             document.getElementById('game-quality').value = game.quality || 'normal';
             document.getElementById('game-account').value = game.game_account || '';
             document.getElementById('game-storage-location').value = game.storage_location || '硬盘1号';
@@ -2260,6 +2349,84 @@ async function deleteTest(id) {
     });
 }
 
+// P0-1: 从缺陷点击「关联游戏」→跳转游戏列表并按名称筛选高亮
+function jumpToGameByName(gameName) {
+    if (!gameName) return;
+    if (typeof switchTab === 'function') switchTab('games');
+    setTimeout(function () {
+        const search = document.getElementById('games-search');
+        if (search) {
+            search.value = gameName;
+            if (typeof filterModule === 'function') filterModule('games');
+        }
+        if (typeof showToast === 'function') showToast(`已定位到游戏「${gameName}」`, 'info');
+    }, 120);
+}
+
+// P0-1: 从缺陷点击「客户名称」→跳转客户列表并按名称筛选高亮
+// 软关联兜底：传入值若是历史"设备名"，自动换算成对应客户名(manufacturer)
+function jumpToCustomerByName(name) {
+    if (!name) return;
+    let customer = name;
+    if (typeof allDevicesData !== 'undefined' && Array.isArray(allDevicesData)) {
+        const isManufacturer = allDevicesData.some(d => (d.manufacturer || '').trim() === name.trim());
+        if (!isManufacturer) {
+            const byDeviceName = allDevicesData.find(d => (d.name || '').trim() === name.trim());
+            if (byDeviceName && byDeviceName.manufacturer) customer = byDeviceName.manufacturer;
+        }
+    }
+    if (typeof switchTab === 'function') switchTab('devices');
+    setTimeout(function () {
+        const search = document.getElementById('devices-search');
+        if (search) {
+            search.value = customer;
+            if (typeof filterModule === 'function') filterModule('devices');
+        }
+        if (typeof showToast === 'function') showToast(`已定位到客户「${customer}」`, 'info');
+    }, 120);
+}
+
+// P0-1: 打开「添加缺陷」弹窗（先填充下拉再打开）
+function openBugModal() {
+    if (typeof resetForm === 'function') resetForm('bug-form');
+    document.getElementById('bug-id').value = '';
+    populateBugModalSelects();
+    openModal('bug-modal');
+}
+
+// P0-1: 填充缺陷弹窗的「游戏名称」「客户名称」下拉
+// 游戏名 value=游戏名文本(重名用平台后缀在label区分); 客户名 value=manufacturer(客户名)
+function populateBugModalSelects() {
+    const gameSel = document.getElementById('bug-game-name');
+    const devSel = document.getElementById('bug-device-name');
+    if (gameSel && typeof allGamesData !== 'undefined' && Array.isArray(allGamesData)) {
+        // 统计重名游戏，重名才加平台后缀
+        const nameCount = {};
+        allGamesData.forEach(g => { const n = g.name || ''; nameCount[n] = (nameCount[n] || 0) + 1; });
+        let html = '<option value="">未关联</option>';
+        allGamesData.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh')).forEach(g => {
+            const n = g.name || '';
+            if (!n) return;
+            const label = (nameCount[n] > 1 && g.platform) ? `${n}（${g.platform}）` : n;
+            html += `<option value="${escapeHtml(n)}">${escapeHtml(label)}</option>`;
+        });
+        gameSel.innerHTML = html;
+    }
+    if (devSel && typeof allDevicesData !== 'undefined' && Array.isArray(allDevicesData)) {
+        // 按客户名(manufacturer)去重
+        const seen = new Set();
+        const customers = [];
+        allDevicesData.forEach(d => {
+            const m = (d.manufacturer || '').trim();
+            if (m && !seen.has(m)) { seen.add(m); customers.push(m); }
+        });
+        customers.sort((a, b) => a.localeCompare(b, 'zh'));
+        let html = '<option value="">未关联</option>';
+        customers.forEach(m => { html += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`; });
+        devSel.innerHTML = html;
+    }
+}
+
 // 编辑缺陷
 async function editBug(id) {
     try {
@@ -2268,8 +2435,10 @@ async function editBug(id) {
         const bug = result.data.find(b => b.id === id);
 
         if (bug) {
+            populateBugModalSelects();
             document.getElementById('bug-id').value = bug.id;
             document.getElementById('bug-versions').value = bug.versions || '';
+            document.getElementById('bug-game-name').value = bug.game_name || '';
             document.getElementById('bug-device-name').value = bug.device_name || '';
             document.getElementById('bug-discovery-time').value = bug.discovery_time || '';
             document.getElementById('bug-owner').value = bug.owner || '';
@@ -3041,31 +3210,49 @@ function initTableSort(tableId) {
         th.style.userSelect = 'none';
         th.style.position = 'relative';
 
-        // 保留表头拖拽的grab光标（不覆盖games-table的cursor:grab）
-        if (tableId !== 'games-table' || !th.dataset.field) {
-            th.style.cursor = 'pointer';
-        }
+        // ★ th本身不设pointer光标（空白区域不响应排序）
+        th.style.cursor = 'default';
 
-        // 添加排序箭头占位
-        if (!th.querySelector('.sort-arrow')) {
+        // ★ 将表头文字包裹在 sort-label span 中，只有这个区域可点击排序
+        if (!th.querySelector('.sort-label')) {
+            const label = document.createElement('span');
+            label.className = 'sort-label';
+
+            // 收集所有文本子节点（排除已有的 sort-arrow）
+            Array.from(th.childNodes).forEach(node => {
+                if (node.nodeType === 3 || (node.nodeType === 1 && !node.classList.contains('sort-arrow'))) {
+                    label.appendChild(node.cloneNode(true));
+                }
+            });
+
+            // 清空th，重新组装：文字标签 + 箭头
+            const oldArrow = th.querySelector('.sort-arrow');
+            th.innerHTML = '';
+            th.appendChild(label);
+
+            // 排序箭头放在 label 内部右侧
             const arrow = document.createElement('span');
             arrow.className = 'sort-arrow';
             arrow.innerHTML = ' <span class="sort-indicator"></span>';
-            th.appendChild(arrow);
+            label.appendChild(arrow);
         }
 
         // 更新当前排序状态显示
         updateSortIndicator(th, tableId);
 
-        th.addEventListener('click', () => {
-            // 如果刚完成长按拖拽，跳过排序（防止竞争）
-            if (_isHeaderLongPress) {
-                _isHeaderLongPress = false;
-                return;
-            }
-            const field = th.getAttribute('data-field');
-            handleSortClick(tableId, field);
-        });
+        // ★ 点击事件只绑定到 sort-label，不在整个 th 上
+        const sortLabel = th.querySelector('.sort-label');
+        if (sortLabel) {
+            sortLabel.addEventListener('click', () => {
+                // 如果刚完成长按拖拽，跳过排序（防止竞争）
+                if (_isHeaderLongPress) {
+                    _isHeaderLongPress = false;
+                    return;
+                }
+                const field = th.getAttribute('data-field');
+                handleSortClick(tableId, field);
+            });
+        }
     });
 }
 

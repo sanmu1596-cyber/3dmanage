@@ -130,11 +130,23 @@ document.addEventListener('keydown', function(e) {
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(e.key)) {
         return;
     }
-    
+
     const overlay = document.getElementById('global-search-overlay');
     const isSearchOpen = overlay && overlay.style.display !== 'none';
-    const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-    const isInModal = document.activeElement.closest('.modal[style*="block"], .modal.show');
+    // ★ 关键修复：检测是否在编辑环境
+    // 1) 原生表单控件 INPUT/TEXTAREA/SELECT
+    // 2) contenteditable 富文本（如游戏问题/大事的内容编辑器）
+    // 3) 处于任意打开的弹窗内（包括 .modal / .modal-overlay / 自定义弹窗）
+    const activeEl = document.activeElement;
+    const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl?.tagName)
+        || activeEl?.isContentEditable
+        || !!activeEl?.closest('[contenteditable="true"], .rich-paste-editor, .focus-rich-editor');
+    // 检查是否有任何打开的弹窗（包括 .modal-overlay 自定义弹窗）
+    const hasOpenModal = !!Array.from(document.querySelectorAll('.modal, .modal-overlay')).find(m => {
+        const ds = m.style.display;
+        return ds === 'flex' || ds === 'block' || m.classList.contains('show');
+    });
+    const isInModal = !!activeEl?.closest('.modal, .modal-overlay, .modal-box') || hasOpenModal;
 
     // Ctrl+K / Cmd+K: 全局搜索
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -509,48 +521,38 @@ const batchReloadMap = {
     adaptations: loadProgressData
 };
 
-// 注入 checkbox 到表格（在每次 render 后调用）
+// 注入 checkbox 到表格（兜底：仅当render未输出batch-td时同步补全；正常情况render直接产出，此处不执行任何插入）
+// ★ 改造说明：
+// 旧方案：HTML thead 不含 batch-th + render 不输出 batch-td → MutationObserver 异步插入 th + td (80ms 延迟) → 列错位抖动
+// 新方案：1) HTML thead 静态写死 .batch-th  2) render函数直接输出 .batch-td  3) 本函数仅作为兜底
 function injectBatchCheckboxes(tableId) {
     const resource = tableToBatchResource[tableId];
     if (!resource) return;
-    
+
     const table = document.getElementById(tableId);
     if (!table) return;
-    
-    // 获取对应的 <thead>
-    const theadRow = table.closest('table')?.querySelector('thead tr');
-    if (!theadRow) return;
-    
-    // 如果已有 checkbox 列头，不重复添加
-    if (theadRow.querySelector('.batch-th')) return;
 
-    // 清除旧行级 checkbox（防止 MutationObserver 重复触发导致多注入）
-    table.querySelectorAll('td > input.row-checkbox').forEach(cb => {
-        cb.closest('td').remove();
-    });
-
-    // 在序号列之前添加 checkbox 表头
-    const th = document.createElement('th');
-    th.className = 'batch-th';
-    th.style.cssText = 'width:36px;min-width:36px;max-width:36px;overflow:hidden;text-overflow:clip;padding:4px 2px;text-align:center;';
-    th.innerHTML = `<input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('${tableId}', this.checked)">`;
-    theadRow.insertBefore(th, theadRow.firstChild);
-    
-    // 给每一行添加 checkbox
+    // 给每一行添加 checkbox（兜底：render没输出batch-td时才补）
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
         if (row.querySelector('.empty-state')) return; // 跳过空状态行
-        // 从操作列的按钮中提取 ID
-        const editBtn = row.querySelector('button[onclick*="edit"], button[onclick*="Edit"], button[onclick*="delete"], button[onclick*="Delete"]');
-        let rowId = null;
-        if (editBtn) {
-            const match = editBtn.getAttribute('onclick')?.match(/\((\d+)/);
-            if (match) rowId = parseInt(match[1]);
+        if (row.querySelector('.batch-td') || row.querySelector('.row-checkbox')) return; // 已有则跳过
+
+        // 优先从 row.dataset.id 取
+        let rowId = row.dataset.id ? parseInt(row.dataset.id) : null;
+
+        // 兜底：从操作列的按钮中提取 ID
+        if (rowId === null || isNaN(rowId)) {
+            const editBtn = row.querySelector('button[onclick*="edit"], button[onclick*="Edit"], button[onclick*="delete"], button[onclick*="Delete"]');
+            if (editBtn) {
+                const match = editBtn.getAttribute('onclick')?.match(/\((\d+)/);
+                if (match) rowId = parseInt(match[1]);
+            }
         }
-        if (rowId === null) return;
-        
+        if (rowId === null || isNaN(rowId)) return;
+
         const td = document.createElement('td');
-        td.style.cssText = 'width:36px;min-width:36px;max-width:36px;overflow:hidden;text-overflow:clip;padding:4px 2px;text-align:center;';
+        td.className = 'batch-td';
         td.innerHTML = `<input type="checkbox" class="row-checkbox" data-id="${rowId}" data-resource="${resource}" onchange="batchToggleRow(this)">`;
         row.insertBefore(td, row.firstChild);
     });
@@ -653,26 +655,23 @@ async function batchDelete() {
     });
 }
 
-// 在表格渲染后自动注入checkbox（使用 MutationObserver + 防抖合并）
-let _batchTimers = {};
+// ★ 改造说明：表头 .batch-th 已在HTML静态写死，这里只需同步注入行级 td。
+// 原来用 MutationObserver + 80ms 防抖 → 异步生效会导致已渲染的表格"先少一列再多一列"，引发列宽重排+视觉抖动。
+// 现在改为：MutationObserver 触发后立即同步执行 injectBatchCheckboxes（仅插td，不动th），无延迟无重排。
 const _batchObserver = new MutationObserver((mutations) => {
+    const tbodyIds = new Set();
     mutations.forEach(m => {
         const tbody = m.target;
         if (tbody.id && tableToBatchResource[tbody.id]) {
-            // 防抖：合并同一 tbody 的多次变更
-            clearTimeout(_batchTimers[tbody.id]);
-            _batchTimers[tbody.id] = setTimeout(() => {
-                // 先清除全选状态
-                batchState.selected.clear();
-                updateBatchBar();
-                // 移除旧的 checkbox 列头
-                const theadRow = tbody.closest('table')?.querySelector('thead tr');
-                const oldTh = theadRow?.querySelector('.batch-th');
-                if (oldTh) oldTh.remove();
-                // 重新注入
-                injectBatchCheckboxes(tbody.id);
-            }, 80);
+            tbodyIds.add(tbody.id);
         }
+    });
+    // 同步处理：每次变更后立即补全行级checkbox（表头已静态写死，不会插td引发列变化）
+    tbodyIds.forEach(tbodyId => {
+        // 数据完全重渲染时清空选中状态
+        batchState.selected.clear();
+        updateBatchBar();
+        injectBatchCheckboxes(tbodyId);
     });
 });
 
@@ -749,8 +748,8 @@ const CTX_MENU_CONFIGS = {
     },
     'devices-table': {
         getItems: (tr, id) => [
-            { icon: '✏️', label: '编辑设备', action: () => editDevice(id) },
-            { icon: '📋', label: '复制设备名', action: () => copyToClipboard(tr.querySelectorAll('td')[2]?.textContent || '') },
+            { icon: '✏️', label: '编辑客户', action: () => editDevice(id) },
+            { icon: '📋', label: '复制客户名', action: () => copyToClipboard(tr.querySelectorAll('td')[2]?.textContent || '') },
             { divider: true },
             { icon: '🗑️', label: '删除设备', action: () => deleteDevice(id), danger: true }
         ]

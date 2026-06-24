@@ -7,6 +7,8 @@
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
     <link rel="stylesheet" href="styles-tapd.css?v=20260624c">
+    <!-- ★ GUI 设计规范（最后加载，全局统一） -->
+    <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -54,7 +56,7 @@
                             <span class="sidebar-icon">🎮</span>游戏列表<span class="shortcut-badge">⌘2</span>
                         </a>
                         <a class="sidebar-item" data-tab="devices" onclick="switchTab('devices')">
-                            <span class="sidebar-icon">📱</span>设备列表<span class="shortcut-badge">⌘3</span>
+                            <span class="sidebar-icon">📱</span>客户列表<span class="shortcut-badge">⌘3</span>
                         </a>
                         <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
                             <span class="sidebar-icon">👥</span>项目成员列表<span class="shortcut-badge">⌘4</span>
@@ -90,7 +92,7 @@
                     <div class="sidebar-section-title">交织模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="interlace-issues" onclick="switchTab('interlace-issues')">
-                            <span class="sidebar-icon">🔗</span>问题列表
+                            <span class="sidebar-icon">⚠️</span>交织问题
                         </a>
                         <a class="sidebar-item" data-tab="interlace-versions" onclick="switchTab('interlace-versions')">
                             <span class="sidebar-icon">📦</span>版本管理
@@ -102,7 +104,7 @@
                     <div class="sidebar-section-title">客户端模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="client-issues" onclick="switchTab('client-issues')">
-                            <span class="sidebar-icon">🖥️</span>问题跟踪
+                            <span class="sidebar-icon">⚠️</span>客户端问题
                         </a>
                         <a class="sidebar-item" data-tab="versions" onclick="switchTab('versions')">
                             <span class="sidebar-icon">📦</span>版本管理
@@ -219,7 +221,7 @@
                                 <canvas id="chart-platform" height="260"></canvas>
                             </div>
                             <div class="chart-card">
-                                <div class="chart-card-header">上线状态分布</div>
+                                <div class="chart-card-header">适配状态分布</div>
                                 <canvas id="chart-online-status" height="260"></canvas>
                             </div>
                             <div class="chart-card">
@@ -233,6 +235,82 @@
                             <div class="chart-card">
                                 <div class="chart-card-header">📋 最近活动</div>
                                 <div id="recent-activity-list" class="activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== 近期关注事项（故事墙） ==================== -->
+                    <div id="focus-items-section">
+                        <div class="focus-header">
+                            <div class="focus-title-row">
+                                <h3 class="focus-title">📌 近期关注事项</h3>
+                                <button class="tool-btn tool-btn-primary focus-add-btn" onclick="openFocusItemEditor()">
+                                    <span class="tool-icon">＋</span>新增大事
+                                </button>
+                            </div>
+                            <div class="focus-toolbar">
+                                <div class="focus-filter-group">
+                                    <button class="focus-filter-btn active" data-status="" onclick="filterFocusItems('')">全部</button>
+                                    <button class="focus-filter-btn" data-status="new" onclick="filterFocusItems('new')">新建</button>
+                                    <button class="focus-filter-btn" data-status="in_progress" onclick="filterFocusItems('in_progress')">进行中</button>
+                                    <button class="focus-filter-btn" data-status="done" onclick="filterFocusItems('done')">已结束</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 故事墙容器（拖拽排序） -->
+                        <div id="focus-items-board" class="focus-board"></div>
+
+                        <!-- 空状态 -->
+                        <div id="focus-empty-state" class="empty-state" style="display:none;">
+                            <div class="empty-icon">📌</div>
+                            <div class="empty-text">暂无关注事项</div>
+                            <div class="empty-sub">点击上方「＋ 新增大事」添加第一条关注事项</div>
+                        </div>
+
+                        <!-- 编辑器弹窗 -->
+                        <div id="focus-editor-modal" class="modal-overlay" style="display:none;" onclick="closeFocusEditor(event)">
+                            <div class="modal-box modal-lg focus-editor-box" onclick="event.stopPropagation()">
+                                <div class="modal-header">
+                                    <h4 id="focus-editor-title">新增大事</h4>
+                                    <button class="modal-close" onclick="closeFocusEditor()">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" id="focus-edit-id" value="">
+                                    <div class="form-group">
+                                        <label>模块</label>
+                                        <select id="focus-edit-module" class="form-control">
+                                            <option value="游戏">🎮 游戏</option>
+                                            <option value="交织">🔗 交织</option>
+                                            <option value="客户端">📱 客户端</option>
+                                            <option value="硬件">🖥 硬件</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>内容</label>
+                                        <div id="focus-edit-content" class="focus-rich-editor"
+                                     contenteditable="true" data-placeholder="输入关注事项内容...（支持粘贴截图）"></div>
+                                        <div class="editor-toolbar">
+                                            <span class="toolbar-hint">💡 单击编辑 | Ctrl+V 粘贴图片</span>
+                                            <button class="tool-btn btn-sm" onclick="insertImageToEditor()" title="插入图片">🖼 插图</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group form-inline-2col">
+                                        <div>
+                                            <label>状态</label>
+                                            <select id="focus-edit-status" class="form-control">
+                                                <option value="new">🆕 新建</option>
+                                                <option value="in_progress">🔄 进行中</option>
+                                                <option value="done">✅ 结束</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <input type="file" id="focus-image-input" accept="image/*" style="display:none" onchange="handleFocusImageUpload(this)">
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-default" onclick="closeFocusEditor()">取消</button>
+                                    <button class="btn btn-primary" onclick="saveFocusItem()">保存</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -334,7 +412,7 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="config_path" checked><span>配置路径</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_progress" checked><span>适配进度</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>上线状态</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>适配状态</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quality" checked><span>品质</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_account" checked><span>游戏账号</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="storage_location" checked><span>存储位置</span></label></div>
@@ -347,6 +425,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('games-table', this.checked)"></th>
                                     <th width="50">序号</th>
                                     <th data-field="name">游戏名称</th>
                                     <th data-field="english_name">英文名称</th>
@@ -360,7 +439,7 @@
                                     <th data-field="config_path">配置路径</th>
                                     <th data-field="adapter_progress">适配进度</th>
                                     <th data-field="owner">负责人</th>
-                                    <th data-field="online_status">上线状态</th>
+                                    <th data-field="online_status">适配状态</th>
                                     <th data-field="quality">品质</th>
                                     <th data-field="game_account">游戏账号</th>
                                     <th data-field="storage_location">存储位置</th>
@@ -426,6 +505,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('members-table', this.checked)"></th>
                                     <th width="50">序号</th>
                                     <th data-field="name">姓名</th>
                                     <th data-field="wechat_id">企业微信ID</th>
@@ -569,7 +649,7 @@
                                     <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
-                                    <div class="dropdown-item" onclick="exportToPDF('设备列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('客户列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="toggleDeviceColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
                                     <div class="dropdown-divider"></div>
@@ -577,7 +657,7 @@
                                 </div>
                             </div>
                             <span class="toolbar-divider"></span>
-                            <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
+                            <input type="text" id="devices-search" class="filter-input" placeholder="搜索客户名称/设备..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
                                 <option value="">全部状态</option>
                                 <option value="available">可用</option>
@@ -599,7 +679,7 @@
                             </div>
                         </div>
                         <div class="settings-content">
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>厂商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>客户名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_type" checked><span>设备类型</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>设备名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirements" checked><span>设备需求</span></label></div>
@@ -616,8 +696,9 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('devices-table', this.checked)"></th>
                                     <th width="40"></th>
-                                    <th data-field="manufacturer">厂商</th>
+                                    <th data-field="manufacturer">客户名称</th>
                                     <th data-field="device_type">设备类型</th>
                                     <th data-field="name">设备名称</th>
                                     <th data-field="requirements">设备需求</th>
@@ -698,7 +779,7 @@
                                     <th>游戏平台</th>
                                     <th>游戏类型</th>
                                     <th>负责人</th>
-                                    <th>上线状态</th>
+                                    <th>适配状态</th>
                                     <th>品质</th>
                                     <th>问题备注</th>
                                     <th>更新日期</th>
@@ -796,6 +877,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('tests-table', this.checked)"></th>
                                     <th width="50">序号</th>
                                     <th data-field="name">测试名称</th>
                                     <th data-field="game_name">游戏</th>
@@ -820,7 +902,7 @@
                 <section id="bugs" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('bug-modal')"><span class="tool-icon">＋</span>添加缺陷</button>
+                            <button class="tool-btn tool-btn-primary" onclick="openBugModal()"><span class="tool-icon">＋</span>添加缺陷</button>
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
@@ -857,8 +939,9 @@
                             </div>
                         </div>
                         <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_name" checked><span>关联游戏</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="versions" checked><span>涉及版本</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>设备名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>客户名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="discovery_time" checked><span>发现时间</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="bug_status" checked><span>缺陷状态</span></label></div>
@@ -871,9 +954,11 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('bugs-table', this.checked)"></th>
                                     <th width="50">序号</th>
+                                    <th data-field="game_name">关联游戏</th>
                                     <th data-field="versions">涉及版本</th>
-                                    <th data-field="device_name">设备名称</th>
+                                    <th data-field="device_name">客户名称</th>
                                     <th data-field="discovery_time">发现时间</th>
                                     <th data-field="owner">负责人</th>
                                     <th data-field="bug_status">缺陷状态</th>
@@ -895,30 +980,37 @@
                 <section id="game-issues" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openGameIssueModal()"><span class="tool-icon">＋</span>新增游戏问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="gi-search" class="filter-input" placeholder="搜索游戏/问题描述..." style="width:200px" oninput="filterGameIssues()">
-                            <select id="gi-status-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="gi-type-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部类型</option>
-                                <option value="画面问题">画面问题</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="适配问题">适配问题</option>
-                                <option value="崩溃闪退">崩溃闪退</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="gi-priority-filter" class="compact-select" onchange="filterGameIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
+                            <button class="tool-btn tool-btn-primary" onclick="openGameIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="gi-search" class="filter-input" placeholder="搜索游戏/问题描述..." oninput="filterGameIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="gi-status-filter" class="filter-select" onchange="filterGameIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="gi-type-filter" class="filter-select" onchange="filterGameIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="画面问题">画面问题</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="适配问题">适配问题</option>
+                                    <option value="崩溃闪退">崩溃闪退</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -928,7 +1020,6 @@
                                     <th style="width:50px">序号</th>
                                     <th style="width:120px">游戏名称</th>
                                     <th style="width:90px">问题类型</th>
-                                    <th style="width:70px">优先级</th>
                                     <th style="width:300px">问题描述</th>
                                     <th style="width:80px">负责人</th>
                                     <th style="width:80px">状态</th>
@@ -1690,20 +1781,24 @@
                 <!-- ========== 游戏问题弹窗 ========== -->
                 <div class="modal" id="game-issue-modal">
                     <div class="modal-overlay" onclick="if(event.target===this)closeModal('game-issue-modal')"></div>
-                    <div class="modal-container" style="max-width:600px">
+                    <div class="modal-container modal-game-issue">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h3 id="game-issue-modal-title">新增游戏问题</h3>
-                                <button class="modal-close" onclick="closeModal('game-issue-modal')">✕</button>
+                                <button class="modal-close modal-close-plain" onclick="closeModal('game-issue-modal')" title="关闭">✕</button>
                             </div>
                             <form id="game-issue-form" onsubmit="submitGameIssueForm(event)">
                                 <input type="hidden" id="gi-id">
                                 <div class="form-row">
                                     <div class="form-group" style="flex:2">
                                         <label>游戏名称 <span class="required">*</span></label>
-                                        <select id="gi-game-name" required>
-                                            <option value="">选择游戏</option>
-                                        </select>
+                                        <!-- ★ 可搜索下拉（filterable select）：input + 隐藏值 + 浮层 -->
+                                        <div class="searchable-select" id="gi-game-name-wrap">
+                                            <input type="text" class="searchable-select-input" id="gi-game-name-input" placeholder="输入游戏名快速定位..." autocomplete="off">
+                                            <span class="searchable-select-arrow">▾</span>
+                                            <div class="searchable-select-dropdown" id="gi-game-name-dropdown"></div>
+                                            <input type="hidden" id="gi-game-name" required>
+                                        </div>
                                     </div>
                                     <div class="form-group" style="flex:1">
                                         <label>问题类型</label>
@@ -1718,15 +1813,6 @@
                                     </div>
                                 </div>
                                 <div class="form-row">
-                                    <div class="form-group" style="flex:1">
-                                        <label>优先级</label>
-                                        <select id="gi-priority">
-                                            <option value="">选择优先级</option>
-                                            <option value="高">高</option>
-                                            <option value="中">中</option>
-                                            <option value="低">低</option>
-                                        </select>
-                                    </div>
                                     <div class="form-group" style="flex:1">
                                         <label>负责人 <span class="required">*</span></label>
                                         <select id="gi-owner" required>
@@ -1744,8 +1830,9 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label>问题描述 <span class="required">*</span></label>
-                                    <textarea id="gi-issue-desc" rows="3" required placeholder="详细描述问题现象..."></textarea>
+                                    <label>问题描述 <span class="required">*</span> <span style="color:var(--text-tertiary);font-weight:normal;font-size:12px;">（支持粘贴/拖拽 图片和视频）</span></label>
+                                    <div id="gi-issue-desc-editor" class="rich-paste-editor" contenteditable="true" data-placeholder="详细描述问题现象，可直接 Ctrl+V 粘贴图片或拖拽视频..."></div>
+                                    <input type="hidden" id="gi-issue-desc">
                                 </div>
                                 <div class="form-group">
                                     <label>备注</label>
@@ -2070,29 +2157,45 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openInterlaceIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="interlace-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterInterlaceIssues()">
-                            <select id="interlace-issue-status-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="interlace-issue-type-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部类型</option>
-                                <option value="交织闪烁">交织闪烁</option>
-                                <option value="深度异常">深度异常</option>
-                                <option value="画面错位">画面错位</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="interlace-issue-priority-filter" class="compact-select" onchange="filterInterlaceIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="interlace-issue-search" class="filter-input" placeholder="搜索问题描述..." oninput="filterInterlaceIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="interlace-issue-status-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="interlace-issue-type-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="交织闪烁">交织闪烁</option>
+                                    <option value="深度异常">深度异常</option>
+                                    <option value="画面错位">画面错位</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>优先级</label>
+                                <select id="interlace-issue-priority-filter" class="filter-select" onchange="filterInterlaceIssues()">
+                                    <option value="">全部优先级</option>
+                                    <option value="高">高</option>
+                                    <option value="中">中</option>
+                                    <option value="低">低</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2191,29 +2294,45 @@
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <button class="tool-btn tool-btn-primary" onclick="openClientIssueModal()"><span class="tool-icon">＋</span>新增问题</button>
-                            <span class="toolbar-divider"></span>
-                            <input type="text" id="client-issue-search" class="filter-input" placeholder="搜索问题描述..." style="width:200px" oninput="filterClientIssues()">
-                            <select id="client-issue-status-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部状态</option>
-                                <option value="待处理">待处理</option>
-                                <option value="处理中">处理中</option>
-                                <option value="已解决">已解决</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                            <select id="client-issue-type-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部类型</option>
-                                <option value="界面问题">界面问题</option>
-                                <option value="功能异常">功能异常</option>
-                                <option value="性能问题">性能问题</option>
-                                <option value="崩溃闪退">崩溃闪退</option>
-                                <option value="其他">其他</option>
-                            </select>
-                            <select id="client-issue-priority-filter" class="compact-select" onchange="filterClientIssues()">
-                                <option value="">全部优先级</option>
-                                <option value="高">高</option>
-                                <option value="中">中</option>
-                                <option value="低">低</option>
-                            </select>
+                        </div>
+                    </div>
+                    <!-- 筛选面板（常驻，与游戏列表统一风格） -->
+                    <div class="filter-panel show">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>搜索</label>
+                                <input type="text" id="client-issue-search" class="filter-input" placeholder="搜索问题描述..." oninput="filterClientIssues()">
+                            </div>
+                            <div class="filter-group">
+                                <label>状态</label>
+                                <select id="client-issue-status-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部状态</option>
+                                    <option value="待处理">待处理</option>
+                                    <option value="处理中">处理中</option>
+                                    <option value="已解决">已解决</option>
+                                    <option value="已关闭">已关闭</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <select id="client-issue-type-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部类型</option>
+                                    <option value="界面问题">界面问题</option>
+                                    <option value="功能异常">功能异常</option>
+                                    <option value="性能问题">性能问题</option>
+                                    <option value="崩溃闪退">崩溃闪退</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>优先级</label>
+                                <select id="client-issue-priority-filter" class="filter-select" onchange="filterClientIssues()">
+                                    <option value="">全部优先级</option>
+                                    <option value="高">高</option>
+                                    <option value="中">中</option>
+                                    <option value="低">低</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2341,7 +2460,147 @@
                         .pending-add-row td { border-top: 2px solid #3b82f6 !important; }
                         @keyframes fadeInRow { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
                         .new-row-game-select { width:100%; min-width:180px; padding:6px 10px; border:2px solid #3b82f6; border-radius:6px; font-size:14px; background:#fff; outline:none; box-shadow:0 0 0 3px rgba(59,130,246,0.15); cursor:pointer; }
+                        /* 报表子 Tab 切换条 */
+                        .report-sub-tabs { display:flex; gap:4px; padding:8px 12px 0; border-bottom:1px solid var(--border-light,#eee); flex-shrink:0; }
+                        .report-sub-tab { padding:8px 18px; border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:500; color:var(--text-secondary,#616161); border-bottom:2px solid transparent; transition:all .15s; border-radius:6px 6px 0 0; }
+                        .report-sub-tab:hover { color:var(--primary,#1677ff); background:var(--primary-light,rgba(22,119,255,.06)); }
+                        .report-sub-tab.active { color:var(--primary,#1677ff); border-bottom-color:var(--primary,#1677ff); }
+                        .report-sub-panel { flex:1; display:flex; flex-direction:column; min-height:0; }
+                        /* ===== 腾讯系游戏开发进展 — 4分组并排看板（忠实还原图片） ===== */
+                        section#reports.tab-content.active { display:flex; flex-direction:column; }
+                        .tx-board-container { overflow:auto; min-height:0; flex:1; }
+                        /* 总宽由 JS 显式设置(各列之和)，不用 min-width:100% 避免被容器拉伸导致拖一列其他列重排 */
+                        .tx-board-table { border-collapse:collapse; table-layout:fixed; }
+                        .tx-board-table th, .tx-board-table td { border:1px solid #d7dce3; padding:8px 10px; font-size:13px; vertical-align:top; overflow:hidden; }
+                        /* 大分组表头（第一行，彩色块） */
+                        .tx-board-table thead .tx-grp-h { text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; cursor:pointer; }
+                        .tx-grp-适配进行中, .tx-grp-未来排期 { background:#dbeafe; }
+                        .tx-grp-已适配-修复BUG { background:#fef3c7; }
+                        .tx-grp-已适配游戏列表 { background:#dcfce7; }
+                        /* 子列表头（第二行，浅色块） — relative 容纳列宽手柄 */
+                        .tx-board-table thead .tx-sub-h { position:relative; text-align:center; font-weight:600; font-size:13px; color:#374151; background:rgba(255,255,255,0.55); white-space:nowrap; cursor:pointer; }
+                        .tx-board-table thead .tx-sub-h.s-适配进行中, .tx-board-table thead .tx-sub-h.s-未来排期 { background:#eff6ff; }
+                        .tx-board-table thead .tx-sub-h.s-已适配-修复BUG { background:#fffbeb; }
+                        .tx-board-table thead .tx-sub-h.s-已适配游戏列表 { background:#f0fdf4; }
+                        /* 列宽拖拽手柄（hover 列头时显示，参考游戏列表；th overflow:hidden 故贴 right:0 内侧） */
+                        .tx-board-table thead .tx-sub-h { overflow:visible; }
+                        .tx-col-resize { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:6; }
+                        .tx-col-resize:hover, body.col-resizing .tx-col-resize { background:rgba(22,119,255,0.45); }
+                        body.col-resizing, body.row-resizing { cursor:col-resize; user-select:none; }
+                        body.row-resizing { cursor:row-resize; }
+                        /* 行高拖拽手柄（每行第一格底部，td overflow:hidden 故贴 bottom:0 内侧） */
+                        .tx-board-table td.tx-c-name { position:relative; }
+                        .tx-row-resize { position:absolute; left:0; right:0; bottom:0; height:5px; cursor:row-resize; z-index:5; }
+                        .tx-row-resize:hover, body.row-resizing .tx-row-resize { background:rgba(22,119,255,0.45); }
+                        /* 单元格：游戏名称水平+垂直居中加粗、备注左对齐多行 */
+                        .tx-board-table td.tx-c-name { text-align:center; vertical-align:middle; font-weight:600; white-space:normal; word-break:break-word; }
+                        .tx-board-table td.tx-c-note { text-align:left; vertical-align:top; white-space:pre-wrap; line-height:1.6; word-break:break-word; }
+                        .tx-board-table td.tx-c-plain { text-align:center; vertical-align:middle; white-space:normal; word-break:break-word; }
+                        /* ★ 单元格自定义格式容器(tx-cellfmt)：默认继承所在格的字重/对齐，
+                           一旦 wrapper 自身带了内联 style(加粗/字体/颜色等)，内联天然压过本规则 → 自定义格式生效 */
+                        .tx-board-table td .tx-cellfmt { display:block; font-weight:inherit; }
+                        .tx-board-table td.tx-c-empty { text-align:center; vertical-align:middle; color:#c0c4cc; position:relative; }
+                        /* 空白格 hover 时显示淡"＋"提示可双击添加 */
+                        .tx-board-table td.tx-c-empty.tx-editable:hover::after { content:'＋'; color:#1677ff; opacity:0.5; font-size:16px; pointer-events:none; }
+                        /* 备注里"本周进展/本周无进展"高亮（由JS加span） */
+                        .tx-hl-red { color:#dc2626; font-weight:700; }
+                        .tx-hl-green { color:#16a34a; font-weight:700; }
+                        /* 可编辑单元格：Excel 式——单击选中，双击编辑 */
+                        .tx-board-table td.tx-editable { cursor:cell; transition:background .12s; user-select:none; }
+                        .tx-board-table td.tx-editable:hover { background:rgba(22,119,255,0.05); }
+                        /* ★ 选中态：蓝色边框高亮（Excel/腾讯文档风格） */
+                        .tx-board-table td.tx-selected { background:rgba(22,119,255,0.12) !important; box-shadow:inset 0 0 0 2px #1677ff; position:relative; }
+                        .tx-board-table td.tx-sel-anchor { box-shadow:inset 0 0 0 2px #0958d9; }
+                        /* 编辑态：白底、可选文字 */
+                        .tx-board-table td.tx-editable.editing { background:#fff !important; box-shadow:inset 0 0 0 2px #1677ff; cursor:text; user-select:text; }
+                        /* 列名/分组名编辑输入框 */
+                        .tx-colname-input { width:100%; box-sizing:border-box; border:2px solid #1677ff; border-radius:4px; padding:4px 6px; font-size:13px; font-weight:600; outline:none; text-align:center; font-family:inherit; }
+                        /* 行尾追加按钮行 */
+                        .tx-board-table tr.tx-add-row td { text-align:center; padding:4px; }
+                        .tx-add-btn { border:1px dashed #c0c4cc; background:transparent; color:#1677ff; cursor:pointer; border-radius:4px; padding:3px 14px; font-size:13px; transition:all .12s; }
+                        .tx-add-btn:hover { background:rgba(22,119,255,0.08); border-color:#1677ff; }
+                        .tx-del-cell-btn { border:none; background:transparent; color:#c0c4cc; cursor:pointer; font-size:12px; padding:0 4px; transition:color .12s; }
+                        .tx-del-cell-btn:hover { color:#dc2626; }
+                        .tx-board-tip { flex-shrink:0; padding:8px 12px; font-size:12px; color:var(--text-light,#999); }
+                        .tx-board-table td.tx-editing-cell { padding:0; }
+                        .tx-board-table td textarea.tx-cell-input { width:100%; min-width:120px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; resize:vertical; outline:none; box-sizing:border-box; font-family:inherit; }
+                        /* ★ 富文本可编辑区（contenteditable 单元格） */
+                        .tx-board-table td .tx-cell-rich { width:100%; min-width:120px; min-height:32px; border:2px solid #1677ff; border-radius:4px; padding:6px 8px; font-size:13px; line-height:1.5; outline:none; box-sizing:border-box; font-family:inherit; background:#fff; overflow:auto; }
+                        .tx-board-table td .tx-cell-rich:focus { border-color:#1677ff; box-shadow:0 0 0 2px rgba(22,119,255,0.12); }
+                        .tx-board-table td .tx-cell-rich ul, .tx-board-table td .tx-cell-rich ol { margin:2px 0; padding-left:20px; }
+                        /* ★ 批量整格格式容器：作为块级承载整格内容，整格级字体/颜色/加粗等设在它身上 */
+                        .tx-board-table td .tx-cellfmt, .tx-cellfmt { display:block; }
+                        /* ★ 单元格对齐：让 td 的对齐真正作用到块级子元素(ol/ul/div/p) —— 否则列表块撑满整格，text-align 看不出效果 */
+                        .tx-board-table td[data-halign="center"] { text-align:center; }
+                        .tx-board-table td[data-halign="right"]  { text-align:right; }
+                        .tx-board-table td[data-halign="left"]   { text-align:left; }
+                        /* 块级列表/段落本身宽度撑满，需用 inline-block + auto margin 才能整体水平移动 */
+                        .tx-board-table td[data-halign] > ul, .tx-board-table td[data-halign] > ol,
+                        .tx-board-table td[data-halign] ul, .tx-board-table td[data-halign] ol { display:inline-block; text-align:left; }
+                        .tx-board-table td[data-halign="center"] > ul, .tx-board-table td[data-halign="center"] > ol { margin-left:auto; margin-right:auto; }
+                        .tx-board-table td[data-halign="right"]  > ul, .tx-board-table td[data-halign="right"]  > ol { margin-left:auto; margin-right:0; }
+                        .tx-board-table td[data-halign="left"]   > ul, .tx-board-table td[data-halign="left"]   > ol { margin-left:0; margin-right:auto; }
+                        .tx-board-table td[data-valign="top"]    { vertical-align:top; }
+                        .tx-board-table td[data-valign="middle"] { vertical-align:middle; }
+                        .tx-board-table td[data-valign="bottom"] { vertical-align:bottom; }
+                        /* ★ 腾讯文档式富文本工具栏：单行紧凑 + 下拉子选项 */
+                        .tx-format-bar { flex-shrink:0; display:flex; flex-wrap:nowrap; align-items:center; gap:1px; padding:5px 10px; margin:0 0 6px; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:0.45; pointer-events:none; transition:opacity .15s; overflow-x:auto; }
+                        .tx-format-bar.active { opacity:1; pointer-events:auto; }
+                        /* 普通图标按钮 */
+                        .tx-fmt-btn { min-width:28px; height:28px; padding:0 6px; border:1px solid transparent; background:transparent; color:var(--text-secondary,#555); border-radius:5px; cursor:pointer; font-size:14px; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; flex-shrink:0; }
+                        .tx-fmt-btn:hover { background:rgba(22,119,255,0.08); color:var(--primary,#1677ff); }
+                        .tx-fmt-btn.on { background:rgba(22,119,255,0.14); color:var(--primary,#1677ff); }
+                        .tx-fmt-div { width:1px; height:18px; background:var(--border,#e5e6eb); margin:0 4px; flex-shrink:0; }
+                        /* 下拉菜单容器 */
+                        .tx-fmt-menu { position:relative; flex-shrink:0; }
+                        /* 文字型触发器（字体/字号） */
+                        .tx-fmt-trigger { display:inline-flex; align-items:center; gap:3px; height:28px; padding:0 6px; border:1px solid transparent; background:transparent; color:var(--text-primary,#1f2329); border-radius:5px; cursor:pointer; font-size:12px; line-height:1; transition:all .12s; }
+                        .tx-fmt-trigger:hover, .tx-fmt-menu.open .tx-fmt-trigger { background:rgba(22,119,255,0.08); }
+                        .tx-fmt-trigger-label { min-width:42px; text-align:left; white-space:nowrap; }
+                        /* 图标型分体触发器（颜色/对齐/列表/行距） */
+                        .tx-fmt-split { display:inline-flex; align-items:center; gap:2px; height:28px; padding:0 4px; border:1px solid transparent; background:transparent; color:var(--text-secondary,#555); border-radius:5px; cursor:pointer; line-height:1; transition:all .12s; }
+                        .tx-fmt-split:hover, .tx-fmt-menu.open .tx-fmt-split { background:rgba(22,119,255,0.08); }
+                        .tx-fmt-ico { font-size:14px; line-height:1; }
+                        .tx-fmt-caret { font-size:9px; color:#9aa0a8; line-height:1; }
+                        .tx-fmt-color-ico { font-size:13px; font-weight:700; color:var(--text-secondary,#555); line-height:1; padding:0 1px; }
+                        /* 弹出层：position:fixed 脱离工具栏 overflow 裁剪 + 表头层叠，位置由 JS 计算 */
+                        .tx-fmt-pop { position:fixed; z-index:10050; background:var(--bg-card,#fff); border:1px solid var(--border,#e5e6eb); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.16); padding:4px; display:none; }
+                        .tx-fmt-menu.open .tx-fmt-pop { display:block; }
+                        .tx-fmt-pop-list { min-width:130px; max-height:280px; overflow-y:auto; }
+                        .tx-fmt-pop-grid { min-width:120px; }
+                        .tx-fmt-opt { padding:7px 12px; font-size:13px; color:var(--text-primary,#1f2329); border-radius:5px; cursor:pointer; white-space:nowrap; transition:background .1s; }
+                        .tx-fmt-opt:hover { background:rgba(22,119,255,0.08); color:var(--primary,#1677ff); }
+                        /* 颜色面板 */
+                        .tx-fmt-pop-color { width:176px; }
+                        .tx-fmt-swatches { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; padding:6px; }
+                        .tx-fmt-swatch { width:16px; height:16px; border-radius:3px; cursor:pointer; border:1px solid rgba(0,0,0,0.1); transition:transform .1s; }
+                        .tx-fmt-swatch:hover { transform:scale(1.18); }
+                        .tx-fmt-custom { display:flex; align-items:center; gap:6px; padding:7px 10px; font-size:13px; color:var(--text-secondary,#555); cursor:pointer; border-top:1px solid var(--border-light,#eee); margin-top:2px; }
+                        .tx-fmt-custom input[type="color"] { width:24px; height:24px; padding:0; border:1px solid var(--border,#d4d8dc); border-radius:4px; cursor:pointer; background:none; }
+                        .tx-fmt-clearfill { text-align:center; color:var(--text-secondary,#555); border-top:1px solid var(--border-light,#eee); margin-top:2px; }
+                        [data-theme="dark"] .tx-format-bar { background:#1c2330; border-color:#2a3140; }
+                        [data-theme="dark"] .tx-fmt-btn, [data-theme="dark"] .tx-fmt-split { color:#cbd0d8; }
+                        [data-theme="dark"] .tx-fmt-trigger { color:#e8eaed; }
+                        [data-theme="dark"] .tx-fmt-pop { background:#1c2330; border-color:#2a3140; }
+                        [data-theme="dark"] .tx-fmt-opt { color:#e8eaed; }
+                        [data-theme="dark"] .tx-board-table td .tx-cell-rich { background:#1c2330; color:#e8eaed; }
+                        /* 暗色适配 */
+                        [data-theme="dark"] .tx-board-table th, [data-theme="dark"] .tx-board-table td { border-color:#2a3140; color:#e8eaed; }
+                        [data-theme="dark"] .tx-grp-适配进行中, [data-theme="dark"] .tx-grp-未来排期 { background:#1e3a5f; }
+                        [data-theme="dark"] .tx-grp-已适配-修复BUG { background:#4a3c1a; }
+                        [data-theme="dark"] .tx-grp-已适配游戏列表 { background:#1f3d2a; }
+                        [data-theme="dark"] .tx-board-table thead .tx-grp-h { color:#e8eaed; }
+                        [data-theme="dark"] .tx-board-table thead .tx-sub-h { background:rgba(0,0,0,0.25); color:#cbd0d8; }
                     </style>
+                    <!-- 子 Tab 切换：汇报报表 / 腾讯系游戏开发进展 -->
+                    <div class="report-sub-tabs">
+                        <button class="report-sub-tab active" data-subtab="report-customer" onclick="switchReportSubTab('report-customer')">📋 各客户适配进展</button>
+                        <button class="report-sub-tab" data-subtab="report-tencent" onclick="switchReportSubTab('report-tencent')">🐧 腾讯系游戏开发进展</button>
+                        <button class="report-sub-tab" data-subtab="report-main" onclick="switchReportSubTab('report-main')">📊 汇报报表</button>
+                    </div>
+
+                    <!-- ========== 子面板1：汇报报表（原有内容；默认隐藏，默认显示「各客户适配进展」看板） ========== -->
+                    <div id="report-sub-main" class="report-sub-panel" style="display:none;">
                     <div class="toolbar">
                         <div class="toolbar-left">
                             <div style="position:relative;">
@@ -2401,6 +2660,123 @@
                             <label class="checkbox-label"><input type="checkbox" value="action" checked><span>操作</span></label>
                         </div>
                     </div>
+                    </div><!-- /#report-sub-main -->
+
+                    <!-- ========== 看板面板（腾讯系 / 各客户适配进展 共用同一引擎，按 _txBoardId 切换数据） ========== -->
+                    <div id="report-sub-tencent" class="report-sub-panel" style="display:none;">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <span id="tx-board-title" style="font-weight:600;color:var(--text-primary);">腾讯系游戏开发进展</span>
+                            </div>
+                            <div class="toolbar-right">
+                                <button class="tool-btn" onclick="resetTxBoard()" title="恢复为初始数据">重置</button>
+                                <button class="tool-btn tool-btn-primary" onclick="exportTxBoard()" title="导出当前看板"><span class="tool-icon">⬇</span>导出</button>
+                            </div>
+                        </div>
+                        <!-- ★ 富文本格式工具栏（腾讯文档式：单行紧凑 + 下拉子选项） -->
+                        <div class="tx-format-bar" id="tx-format-bar" aria-label="文本格式工具栏">
+                            <!-- 撤销/重做 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="undo" title="撤销">↶</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="redo" title="重做">↷</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 清除格式 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="removeFormat" title="清除格式">⌫</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 字体（带下拉箭头的文字按钮） -->
+                            <div class="tx-fmt-menu" data-menu="font">
+                                <button type="button" class="tx-fmt-trigger" title="字体"><span class="tx-fmt-trigger-label" id="tx-fmt-font-label">微软雅黑</span><span class="tx-fmt-caret">▾</span></button>
+                                <div class="tx-fmt-pop tx-fmt-pop-list">
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="'Microsoft YaHei', sans-serif" style="font-family:'Microsoft YaHei'">微软雅黑</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="SimSun, serif" style="font-family:SimSun">宋体</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="SimHei, sans-serif" style="font-family:SimHei">黑体</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="KaiTi, serif" style="font-family:KaiTi">楷体</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="Arial, sans-serif" style="font-family:Arial">Arial</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="'Times New Roman', serif" style="font-family:'Times New Roman'">Times New Roman</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontName" data-val="Consolas, monospace" style="font-family:Consolas">Consolas</div>
+                                </div>
+                            </div>
+                            <!-- 字号 -->
+                            <div class="tx-fmt-menu" data-menu="size">
+                                <button type="button" class="tx-fmt-trigger" title="字号"><span class="tx-fmt-trigger-label" id="tx-fmt-size-label">14px</span><span class="tx-fmt-caret">▾</span></button>
+                                <div class="tx-fmt-pop tx-fmt-pop-list">
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="1" data-label="10px">10px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="2" data-label="13px">13px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="3" data-label="14px">14px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="4" data-label="16px">16px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="5" data-label="20px">20px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="6" data-label="24px">24px</div>
+                                    <div class="tx-fmt-opt" data-cmd="fontSize" data-val="7" data-label="32px">32px</div>
+                                </div>
+                            </div>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 粗细 / 斜体 / 下划线 / 删除线 -->
+                            <button type="button" class="tx-fmt-btn" data-cmd="bold" title="加粗" style="font-weight:700;font-family:serif;">B</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="italic" title="斜体" style="font-style:italic;font-family:serif;">I</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="underline" title="下划线" style="text-decoration:underline;font-family:serif;">U</button>
+                            <button type="button" class="tx-fmt-btn" data-cmd="strikeThrough" title="删除线" style="text-decoration:line-through;font-family:serif;">S</button>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 文字颜色（按钮+下拉色板） -->
+                            <div class="tx-fmt-menu" data-menu="fore">
+                                <button type="button" class="tx-fmt-split" title="文字颜色">
+                                    <span class="tx-fmt-color-ico" id="tx-fmt-fore-ico" style="border-bottom:3px solid #e23b3b;">A</span>
+                                    <span class="tx-fmt-caret">▾</span>
+                                </button>
+                                <div class="tx-fmt-pop tx-fmt-pop-color">
+                                    <div class="tx-fmt-swatches" id="tx-fmt-fore-swatches"></div>
+                                    <label class="tx-fmt-custom">自定义<input type="color" id="tx-fmt-fore" value="#e23b3b"></label>
+                                </div>
+                            </div>
+                            <!-- 单元格填充色 -->
+                            <div class="tx-fmt-menu" data-menu="fill">
+                                <button type="button" class="tx-fmt-split" title="单元格填充色">
+                                    <span class="tx-fmt-color-ico" id="tx-fmt-fill-ico" style="background:#fff3a8;border-radius:2px;">▩</span>
+                                    <span class="tx-fmt-caret">▾</span>
+                                </button>
+                                <div class="tx-fmt-pop tx-fmt-pop-color">
+                                    <div class="tx-fmt-swatches" id="tx-fmt-fill-swatches"></div>
+                                    <div class="tx-fmt-opt tx-fmt-clearfill" data-fill="">清除填充</div>
+                                    <label class="tx-fmt-custom">自定义<input type="color" id="tx-fmt-fill" value="#fff3a8"></label>
+                                </div>
+                            </div>
+                            <span class="tx-fmt-div"></span>
+                            <!-- 对齐（下拉） -->
+                            <div class="tx-fmt-menu" data-menu="align">
+                                <button type="button" class="tx-fmt-split" title="对齐">
+                                    <span class="tx-fmt-ico" id="tx-fmt-align-ico">⬌</span><span class="tx-fmt-caret">▾</span>
+                                </button>
+                                <div class="tx-fmt-pop tx-fmt-pop-grid">
+                                    <div class="tx-fmt-opt" data-cmd="justifyLeft">⬅ 左对齐</div>
+                                    <div class="tx-fmt-opt" data-cmd="justifyCenter">↔ 水平居中</div>
+                                    <div class="tx-fmt-opt" data-cmd="justifyRight">➡ 右对齐</div>
+                                    <div class="tx-fmt-divider" style="height:1px;background:var(--border,#e5e6eb);margin:4px 0;"></div>
+                                    <div class="tx-fmt-opt" data-cmd="alignTop">⬆ 顶部对齐</div>
+                                    <div class="tx-fmt-opt" data-cmd="alignMiddle">⬍ 垂直居中</div>
+                                    <div class="tx-fmt-opt" data-cmd="alignBottom">⬇ 底部对齐</div>
+                                </div>
+                            </div>
+                            <!-- 行距（下拉） -->
+                            <div class="tx-fmt-menu" data-menu="lh">
+                                <button type="button" class="tx-fmt-split" title="行距">
+                                    <span class="tx-fmt-ico">↕</span><span class="tx-fmt-caret">▾</span>
+                                </button>
+                                <div class="tx-fmt-pop tx-fmt-pop-grid">
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="1.0">1.0 倍</div>
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="1.2">1.2 倍</div>
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="1.5">1.5 倍</div>
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="1.8">1.8 倍</div>
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="2.0">2.0 倍</div>
+                                    <div class="tx-fmt-opt" data-cmd="lineHeight" data-val="2.5">2.5 倍</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 看板：横向滚动容器，内部一张大表（4 大分组并排，子表头 + 双击编辑） -->
+                        <div class="table-container tx-board-container">
+                            <table class="data-table tx-board-table" id="tx-board-table">
+                                <!-- 由 renderTxBoard() 动态生成 -->
+                            </table>
+                        </div>
+                        <div class="tx-board-tip">💡 单击选中单元格、拖拽/Shift 选多个 → 工具栏批量设格式；双击进入格内编辑文字；行尾"＋"追加行</div>
+                    </div><!-- /#report-sub-tencent -->
                 </section>
 
             </main>
@@ -2902,13 +3278,13 @@
     <div id="device-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>添加/编辑 设备</h3>
+                <h3>添加/编辑 客户</h3>
                 <span class="close-btn" onclick="closeModal('device-modal')">&times;</span>
             </div>
             <form id="device-form">
                 <input type="hidden" id="device-id">
                 <div class="form-grid">
-                    <div class="form-group"><label>厂商名称 *</label><input type="text" id="device-manufacturer" required></div>
+                    <div class="form-group"><label>客户名称 *</label><input type="text" id="device-manufacturer" required></div>
                     <div class="form-group"><label>设备类型 *</label><input type="text" id="device-type" required></div>
                     <div class="form-group"><label>设备名称 *</label><input type="text" id="device-name" required></div>
                     <div class="form-group"><label>设备数量</label><input type="number" id="device-quantity" value="1"></div>
@@ -2948,9 +3324,8 @@
                     <div class="form-group"><label>适配进度</label><input type="text" id="game-adapter-progress" placeholder="例如：80%"></div>
                     <div class="form-group"><label>游戏版本</label><input type="text" id="game-version"></div>
                     <div class="form-group"><label>安装包大小</label><input type="text" id="game-package-size" placeholder="例如：500MB"></div>
-                    <div class="form-group"><label>适配状态</label><select id="game-adaptation-status"><option value="pending">待适配</option><option value="in_progress">适配中</option><option value="completed">已完成</option><option value="failed">失败</option></select></div>
                     <div class="form-group"><label>负责人</label><select id="game-owner"><option value="">未分配</option></select></div>
-                    <div class="form-group"><label>上线状态</label><select id="game-online-status"><option value="pending">待上线</option><option value="in_progress">适配中</option><option value="paused">暂停适配</option><option value="online">已上线</option></select></div>
+                    <div class="form-group"><label>适配状态</label><select id="game-online-status"><option value="undeveloped">未开始</option><option value="developing">开发中</option><option value="completed">已发布</option><option value="anticheat">反外挂</option><option value="not_applicable">不适用</option></select></div>
                     <div class="form-group"><label>品质</label><select id="game-quality"><option value="normal">一般</option><option value="recommended">推荐</option></select></div>
                     <div class="form-group"><label>游戏账号</label><textarea id="game-account" rows="2" placeholder="每行一个账号，支持多账号"></textarea></div>
                     <div class="form-group"><label>存储位置</label><select id="game-storage-location"><option value="硬盘1号">硬盘1号</option><option value="硬盘2号">硬盘2号</option><option value="硬盘3号">硬盘3号</option><option value="硬盘4号">硬盘4号</option><option value="硬盘5号">硬盘5号</option><option value="硬盘6号">硬盘6号</option><option value="硬盘7号">硬盘7号</option><option value="硬盘8号">硬盘8号</option><option value="硬盘9号">硬盘9号</option><option value="硬盘10号">硬盘10号</option></select></div>
@@ -2997,8 +3372,9 @@
             <form id="bug-form">
                 <input type="hidden" id="bug-id">
                 <div class="form-grid">
+                    <div class="form-group"><label>游戏名称</label><select id="bug-game-name"><option value="">未关联</option></select></div>
+                    <div class="form-group"><label>客户名称</label><select id="bug-device-name"><option value="">未关联</option></select></div>
                     <div class="form-group"><label>涉及版本</label><input type="text" id="bug-versions"></div>
-                    <div class="form-group"><label>设备名称</label><input type="text" id="bug-device-name"></div>
                     <div class="form-group"><label>发现时间</label><input type="date" id="bug-discovery-time"></div>
                     <div class="form-group"><label>负责人</label><input type="text" id="bug-owner"></div>
                     <div class="form-group"><label>缺陷状态</label><select id="bug-status"><option value="open">待处理</option><option value="in_progress">处理中</option><option value="fixed">已修复</option><option value="closed">已关闭</option></select></div>
@@ -3142,21 +3518,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260508"></script>
-    <script src="js/auth.js?v=20260508"></script>
-    <script src="js/crud-module.js?v=20260511"></script>
-    <script src="js/router.js?v=20260508"></script>
+    <script src="js/core.js?v=20260624c"></script>
+    <script src="js/auth.js?v=20260624c"></script>
+    <!-- ★ 通用UI组件 -->
+    <script src="js/components/searchable-select.js?v=20260624c"></script>
+    <script src="js/components/media-viewer.js?v=20260624c"></script>
+    <script src="js/components/tooltip.js?v=20260624c"></script>
+    <script src="js/components/ui-dialog.js?v=20260624c"></script>
+    <script src="js/components/a11y.js?v=20260624c"></script>
+    <script src="js/crud-module.js?v=20260624c"></script>
+    <script src="js/router.js?v=20260624c"></script>
     <script src="js/entities.js?v=20260624c"></script>
-    <script src="js/plans.js?v=20260508"></script>
-    <script src="js/dashboard.js?v=20260508"></script>
-    <script src="js/ui-features.js?v=20260509"></script>
-    <script src="js/admin.js?v=20260508"></script>
-    <script src="js/requirements.js?v=20260508"></script>
-    <script src="js/testcases.js?v=20260508"></script>
-    <script src="js/issues-versions.js?v=20260509"></script>
-    <script src="js/social.js?v=20260508"></script>
+    <script src="js/plans.js?v=20260624c"></script>
+    <script src="js/dashboard.js?v=20260624c"></script>
+    <script src="js/ui-features.js?v=20260624c"></script>
+    <script src="js/admin.js?v=20260624c"></script>
+    <script src="js/requirements.js?v=20260624c"></script>
+    <script src="js/testcases.js?v=20260624c"></script>
+    <script src="js/issues-versions.js?v=20260624c"></script>
+    <script src="js/social.js?v=20260624c"></script>
     <script src="js/reports.js?v=20260624c"></script>
+    <script src="js/tencent-games.js?v=20260624c"></script>
+    <script src="js/focus-items.js?v=20260624c"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260427"></script>
+    <script src="modules-extra.js?v=20260624b"></script>
 </body>
 </html>

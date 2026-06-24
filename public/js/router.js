@@ -132,7 +132,7 @@ function switchTab(tabId, fromHash) {
 // 按需加载当前Tab数据
 async function loadTabData(tabId, switchId) {
     // 显示刷新指示器
-    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'设备列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
+    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'客户列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
     if (tabLabels[tabId]) showRefreshIndicator(`正在加载${tabLabels[tabId]}...`);
 
     // 确保字段选项已加载（全局依赖）
@@ -247,6 +247,8 @@ async function _doLoadTabData(tabId, switchId) {
             break;
         case 'reports':
             loadReports();
+            // 默认进入「各客户适配进展」看板子页
+            if (typeof switchReportSubTab === 'function') switchReportSubTab('report-customer');
             break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
@@ -307,13 +309,17 @@ function renderMembersTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('members-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('members-table');
+    // ★ 列宽锁定+resize手柄
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('members-table') :
             ['name', 'wechat_id', 'role', 'duty', 'status'];
 
         tbody.innerHTML = data.map((member, index) => {
-            let rowHtml = `<td class="text-center"><strong>${index + 1}</strong></td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐，避免后续异步注入引发列抖动）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${member.id}" data-resource="members" onchange="batchToggleRow(this)"></td>`;
+            rowHtml += `<td class="text-center"><strong>${index + 1}</strong></td>`;
 
             colOrder.forEach(field => {
                 // 跳过隐藏列
@@ -339,8 +345,8 @@ function renderMembersTable(data) {
 
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editMember(${member.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteMember(${member.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editMember(${member.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteMember(${member.id})">删除</button>
                 </td>
             `;
             return `<tr data-id="${member.id}">${rowHtml}</tr>`;
@@ -437,6 +443,8 @@ function renderDevicesTable(data) {
     if (typeof initHeaderDrag === 'function') initHeaderDrag('devices-table');
     // 初始化点击排序
     if (typeof initTableSort === 'function') initTableSort('devices-table');
+    // ★ 列宽锁定+resize手柄
+    if (typeof initColumnResize === 'function') requestAnimationFrame(() => initColumnResize());
 
     // 设备表默认列顺序（与表头th的data-field一一对应）
     const defaultDeviceColOrder = ['manufacturer', 'device_type', 'name', 'requirements',
@@ -457,8 +465,10 @@ function renderDevicesTable(data) {
         tbody.setAttribute('data-visible-cols', visibleCount);
 
         tbody.innerHTML = data.map((device, index) => {
-            // 第一列：拖拽手柄（替代序号）
-            let rowHtml = `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
+            // ★ 第一列：复选框（与thead的.batch-th对齐）
+            let rowHtml = `<td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${device.id}" data-resource="devices" onchange="batchToggleRow(this)"></td>`;
+            // 第二列：拖拽手柄（替代序号）
+            rowHtml += `<td class="text-center drag-handle" title="拖拽排序">⋮⋮</td>`;
 
             // 动态渲染各列（支持隐藏）
             colOrder.forEach(field => {
@@ -505,8 +515,8 @@ function renderDevicesTable(data) {
             // 操作列
             rowHtml += `
                 <td class="text-center action-icons">
-                    <button class="action-icon-btn edit" onclick="editDevice(${device.id})" title="编辑">✏️</button>
-                    <button class="action-icon-btn delete" onclick="deleteDevice(${device.id})" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-edit" onclick="editDevice(${device.id})">编辑</button>
+                    <button class="btn btn-small btn-delete" onclick="deleteDevice(${device.id})">删除</button>
                 </td>
             `;
             // draggable-row 类启用行拖拽
@@ -526,8 +536,8 @@ function renderDevicesTable(data) {
             <tr>
                 <td colspan="${totalCols}" class="empty-state">
                     <div class="empty-icon">📱</div>
-                    <div class="empty-text">还没有测试设备</div>
-                    <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
+                    <div class="empty-text">还没有客户</div>
+                    <div class="empty-sub">添加客户以便管理适配测试和分配任务</div>
                     <div class="empty-action">
                         <button class="btn btn-primary" onclick="openModal('device-modal')">➕ 添加第一个设备</button>
                     </div>
@@ -708,7 +718,7 @@ let filteredDevicesData = null;
 const BREADCRUMB_MAP = {
     'dashboard': { label: '项目概览', icon: '📊', parent: null },
     'games':     { label: '游戏列表', icon: '🎮', parent: 'dashboard' },
-    'devices':   { label: '设备列表', icon: '📱', parent: 'dashboard' },
+    'devices':   { label: '客户列表', icon: '📱', parent: 'dashboard' },
     'members':   { label: '项目成员', icon: '👥', parent: 'dashboard' },
     'progress':  { label: '适配进展', icon: '📈', parent: 'games' },
     'matrix':    { label: '适配矩阵', icon: '🔲', parent: 'progress' },
@@ -723,9 +733,9 @@ const BREADCRUMB_MAP = {
     'user-management':{label:'用户管理', icon: '🔐', parent: null },
     'versions':  { label: '版本管理', icon: '🏷️', parent: 'devices' },
     'game-versions':{label:'游戏版本', icon: '🎯', parent: 'games' },
-    'interlace-issues':{label:'交错问题', icon: '🔀', parent: 'games' },
-    'interlace-versions':{label:'交错版本', icon: '🔀', parent: 'devices' },
-    'client-issues':{label: '客户问题', icon: '💬', parent: 'games' },
+    'interlace-issues':{label:'交织问题', icon: '⚠️', parent: 'games' },
+    'interlace-versions':{label:'交织版本', icon: '🔀', parent: 'devices' },
+    'client-issues':{label: '客户端问题', icon: '⚠️', parent: 'games' },
     'reports':    { label: '汇报报表', icon: '📊', parent: null }
 };
 
