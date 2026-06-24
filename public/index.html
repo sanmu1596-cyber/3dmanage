@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260618b">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260624a">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260618b">
+    <link rel="stylesheet" href="design-system.css?v=20260624a">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -56,7 +56,7 @@
                             <span class="sidebar-icon">🎮</span>游戏列表<span class="shortcut-badge">⌘2</span>
                         </a>
                         <a class="sidebar-item" data-tab="devices" onclick="switchTab('devices')">
-                            <span class="sidebar-icon">📱</span>设备列表<span class="shortcut-badge">⌘3</span>
+                            <span class="sidebar-icon">📱</span>客户列表<span class="shortcut-badge">⌘3</span>
                         </a>
                         <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
                             <span class="sidebar-icon">👥</span>项目成员列表<span class="shortcut-badge">⌘4</span>
@@ -649,7 +649,7 @@
                                     <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
-                                    <div class="dropdown-item" onclick="exportToPDF('设备列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('客户列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="toggleDeviceColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
                                     <div class="dropdown-divider"></div>
@@ -657,7 +657,7 @@
                                 </div>
                             </div>
                             <span class="toolbar-divider"></span>
-                            <input type="text" id="devices-search" class="filter-input" placeholder="搜索设备名称/厂商..." style="width:180px" oninput="filterModule('devices')">
+                            <input type="text" id="devices-search" class="filter-input" placeholder="搜索客户名称/设备..." style="width:180px" oninput="filterModule('devices')">
                             <select id="devices-status-filter" class="compact-select" onchange="filterModule('devices')">
                                 <option value="">全部状态</option>
                                 <option value="available">可用</option>
@@ -679,7 +679,7 @@
                             </div>
                         </div>
                         <div class="settings-content">
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>厂商</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="manufacturer" checked><span>客户名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_type" checked><span>设备类型</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="name" checked><span>设备名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="requirements" checked><span>设备需求</span></label></div>
@@ -698,7 +698,7 @@
                                 <tr>
                                     <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('devices-table', this.checked)"></th>
                                     <th width="40"></th>
-                                    <th data-field="manufacturer">厂商</th>
+                                    <th data-field="manufacturer">客户名称</th>
                                     <th data-field="device_type">设备类型</th>
                                     <th data-field="name">设备名称</th>
                                     <th data-field="requirements">设备需求</th>
@@ -3276,13 +3276,13 @@
     <div id="device-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>添加/编辑 设备</h3>
+                <h3>添加/编辑 客户</h3>
                 <span class="close-btn" onclick="closeModal('device-modal')">&times;</span>
             </div>
             <form id="device-form">
                 <input type="hidden" id="device-id">
                 <div class="form-grid">
-                    <div class="form-group"><label>厂商名称 *</label><input type="text" id="device-manufacturer" required></div>
+                    <div class="form-group"><label>客户名称 *</label><input type="text" id="device-manufacturer" required></div>
                     <div class="form-group"><label>设备类型 *</label><input type="text" id="device-type" required></div>
                     <div class="form-group"><label>设备名称 *</label><input type="text" id="device-name" required></div>
                     <div class="form-group"><label>设备数量</label><input type="number" id="device-quantity" value="1"></div>
@@ -3515,29 +3515,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260618b"></script>
-    <script src="js/auth.js?v=20260618b"></script>
+    <script src="js/core.js?v=20260624a"></script>
+    <script src="js/auth.js?v=20260624a"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260618b"></script>
-    <script src="js/components/media-viewer.js?v=20260618b"></script>
-    <script src="js/components/tooltip.js?v=20260618b"></script>
-    <script src="js/components/ui-dialog.js?v=20260618b"></script>
-    <script src="js/components/a11y.js?v=20260618b"></script>
-    <script src="js/crud-module.js?v=20260618b"></script>
-    <script src="js/router.js?v=20260618b"></script>
-    <script src="js/entities.js?v=20260618b"></script>
-    <script src="js/plans.js?v=20260618b"></script>
-    <script src="js/dashboard.js?v=20260618b"></script>
-    <script src="js/ui-features.js?v=20260618b"></script>
-    <script src="js/admin.js?v=20260618b"></script>
-    <script src="js/requirements.js?v=20260618b"></script>
-    <script src="js/testcases.js?v=20260618b"></script>
-    <script src="js/issues-versions.js?v=20260618b"></script>
-    <script src="js/social.js?v=20260618b"></script>
-    <script src="js/reports.js?v=20260618b"></script>
-    <script src="js/tencent-games.js?v=20260618b"></script>
+    <script src="js/components/searchable-select.js?v=20260624a"></script>
+    <script src="js/components/media-viewer.js?v=20260624a"></script>
+    <script src="js/components/tooltip.js?v=20260624a"></script>
+    <script src="js/components/ui-dialog.js?v=20260624a"></script>
+    <script src="js/components/a11y.js?v=20260624a"></script>
+    <script src="js/crud-module.js?v=20260624a"></script>
+    <script src="js/router.js?v=20260624a"></script>
+    <script src="js/entities.js?v=20260624a"></script>
+    <script src="js/plans.js?v=20260624a"></script>
+    <script src="js/dashboard.js?v=20260624a"></script>
+    <script src="js/ui-features.js?v=20260624a"></script>
+    <script src="js/admin.js?v=20260624a"></script>
+    <script src="js/requirements.js?v=20260624a"></script>
+    <script src="js/testcases.js?v=20260624a"></script>
+    <script src="js/issues-versions.js?v=20260624a"></script>
+    <script src="js/social.js?v=20260624a"></script>
+    <script src="js/reports.js?v=20260624a"></script>
+    <script src="js/tencent-games.js?v=20260624a"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260618b"></script>
+    <script src="modules-extra.js?v=20260624a"></script>
 </body>
 </html>

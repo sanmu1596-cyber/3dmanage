@@ -1679,7 +1679,7 @@ function renderDeviceDetail(device) {
             <div class="detail-section-title">设备信息</div>
             ${detailField('设备名称', device.name)}
             ${detailField('设备类型', device.device_type)}
-            ${detailField('厂商', device.manufacturer)}
+            ${detailField('客户名称', device.manufacturer)}
             ${detailField('型号', device.model)}
             ${detailField('操作系统', device.os_version)}
         </div>

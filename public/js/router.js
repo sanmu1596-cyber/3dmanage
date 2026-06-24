@@ -132,7 +132,7 @@ function switchTab(tabId, fromHash) {
 // 按需加载当前Tab数据
 async function loadTabData(tabId, switchId) {
     // 显示刷新指示器
-    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'设备列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
+    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'客户列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
     if (tabLabels[tabId]) showRefreshIndicator(`正在加载${tabLabels[tabId]}...`);
 
     // 确保字段选项已加载（全局依赖）
@@ -536,8 +536,8 @@ function renderDevicesTable(data) {
             <tr>
                 <td colspan="${totalCols}" class="empty-state">
                     <div class="empty-icon">📱</div>
-                    <div class="empty-text">还没有测试设备</div>
-                    <div class="empty-sub">添加设备以便管理适配测试和分配任务</div>
+                    <div class="empty-text">还没有客户</div>
+                    <div class="empty-sub">添加客户以便管理适配测试和分配任务</div>
                     <div class="empty-action">
                         <button class="btn btn-primary" onclick="openModal('device-modal')">➕ 添加第一个设备</button>
                     </div>
@@ -718,7 +718,7 @@ let filteredDevicesData = null;
 const BREADCRUMB_MAP = {
     'dashboard': { label: '项目概览', icon: '📊', parent: null },
     'games':     { label: '游戏列表', icon: '🎮', parent: 'dashboard' },
-    'devices':   { label: '设备列表', icon: '📱', parent: 'dashboard' },
+    'devices':   { label: '客户列表', icon: '📱', parent: 'dashboard' },
     'members':   { label: '项目成员', icon: '👥', parent: 'dashboard' },
     'progress':  { label: '适配进展', icon: '📈', parent: 'games' },
     'matrix':    { label: '适配矩阵', icon: '🔲', parent: 'progress' },

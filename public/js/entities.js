@@ -1004,10 +1004,10 @@ const exportConfigs = {
         ]
     },
     devices: {
-        sheetName: '设备列表',
+        sheetName: '客户列表',
         getData: () => allDevicesData,
         columns: [
-            { key: 'manufacturer', label: '厂商' }, { key: 'device_type', label: '设备类型' },
+            { key: 'manufacturer', label: '客户名称' }, { key: 'device_type', label: '设备类型' },
             { key: 'name', label: '设备名称' }, { key: 'requirements', label: '设备需求' },
             { key: 'quantity', label: '数量' }, { key: 'keeper', label: '保管者' },
             { key: 'notes', label: '备注' }, { key: 'adapter_completion_rate', label: '适配完成率' },

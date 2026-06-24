@@ -748,8 +748,8 @@ const CTX_MENU_CONFIGS = {
     },
     'devices-table': {
         getItems: (tr, id) => [
-            { icon: '✏️', label: '编辑设备', action: () => editDevice(id) },
-            { icon: '📋', label: '复制设备名', action: () => copyToClipboard(tr.querySelectorAll('td')[2]?.textContent || '') },
+            { icon: '✏️', label: '编辑客户', action: () => editDevice(id) },
+            { icon: '📋', label: '复制客户名', action: () => copyToClipboard(tr.querySelectorAll('td')[2]?.textContent || '') },
             { divider: true },
             { icon: '🗑️', label: '删除设备', action: () => deleteDevice(id), danger: true }
         ]
