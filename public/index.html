@@ -6,9 +6,9 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260624a">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260624b">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
-    <link rel="stylesheet" href="design-system.css?v=20260624a">
+    <link rel="stylesheet" href="design-system.css?v=20260624b">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -902,7 +902,7 @@
                 <section id="bugs" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('bug-modal')"><span class="tool-icon">＋</span>添加缺陷</button>
+                            <button class="tool-btn tool-btn-primary" onclick="openBugModal()"><span class="tool-icon">＋</span>添加缺陷</button>
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
@@ -939,8 +939,9 @@
                             </div>
                         </div>
                         <div class="settings-content">
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="game_name" checked><span>关联游戏</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="versions" checked><span>涉及版本</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>设备名称</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="device_name" checked><span>客户名称</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="discovery_time" checked><span>发现时间</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="bug_status" checked><span>缺陷状态</span></label></div>
@@ -955,8 +956,9 @@
                                 <tr>
                                     <th class="batch-th no-sort" style="width:36px;min-width:36px;max-width:36px;text-align:center;padding:4px 2px;"><input type="checkbox" class="row-checkbox-all" onchange="batchToggleAll('bugs-table', this.checked)"></th>
                                     <th width="50">序号</th>
+                                    <th data-field="game_name">关联游戏</th>
                                     <th data-field="versions">涉及版本</th>
-                                    <th data-field="device_name">设备名称</th>
+                                    <th data-field="device_name">客户名称</th>
                                     <th data-field="discovery_time">发现时间</th>
                                     <th data-field="owner">负责人</th>
                                     <th data-field="bug_status">缺陷状态</th>
@@ -3370,8 +3372,9 @@
             <form id="bug-form">
                 <input type="hidden" id="bug-id">
                 <div class="form-grid">
+                    <div class="form-group"><label>游戏名称</label><select id="bug-game-name"><option value="">未关联</option></select></div>
+                    <div class="form-group"><label>客户名称</label><select id="bug-device-name"><option value="">未关联</option></select></div>
                     <div class="form-group"><label>涉及版本</label><input type="text" id="bug-versions"></div>
-                    <div class="form-group"><label>设备名称</label><input type="text" id="bug-device-name"></div>
                     <div class="form-group"><label>发现时间</label><input type="date" id="bug-discovery-time"></div>
                     <div class="form-group"><label>负责人</label><input type="text" id="bug-owner"></div>
                     <div class="form-group"><label>缺陷状态</label><select id="bug-status"><option value="open">待处理</option><option value="in_progress">处理中</option><option value="fixed">已修复</option><option value="closed">已关闭</option></select></div>
@@ -3515,29 +3518,29 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260624a"></script>
-    <script src="js/auth.js?v=20260624a"></script>
+    <script src="js/core.js?v=20260624b"></script>
+    <script src="js/auth.js?v=20260624b"></script>
     <!-- ★ 通用UI组件 -->
-    <script src="js/components/searchable-select.js?v=20260624a"></script>
-    <script src="js/components/media-viewer.js?v=20260624a"></script>
-    <script src="js/components/tooltip.js?v=20260624a"></script>
-    <script src="js/components/ui-dialog.js?v=20260624a"></script>
-    <script src="js/components/a11y.js?v=20260624a"></script>
-    <script src="js/crud-module.js?v=20260624a"></script>
-    <script src="js/router.js?v=20260624a"></script>
-    <script src="js/entities.js?v=20260624a"></script>
-    <script src="js/plans.js?v=20260624a"></script>
-    <script src="js/dashboard.js?v=20260624a"></script>
-    <script src="js/ui-features.js?v=20260624a"></script>
-    <script src="js/admin.js?v=20260624a"></script>
-    <script src="js/requirements.js?v=20260624a"></script>
-    <script src="js/testcases.js?v=20260624a"></script>
-    <script src="js/issues-versions.js?v=20260624a"></script>
-    <script src="js/social.js?v=20260624a"></script>
-    <script src="js/reports.js?v=20260624a"></script>
-    <script src="js/tencent-games.js?v=20260624a"></script>
+    <script src="js/components/searchable-select.js?v=20260624b"></script>
+    <script src="js/components/media-viewer.js?v=20260624b"></script>
+    <script src="js/components/tooltip.js?v=20260624b"></script>
+    <script src="js/components/ui-dialog.js?v=20260624b"></script>
+    <script src="js/components/a11y.js?v=20260624b"></script>
+    <script src="js/crud-module.js?v=20260624b"></script>
+    <script src="js/router.js?v=20260624b"></script>
+    <script src="js/entities.js?v=20260624b"></script>
+    <script src="js/plans.js?v=20260624b"></script>
+    <script src="js/dashboard.js?v=20260624b"></script>
+    <script src="js/ui-features.js?v=20260624b"></script>
+    <script src="js/admin.js?v=20260624b"></script>
+    <script src="js/requirements.js?v=20260624b"></script>
+    <script src="js/testcases.js?v=20260624b"></script>
+    <script src="js/issues-versions.js?v=20260624b"></script>
+    <script src="js/social.js?v=20260624b"></script>
+    <script src="js/reports.js?v=20260624b"></script>
+    <script src="js/tencent-games.js?v=20260624b"></script>
     <script src="js/focus-items.js?v=20260603"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
-    <script src="modules-extra.js?v=20260624a"></script>
+    <script src="modules-extra.js?v=20260624b"></script>
 </body>
 </html>

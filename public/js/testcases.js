@@ -1756,7 +1756,7 @@ function renderBugDetail(bug) {
             <div class="detail-section-title">缺陷信息</div>
             ${detailField('标题', bug.title)}
             ${detailField('关联游戏', bug.game_name || '-')}
-            ${detailField('关联设备', bug.device_name || '-')}
+            ${detailField('关联客户', bug.device_name || '-')}
             ${detailField('涉及版本', bug.affected_version)}
         </div>
         <div class="detail-section">

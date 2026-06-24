@@ -716,12 +716,12 @@ bugsRouter.post('/', auth.checkPermission('bugs', 'edit'),
     steps: rules.textArea(3000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const sql = `INSERT INTO bugs (versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                                 owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -750,13 +750,13 @@ bugsRouter.put('/:id', auth.checkPermission('bugs', 'edit'),
     description: rules.textArea(2000),
   }),
   (req, res) => {
-  const { versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  const { versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
           owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id } = req.body;
-  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?,
+  const sql = `UPDATE bugs SET versions = ?, actual_fix_time = ?, planned_fix_time = ?, device_name = ?, game_name = ?,
                             discovery_time = ?, owner = ?, bug_status = ?, priority = ?, problem_type = ?,
                             description = ?, steps = ?, test_id = ?, assignee_id = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`;
-  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, discovery_time,
+  db.run(sql, [versions, actual_fix_time, planned_fix_time, device_name, game_name, discovery_time,
                owner, bug_status, priority, problem_type, description, steps, test_id, assignee_id, req.params.id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });

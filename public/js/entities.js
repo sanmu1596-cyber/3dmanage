@@ -91,7 +91,7 @@ registerColumnConfig('tests-table',
 
 // 缺陷模块列顺序
 registerColumnConfig('bugs-table',
-    ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
+    ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status',
      'priority', 'problem_type', 'description'],
     'bugsColumnOrder'
 );
@@ -1315,7 +1315,7 @@ function renderBugsTable(data) {
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function' ? getColumnOrder('bugs-table') :
-            ['versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
+            ['game_name', 'versions', 'device_name', 'discovery_time', 'owner', 'bug_status', 'priority', 'problem_type', 'description'];
 
         tbody.innerHTML = data.map((bug, index) => {
             // ★ 第一列：复选框（与thead的.batch-th对齐）
@@ -1325,11 +1325,22 @@ function renderBugsTable(data) {
             colOrder.forEach(field => {
                 if (typeof bugVisibleColumns !== 'undefined' && !bugVisibleColumns[field]) return;
                 switch (field) {
+                    case 'game_name':
+                        if (bug.game_name) {
+                            rowHtml += `<td><a class="link-cell" onclick="jumpToGameByName('${escapeHtml(bug.game_name).replace(/'/g, "\\'")}')" title="点击查看该游戏">${highlightSearch(bug.game_name, 'bugs-table')}</a></td>`;
+                        } else {
+                            rowHtml += `<td>-</td>`;
+                        }
+                        break;
                     case 'versions':
                         rowHtml += `<td>${highlightSearch(bug.versions || '-', 'bugs-table')}</td>`;
                         break;
                     case 'device_name':
-                        rowHtml += `<td>${highlightSearch(bug.device_name || '-', 'bugs-table')}</td>`;
+                        if (bug.device_name) {
+                            rowHtml += `<td><a class="link-cell" onclick="jumpToCustomerByName('${escapeHtml(bug.device_name).replace(/'/g, "\\'")}')" title="点击查看该客户">${highlightSearch(bug.device_name, 'bugs-table')}</a></td>`;
+                        } else {
+                            rowHtml += `<td>-</td>`;
+                        }
                         break;
                     case 'discovery_time':
                         rowHtml += `<td>${escapeHtml(bug.discovery_time || '-')}</td>`;
@@ -1370,7 +1381,7 @@ function renderBugsTable(data) {
                     <div class="empty-text">暂无缺陷记录</div>
                     <div class="empty-sub">测试过程中发现的问题会记录在这里</div>
                     <div class="empty-action">
-                        <button class="btn btn-primary" onclick="openModal('bug-modal')">➕ 报告一个缺陷</button>
+                        <button class="btn btn-primary" onclick="openBugModal()">➕ 报告一个缺陷</button>
                     </div>
                 </td>
             </tr>
@@ -1855,6 +1866,7 @@ function initForms() {
         const id = document.getElementById('bug-id').value;
         const data = {
             versions: document.getElementById('bug-versions').value,
+            game_name: document.getElementById('bug-game-name').value,
             device_name: document.getElementById('bug-device-name').value,
             discovery_time: document.getElementById('bug-discovery-time').value,
             owner: document.getElementById('bug-owner').value,
@@ -2337,6 +2349,84 @@ async function deleteTest(id) {
     });
 }
 
+// P0-1: 从缺陷点击「关联游戏」→跳转游戏列表并按名称筛选高亮
+function jumpToGameByName(gameName) {
+    if (!gameName) return;
+    if (typeof switchTab === 'function') switchTab('games');
+    setTimeout(function () {
+        const search = document.getElementById('games-search');
+        if (search) {
+            search.value = gameName;
+            if (typeof filterModule === 'function') filterModule('games');
+        }
+        if (typeof showToast === 'function') showToast(`已定位到游戏「${gameName}」`, 'info');
+    }, 120);
+}
+
+// P0-1: 从缺陷点击「客户名称」→跳转客户列表并按名称筛选高亮
+// 软关联兜底：传入值若是历史"设备名"，自动换算成对应客户名(manufacturer)
+function jumpToCustomerByName(name) {
+    if (!name) return;
+    let customer = name;
+    if (typeof allDevicesData !== 'undefined' && Array.isArray(allDevicesData)) {
+        const isManufacturer = allDevicesData.some(d => (d.manufacturer || '').trim() === name.trim());
+        if (!isManufacturer) {
+            const byDeviceName = allDevicesData.find(d => (d.name || '').trim() === name.trim());
+            if (byDeviceName && byDeviceName.manufacturer) customer = byDeviceName.manufacturer;
+        }
+    }
+    if (typeof switchTab === 'function') switchTab('devices');
+    setTimeout(function () {
+        const search = document.getElementById('devices-search');
+        if (search) {
+            search.value = customer;
+            if (typeof filterModule === 'function') filterModule('devices');
+        }
+        if (typeof showToast === 'function') showToast(`已定位到客户「${customer}」`, 'info');
+    }, 120);
+}
+
+// P0-1: 打开「添加缺陷」弹窗（先填充下拉再打开）
+function openBugModal() {
+    if (typeof resetForm === 'function') resetForm('bug-form');
+    document.getElementById('bug-id').value = '';
+    populateBugModalSelects();
+    openModal('bug-modal');
+}
+
+// P0-1: 填充缺陷弹窗的「游戏名称」「客户名称」下拉
+// 游戏名 value=游戏名文本(重名用平台后缀在label区分); 客户名 value=manufacturer(客户名)
+function populateBugModalSelects() {
+    const gameSel = document.getElementById('bug-game-name');
+    const devSel = document.getElementById('bug-device-name');
+    if (gameSel && typeof allGamesData !== 'undefined' && Array.isArray(allGamesData)) {
+        // 统计重名游戏，重名才加平台后缀
+        const nameCount = {};
+        allGamesData.forEach(g => { const n = g.name || ''; nameCount[n] = (nameCount[n] || 0) + 1; });
+        let html = '<option value="">未关联</option>';
+        allGamesData.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh')).forEach(g => {
+            const n = g.name || '';
+            if (!n) return;
+            const label = (nameCount[n] > 1 && g.platform) ? `${n}（${g.platform}）` : n;
+            html += `<option value="${escapeHtml(n)}">${escapeHtml(label)}</option>`;
+        });
+        gameSel.innerHTML = html;
+    }
+    if (devSel && typeof allDevicesData !== 'undefined' && Array.isArray(allDevicesData)) {
+        // 按客户名(manufacturer)去重
+        const seen = new Set();
+        const customers = [];
+        allDevicesData.forEach(d => {
+            const m = (d.manufacturer || '').trim();
+            if (m && !seen.has(m)) { seen.add(m); customers.push(m); }
+        });
+        customers.sort((a, b) => a.localeCompare(b, 'zh'));
+        let html = '<option value="">未关联</option>';
+        customers.forEach(m => { html += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`; });
+        devSel.innerHTML = html;
+    }
+}
+
 // 编辑缺陷
 async function editBug(id) {
     try {
@@ -2345,8 +2435,10 @@ async function editBug(id) {
         const bug = result.data.find(b => b.id === id);
 
         if (bug) {
+            populateBugModalSelects();
             document.getElementById('bug-id').value = bug.id;
             document.getElementById('bug-versions').value = bug.versions || '';
+            document.getElementById('bug-game-name').value = bug.game_name || '';
             document.getElementById('bug-device-name').value = bug.device_name || '';
             document.getElementById('bug-discovery-time').value = bug.discovery_time || '';
             document.getElementById('bug-owner').value = bug.owner || '';

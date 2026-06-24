@@ -7388,3 +7388,18 @@ mark.search-highlight {
 }
 [data-theme="dark"] .focus-action-btn { color: #6b7280; }
 [data-theme="dark"] .focus-action-btn:hover { background: #2d333b; color: #e5e7eb; }
+
+/* P0-1: 缺陷列表可点击关联（游戏/客户）跳转链接 */
+.link-cell {
+    color: #2563eb;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px dashed transparent;
+    transition: border-color .15s, color .15s;
+}
+.link-cell:hover {
+    color: #1d4ed8;
+    border-bottom-color: #1d4ed8;
+}
+[data-theme="dark"] .link-cell { color: #60a5fa; }
+[data-theme="dark"] .link-cell:hover { color: #93c5fd; border-bottom-color: #93c5fd; }

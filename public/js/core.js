@@ -231,6 +231,7 @@ var testVisibleColumns = {
 
 // 缺陷列表显示列配置
 var bugVisibleColumns = {
+    game_name: true,
     versions: true,
     device_name: true,
     discovery_time: true,
