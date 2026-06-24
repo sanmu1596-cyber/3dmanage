@@ -9,6 +9,71 @@ var App = window.App;
 let requirementsData = [];
 let reqViewMode = 'list'; // 'list' or 'card'
 
+// 统一状态字典（P1-3：含审批闭环态）
+// draft 草稿 → published 已发布 → in_progress 进行中 → pending_review 待审批 → approved 通过 / rejected 驳回(可重做) → closed 已完成
+var REQ_STATUS_MAP = {
+    draft: '📝 草稿',
+    published: '✅ 已发布',
+    assigned: '📌 已指派',
+    in_progress: '🔄 进行中',
+    pending_review: '⏳ 待审批',
+    approved: '✔️ 已通过',
+    rejected: '❌ 已驳回',
+    completed: '🏁 已完成',
+    closed: '🏁 已完成',
+    cancelled: '🚫 已取消'
+};
+function reqStatusLabel(s) { return REQ_STATUS_MAP[s] || s; }
+
+// 当前用户是否有审批权限（管理员/乔老师）。开发模式下 currentUser 通常为超级管理员。
+function canApproveReq() {
+    try {
+        var u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : (window.currentUser || null);
+        if (!u) return true; // 开发模式无用户对象时默认放行，后端仍会二次校验
+        if (u.role_id === 1 || u.is_admin || u.role === 'admin') return true;
+        if (u.real_name === '乔老师' || u.name === '乔老师') return true;
+        // 权限位（若后端下发 permissions）
+        if (u.permissions && u.permissions.requirements && u.permissions.requirements.edit) return true;
+        return false;
+    } catch (e) { return true; }
+}
+
+// 根据需求状态生成流转操作按钮 HTML（紧凑型，用于列表/卡片）
+// style: 'table' | 'card' | 'detail'
+function reqFlowButtons(r, style) {
+    var id = r.id;
+    var btns = [];
+    var canApprove = canApproveReq();
+    if (style === 'card') {
+        if (r.status === 'draft') btns.push(`<button class="plan-card-action-btn btn-publish" onclick="event.stopPropagation(); publishRequirement(${id})">🚀 发布</button>`);
+        if (['published','assigned','in_progress','rejected'].indexOf(r.status) >= 0)
+            btns.push(`<button class="plan-card-action-btn" style="background:#e6f0ff;color:#2563eb;" onclick="event.stopPropagation(); submitReviewReq(${id})">📤 提交审批</button>`);
+        if (r.status === 'pending_review' && canApprove) {
+            btns.push(`<button class="plan-card-action-btn" style="background:#e7f7ec;color:#2f855a;" onclick="event.stopPropagation(); approveReq(${id})">✔️ 通过</button>`);
+            btns.push(`<button class="plan-card-action-btn" style="background:#fdecec;color:#c53030;" onclick="event.stopPropagation(); rejectReq(${id})">❌ 驳回</button>`);
+        }
+    } else if (style === 'detail') {
+        if (r.status === 'draft') btns.push(`<button class="tool-btn tool-btn-primary" onclick="publishRequirement(${id})">🚀 发布</button>`);
+        if (['published','assigned','in_progress','rejected'].indexOf(r.status) >= 0)
+            btns.push(`<button class="tool-btn" style="background:#2563eb;color:#fff;" onclick="submitReviewReq(${id})">📤 提交审批</button>`);
+        if (r.status === 'pending_review' && canApprove) {
+            btns.push(`<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="approveReq(${id})">✔️ 审批通过</button>`);
+            btns.push(`<button class="tool-btn" style="background:var(--danger,#e53e3e);color:#fff;" onclick="rejectReq(${id})">❌ 驳回</button>`);
+        }
+        if (['approved','published','assigned','in_progress'].indexOf(r.status) >= 0)
+            btns.push(`<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closeRequirement(${id})">🏁 完成</button>`);
+    } else { // table
+        if (r.status === 'draft') btns.push(`<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishRequirement(${id})">发布</button>`);
+        if (['published','assigned','in_progress','rejected'].indexOf(r.status) >= 0)
+            btns.push(`<button class="btn btn-small" style="background:#2563eb;color:#fff;" onclick="submitReviewReq(${id})">提交审批</button>`);
+        if (r.status === 'pending_review' && canApprove) {
+            btns.push(`<button class="btn btn-small" style="background:#2f855a;color:#fff;" onclick="approveReq(${id})">通过</button>`);
+            btns.push(`<button class="btn btn-small" style="background:#c53030;color:#fff;" onclick="rejectReq(${id})">驳回</button>`);
+        }
+    }
+    return btns.join('');
+}
+
 // 加载需求列表
 async function loadRequirements() {
     try {
@@ -50,12 +115,14 @@ function renderRequirements() {
     const totalCount = requirementsData.length;
     const draftCount = requirementsData.filter(r => r.status === 'draft').length;
     const publishedCount = requirementsData.filter(r => r.status === 'published').length;
-    const closedCount = requirementsData.filter(r => r.status === 'closed').length;
+    const reviewCount = requirementsData.filter(r => r.status === 'pending_review').length;
+    const closedCount = requirementsData.filter(r => r.status === 'closed' || r.status === 'completed').length;
     if (summaryBar) {
         summaryBar.innerHTML = `
             <span class="summary-item">共 <strong>${totalCount}</strong></span>
             <span class="summary-item">草稿 <strong>${draftCount}</strong></span>
             <span class="summary-item">已发布 <strong>${publishedCount}</strong></span>
+            <span class="summary-item" style="${reviewCount > 0 ? 'color:#d69e2e;font-weight:600;' : ''}">待审批 <strong>${reviewCount}</strong></span>
             <span class="summary-item">已完成 <strong>${closedCount}</strong></span>
         `;
     }
@@ -83,8 +150,7 @@ function renderReqTable(filtered) {
     }
     tbody.innerHTML = filtered.map((r, i) => {
         const priorityBadge = { high: '🔴 高', medium: '🟡 中', low: '🟢 低' }[r.priority] || r.priority;
-        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
-        const statusLabel = statusMap[r.status] || r.status;
+        const statusLabel = reqStatusLabel(r.status);
         const totalGames = r.total_games || 0;
         const finishedGames = r.finished_games || 0;
         const progress = totalGames > 0 ? Math.round(finishedGames / totalGames * 100) : 0;
@@ -106,7 +172,7 @@ function renderReqTable(filtered) {
             <td style="font-size:12px;color:var(--text-muted);">${(r.created_at || '').slice(0, 10)}</td>
             <td>
                 <button class="btn btn-small btn-edit" onclick="editRequirement(${r.id})">编辑</button>
-                ${r.status === 'draft' ? `<button class="btn btn-small" style="background:var(--primary);color:#fff;" onclick="publishRequirement(${r.id})">发布</button>` : ''}
+                ${reqFlowButtons(r, 'table')}
                 <button class="btn btn-small btn-delete" onclick="deleteRequirement(${r.id})">删除</button>
             </td>
         </tr>`;
@@ -123,7 +189,6 @@ function renderReqCards(filtered) {
     }
     container.innerHTML = filtered.map(r => {
         const priorityColor = { high: '#e53e3e', medium: '#d69e2e', low: '#38a169' }[r.priority] || '#718096';
-        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
         const totalGames = r.total_games || 0;
         const finishedGames = r.finished_games || 0;
         const progress = totalGames > 0 ? Math.round(finishedGames / totalGames * 100) : 0;
@@ -131,7 +196,7 @@ function renderReqCards(filtered) {
         <div class="plan-card status-${r.status}" onclick="openReqDetail(${r.id})" style="cursor:pointer;">
             <div class="plan-card-top">
                 <div class="plan-card-title-row">
-                    <span class="plan-card-status status-${r.status}">${statusMap[r.status] || r.status}</span>
+                    <span class="plan-card-status status-${r.status}">${reqStatusLabel(r.status)}</span>
                     <span class="plan-card-title">${escapeHtml(r.title)}</span>
                     <span class="plan-card-no">${escapeHtml(r.req_no || '')}</span>
                 </div>
@@ -151,7 +216,7 @@ function renderReqCards(filtered) {
             </div>
             <div class="plan-card-actions" onclick="event.stopPropagation()">
                 <button class="plan-card-action-btn" onclick="event.stopPropagation(); editRequirement(${r.id})">✏️ 编辑</button>
-                ${r.status === 'draft' ? `<button class="plan-card-action-btn btn-publish" onclick="event.stopPropagation(); publishRequirement(${r.id})">🚀 发布</button>` : ''}
+                ${reqFlowButtons(r, 'card')}
                 <button class="plan-card-action-btn btn-danger" onclick="event.stopPropagation(); deleteRequirement(${r.id})">🗑️ 删除</button>
             </div>
         </div>`;
@@ -305,23 +370,25 @@ async function openReqDetail(id) {
         const actionsEl = document.getElementById('req-detail-actions');
         actionsEl.innerHTML = `
             <button class="tool-btn" onclick="editRequirement(${r.id})">✏️ 编辑</button>
-            ${r.status === 'draft' ? `<button class="tool-btn tool-btn-primary" onclick="publishRequirement(${r.id})">🚀 发布</button>` : ''}
-            ${r.status === 'published' ? `<button class="tool-btn" style="background:var(--success);color:#fff;" onclick="closeRequirement(${r.id})">✅ 完成</button>` : ''}
+            ${reqFlowButtons(r, 'detail')}
             <button class="tool-btn" onclick="createPlanFromReq(${r.id})">📋 创建配置计划</button>
             <button class="btn btn-small btn-delete" onclick="deleteRequirement(${r.id})">🗑️ 删除</button>
         `;
 
         // 信息条
         const priorityLabel = { high: '🔴 高', medium: '🟡 中', low: '🟢 低' }[r.priority] || r.priority;
-        const statusMap = { draft: '📝 草稿', published: '✅ 已发布', in_progress: '🔄 进行中', closed: '🏁 已完成' };
         const infoEl = document.getElementById('req-detail-info');
         infoEl.innerHTML = `
-            <span class="info-tag"><span class="tag-label">状态：</span>${statusMap[r.status] || r.status}</span>
+            <span class="info-tag"><span class="tag-label">状态：</span>${reqStatusLabel(r.status)}</span>
             <span class="info-tag"><span class="tag-label">优先级：</span>${priorityLabel}</span>
             <span class="info-tag"><span class="tag-label">指派给：</span>${escapeHtml(r.assigned_name || '未指派')}</span>
             ${r.deadline ? `<span class="info-tag"><span class="tag-label">截止日期：</span>${r.deadline}</span>` : ''}
             <span class="info-tag"><span class="tag-label">创建者：</span>${escapeHtml(r.creator_name || '-')}</span>
             <span class="info-tag"><span class="tag-label">创建时间：</span>${(r.created_at || '').slice(0, 16)}</span>
+            ${r.submitted_at ? `<span class="info-tag"><span class="tag-label">提交审批：</span>${(r.submitted_at || '').slice(0, 16)}</span>` : ''}
+            ${r.approver_name ? `<span class="info-tag"><span class="tag-label">审批人：</span>${escapeHtml(r.approver_name)}</span>` : ''}
+            ${r.approved_at ? `<span class="info-tag"><span class="tag-label">审批时间：</span>${(r.approved_at || '').slice(0, 16)}</span>` : ''}
+            ${r.status === 'rejected' && r.reject_reason ? `<div style="margin-top:8px;padding:10px 14px;background:#fdecec;border:1px solid #f5c2c2;border-radius:6px;font-size:13px;line-height:1.6;color:#c53030;white-space:pre-wrap;"><strong>❌ 驳回理由：</strong>${escapeHtml(r.reject_reason)}</div>` : ''}
             ${r.description ? `<div style="margin-top:8px;padding:10px 14px;background:var(--bg-card);border-radius:6px;font-size:13px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;">${escapeHtml(r.description)}</div>` : ''}
         `;
 
@@ -371,6 +438,94 @@ async function closeRequirement(id) {
             showToast('操作失败', 'danger');
         }
     });
+}
+
+// ===== P1-3 流转操作：提交审批 / 通过 / 驳回 =====
+
+// 通用：调用流转接口并刷新（同时刷新列表与当前详情视图）
+async function _reqFlowCall(id, path, body, okMsg) {
+    try {
+        const resp = await authFetch(`${API_BASE}/requirements/${id}/${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast(okMsg, 'success');
+            await loadRequirements();
+            // 若详情视图正打开，刷新详情
+            const detailView = document.getElementById('req-detail-view');
+            if (detailView && detailView.style.display !== 'none') {
+                openReqDetail(id);
+            }
+            return true;
+        } else {
+            showToast('操作失败: ' + (result.error || ''), 'danger');
+            return false;
+        }
+    } catch (e) {
+        showToast('操作失败: ' + e.message, 'danger');
+        return false;
+    }
+}
+
+// 提交审批
+function submitReviewReq(id) {
+    showConfirm('确定提交该需求审批？提交后将通知创建者（TPM）进行审批。', () => {
+        _reqFlowCall(id, 'submit-review', null, '已提交审批');
+    });
+}
+
+// 审批通过（仅管理员/乔老师，后端二次校验）
+function approveReq(id) {
+    showConfirm('确定审批通过该需求？', () => {
+        _reqFlowCall(id, 'approve', null, '已审批通过');
+    });
+}
+
+// 审批驳回（必填理由）—— 自建轻量模态框
+function rejectReq(id) {
+    // 移除可能残留的旧弹窗
+    const old = document.getElementById('req-reject-modal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'req-reject-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+        <div style="background:var(--bg-card,#fff);border-radius:10px;width:440px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.25);overflow:hidden;">
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border,#eee);font-weight:600;font-size:15px;color:var(--text,#222);">❌ 驳回需求</div>
+            <div style="padding:18px 20px;">
+                <div style="font-size:13px;color:var(--text-secondary,#666);margin-bottom:8px;">请填写驳回理由（必填，将通知执行人重做）：</div>
+                <textarea id="req-reject-reason" rows="4" maxlength="1000" placeholder="例如：测试覆盖不足，缺少XX机型的实测记录…"
+                    style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:13px;line-height:1.5;resize:vertical;outline:none;"></textarea>
+                <div id="req-reject-err" style="color:#c53030;font-size:12px;margin-top:6px;min-height:16px;"></div>
+            </div>
+            <div style="padding:12px 20px;border-top:1px solid var(--border,#eee);display:flex;justify-content:flex-end;gap:10px;">
+                <button class="btn btn-small" onclick="document.getElementById('req-reject-modal').remove()">取消</button>
+                <button class="btn btn-small" style="background:#c53030;color:#fff;" onclick="confirmRejectReq(${id})">确认驳回</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    setTimeout(() => { const ta = document.getElementById('req-reject-reason'); if (ta) ta.focus(); }, 50);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function confirmRejectReq(id) {
+    const ta = document.getElementById('req-reject-reason');
+    const errEl = document.getElementById('req-reject-err');
+    const reason = (ta ? ta.value : '').trim();
+    if (!reason) {
+        if (errEl) errEl.textContent = '驳回理由不能为空';
+        if (ta) ta.focus();
+        return;
+    }
+    const ok = await _reqFlowCall(id, 'reject', { reject_reason: reason }, '已驳回，已通知执行人重做');
+    if (ok) {
+        const modal = document.getElementById('req-reject-modal');
+        if (modal) modal.remove();
+    }
 }
 
 // 基于需求创建配置计划（跳到配置计划创建页面，预填 requirement_id）

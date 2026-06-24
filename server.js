@@ -2333,6 +2333,10 @@ db.serialize(() => {
     assigned_to INTEGER,
     creator_id INTEGER,
     deadline TEXT,
+    submitted_at DATETIME,
+    approver_id INTEGER,
+    approved_at DATETIME,
+    reject_reason TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assigned_to) REFERENCES users(id),
@@ -2340,6 +2344,24 @@ db.serialize(() => {
   )`);
   db.run('CREATE INDEX IF NOT EXISTS idx_requirements_status ON requirements(status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_requirements_assigned ON requirements(assigned_to)');
+
+  // P1-3 启动迁移：旧库兼容，补齐审批闭环字段
+  db.all("PRAGMA table_info(requirements)", (e, cols) => {
+    if (e || !cols) return;
+    const names = cols.map(c => c.name);
+    const addCol = (col, ddl) => {
+      if (!names.includes(col)) {
+        db.run(`ALTER TABLE requirements ADD COLUMN ${ddl}`, (er) => {
+          if (er && !er.message.includes('duplicate column')) console.error(`  [启动] requirements加${col}失败:`, er.message);
+          else if (!er) console.log(`  [启动] requirements表已添加${col}列`);
+        });
+      }
+    };
+    addCol('submitted_at', 'submitted_at DATETIME');
+    addCol('approver_id', 'approver_id INTEGER');
+    addCol('approved_at', 'approved_at DATETIME');
+    addCol('reject_reason', "reject_reason TEXT DEFAULT ''");
+  });
 
   // 给 plans 表添加 requirement_id 字段（关联需求）
   db.run(`ALTER TABLE plans ADD COLUMN requirement_id INTEGER`, (err) => {
@@ -2358,12 +2380,14 @@ requirementsRouter.get('/', (req, res) => {
   db.all(`SELECT r.*, 
           uc.real_name as creator_name,
           ua.real_name as assigned_name,
+          uap.real_name as approver_name,
           (SELECT COUNT(*) FROM plans p WHERE p.requirement_id = r.id) as plan_count,
           (SELECT COUNT(*) FROM plans p INNER JOIN plan_games pg ON pg.plan_id = p.id WHERE p.requirement_id = r.id) as total_games,
           (SELECT COUNT(*) FROM plans p INNER JOIN plan_games pg ON pg.plan_id = p.id WHERE p.requirement_id = r.id AND pg.adapt_status = 'finished') as finished_games
           FROM requirements r
           LEFT JOIN users uc ON r.creator_id = uc.id
           LEFT JOIN users ua ON r.assigned_to = ua.id
+          LEFT JOIN users uap ON r.approver_id = uap.id
           ORDER BY r.created_at DESC`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, data: rows });
@@ -2374,10 +2398,12 @@ requirementsRouter.get('/', (req, res) => {
 requirementsRouter.get('/:id', (req, res) => {
   db.get(`SELECT r.*, 
           uc.real_name as creator_name,
-          ua.real_name as assigned_name
+          ua.real_name as assigned_name,
+          uap.real_name as approver_name
           FROM requirements r
           LEFT JOIN users uc ON r.creator_id = uc.id
           LEFT JOIN users ua ON r.assigned_to = ua.id
+          LEFT JOIN users uap ON r.approver_id = uap.id
           WHERE r.id = ?`, [req.params.id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: '需求不存在' });
@@ -2397,7 +2423,7 @@ requirementsRouter.post('',
   validate({
     title: rules.name(200),
     priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
-    status: rules.statusEnum(['draft','assigned','in_progress','planned','completed','closed','cancelled']),
+    status: rules.statusEnum(['draft','published','assigned','in_progress','planned','pending_review','approved','rejected','completed','closed','cancelled']),
     description: rules.textArea(5000),
     deadline: rules.optional(), // 日期格式由前端保证
   }),
@@ -2433,7 +2459,7 @@ requirementsRouter.put('/:id',
   validate({
     title: rules.name(200),
     priority: rules.requiredEnum(['low','medium','high','urgent'], '优先级'),
-    status: rules.statusEnum(['draft','assigned','in_progress','planned','completed','closed','cancelled']),
+    status: rules.statusEnum(['draft','published','assigned','in_progress','planned','pending_review','approved','rejected','completed','closed','cancelled']),
   }),
   (req, res) => {
   const { title, description, priority, assigned_to, deadline, status } = req.body;
@@ -2472,6 +2498,69 @@ requirementsRouter.post('/:id/publish', (req, res) => {
 requirementsRouter.post('/:id/close', (req, res) => {
   db.run("UPDATE requirements SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// ===== P1-3 任务流程闭环：提交审批 / 通过 / 驳回 =====
+
+// 提交审批（published/in_progress/rejected → pending_review，通知审批人/创建者）
+requirementsRouter.post('/:id/submit-review', (req, res) => {
+  const reqId = req.params.id;
+  db.run(`UPDATE requirements SET status = 'pending_review', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND status IN ('published','assigned','in_progress','rejected')`, [reqId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(400).json({ error: '需求不存在或当前状态不可提交审批' });
+    logActivity('submit_review', 'requirement', parseInt(reqId), '提交审批');
+    // 通知创建者（TPM）来审批；若创建者就是提交人则通知超级管理员可后续扩展
+    db.get("SELECT title, creator_id, assigned_to FROM requirements WHERE id = ?", [reqId], (e, r) => {
+      if (!e && r && r.creator_id) {
+        createNotification(r.creator_id, 'requirement_submit_review', '有需求待审批',
+          `需求「${r.title}」已提交审批，请尽快处理`, 'requirement', parseInt(reqId));
+      }
+    });
+    res.json({ success: true });
+  });
+});
+
+// 审批通过（pending_review → approved，记录审批人/时间，通知指派人）
+requirementsRouter.post('/:id/approve', auth.checkPermission('requirements', 'edit'), (req, res) => {
+  const reqId = req.params.id;
+  const approverId = req.user ? req.user.id : null;
+  db.run(`UPDATE requirements SET status = 'approved', approver_id = ?, approved_at = CURRENT_TIMESTAMP,
+          reject_reason = '', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND status = 'pending_review'`, [approverId, reqId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(400).json({ error: '需求不存在或不是待审批状态' });
+    logActivity('approve', 'requirement', parseInt(reqId), '审批通过');
+    db.get("SELECT title, assigned_to FROM requirements WHERE id = ?", [reqId], (e, r) => {
+      if (!e && r && r.assigned_to) {
+        createNotification(r.assigned_to, 'requirement_approved', '需求审批通过',
+          `需求「${r.title}」已审批通过`, 'requirement', parseInt(reqId));
+      }
+    });
+    res.json({ success: true });
+  });
+});
+
+// 审批驳回（pending_review → rejected，必填驳回理由，通知指派人重做）
+requirementsRouter.post('/:id/reject', auth.checkPermission('requirements', 'edit'), (req, res) => {
+  const reqId = req.params.id;
+  const approverId = req.user ? req.user.id : null;
+  const reason = (req.body && req.body.reject_reason ? String(req.body.reject_reason) : '').trim();
+  if (!reason) return res.status(400).json({ error: '驳回理由不能为空' });
+  if (reason.length > 1000) return res.status(400).json({ error: '驳回理由过长（最多1000字）' });
+  db.run(`UPDATE requirements SET status = 'rejected', approver_id = ?, reject_reason = ?,
+          updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending_review'`, [approverId, reason, reqId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(400).json({ error: '需求不存在或不是待审批状态' });
+    logActivity('reject', 'requirement', parseInt(reqId), '审批驳回：' + reason);
+    db.get("SELECT title, assigned_to FROM requirements WHERE id = ?", [reqId], (e, r) => {
+      if (!e && r && r.assigned_to) {
+        createNotification(r.assigned_to, 'requirement_rejected', '需求被驳回',
+          `需求「${r.title}」被驳回，原因：${reason}`, 'requirement', parseInt(reqId));
+      }
+    });
     res.json({ success: true });
   });
 });
