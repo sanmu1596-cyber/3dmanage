@@ -32,7 +32,18 @@ function registerColumnConfig(tableId, defaultOrder, storageKey) {
         try {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                _columnConfigs[tableId].order = parsed;
+                // ★ 合并策略(修复"新增字段不显示"bug)：
+                //   1. 只保留 defaultOrder 中仍存在的字段(剔除已废弃字段)，保留用户拖拽偏好
+                //   2. defaultOrder 中存在但 localStorage 缺失的"新增字段"追加到末尾
+                // 否则：旧版本保存的列顺序会永久覆盖默认顺序，导致后续新增的列(如 game_name)永不渲染
+                const validSaved = parsed.filter(f => defaultOrder.includes(f));
+                const missingNew = defaultOrder.filter(f => !validSaved.includes(f));
+                const merged = [...validSaved, ...missingNew];
+                _columnConfigs[tableId].order = merged;
+                // 如有变化(新增/废弃字段)，回写 localStorage，使修复持久化
+                if (merged.length !== parsed.length || merged.some((f, i) => f !== parsed[i])) {
+                    try { localStorage.setItem(_columnConfigs[tableId].storageKey, JSON.stringify(merged)); } catch (e) {}
+                }
             }
         } catch (e) {
             console.warn(`加载${tableId}列顺序失败:`, e);
