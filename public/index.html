@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260624d">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260625c">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
     <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -135,6 +135,9 @@
                         </a>
                         <a class="sidebar-item" data-tab="reports" onclick="switchTab('reports')">
                             <span class="sidebar-icon">📊</span>汇报报表
+                        </a>
+                        <a class="sidebar-item" data-tab="faq" onclick="switchTab('faq')">
+                            <span class="sidebar-icon">💡</span>FAQ知识库
                         </a>
                     </div>
                 </div>
@@ -2364,6 +2367,88 @@
                     </div>
                 </section>
 
+                <!-- ========== FAQ 知识库 (P2-1) ========== -->
+                <section id="faq" class="tab-content">
+                    <div class="toolbar">
+                        <div class="toolbar-left">
+                            <button class="tool-btn tool-btn-primary" onclick="openFaqModal()"><span class="tool-icon">＋</span>新增知识</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="faq-search-box">
+                                <span class="faq-search-icon">🔍</span>
+                                <input type="text" id="faq-search" class="faq-search-input" placeholder="搜索问题、解决方案或关键词…" oninput="filterFaq()">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="faq-layout">
+                        <!-- 左侧分类导航 -->
+                        <aside class="faq-sidebar">
+                            <div class="faq-cat-title">分类</div>
+                            <div id="faq-categories" class="faq-cat-list"></div>
+                        </aside>
+                        <!-- 右侧问答卡片区 -->
+                        <div class="faq-main">
+                            <div id="faq-cards" class="faq-cards"></div>
+                            <div id="faq-empty" class="faq-empty" style="display:none;">
+                                <div class="faq-empty-icon">📭</div>
+                                <div class="faq-empty-text">暂无匹配的知识条目</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- FAQ 编辑弹窗 -->
+                <div class="modal" id="faq-modal">
+                    <div class="modal-overlay" onclick="if(event.target===this)closeModal('faq-modal')"></div>
+                    <div class="modal-container" style="max-width:640px">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="faq-modal-title">新增知识</h3>
+                                <button class="modal-close" onclick="closeModal('faq-modal')">✕</button>
+                            </div>
+                            <form id="faq-form" onsubmit="submitFaqForm(event)">
+                                <input type="hidden" id="faq-id">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>分类</label>
+                                        <input type="text" id="faq-category" list="faq-category-options" placeholder="如：安装部署 / 适配问题 / 显示异常">
+                                        <datalist id="faq-category-options"></datalist>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>问题 <span class="required">*</span></label>
+                                        <input type="text" id="faq-question" required placeholder="客户常遇到的问题，一句话描述">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>解决方案 <span class="required">*</span></label>
+                                        <textarea id="faq-answer" rows="6" required placeholder="详细的快速解决步骤，可分点说明"></textarea>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label>关键词</label>
+                                        <input type="text" id="faq-keywords" placeholder="便于搜索的关键词，用空格或逗号分隔">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                            <input type="checkbox" id="faq-pinned" style="width:auto;margin:0;"> 置顶显示
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn" onclick="closeModal('faq-modal')">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ========== 用户管理 ========== -->
                 <section id="user-management" class="tab-content">
                     <!-- 子Tab切换 -->
@@ -3596,7 +3681,7 @@
     <script src="js/components/ui-dialog.js?v=20260624c"></script>
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
-    <script src="js/router.js?v=20260624c"></script>
+    <script src="js/router.js?v=20260625c"></script>
     <script src="js/entities.js?v=20260625a"></script>
     <script src="js/plans.js?v=20260624h"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
@@ -3609,6 +3694,7 @@
     <script src="js/reports.js?v=20260625b"></script>
     <script src="js/tencent-games.js?v=20260625b"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
+    <script src="js/faq.js?v=20260625c"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260624b"></script>
 </body>

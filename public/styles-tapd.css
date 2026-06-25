@@ -7425,3 +7425,107 @@ mark.search-highlight {
 }
 [data-theme="dark"] .scope-badge.scope-all { color: #fca5a5; background: rgba(185,28,28,.18); border-color: rgba(252,165,165,.3); }
 [data-theme="dark"] .scope-badge.scope-single { color: #cbd5e1; background: rgba(148,163,184,.15); border-color: rgba(203,213,225,.2); }
+
+/* ==================== FAQ 知识库 (P2-1) ==================== */
+.faq-search-box { position: relative; display: flex; align-items: center; }
+.faq-search-icon { position: absolute; left: 10px; font-size: 13px; opacity: .6; pointer-events: none; }
+.faq-search-input {
+    width: 320px; max-width: 42vw; padding: 7px 12px 7px 30px;
+    border: 1px solid #e2e8f0; border-radius: 18px; font-size: 13px;
+    outline: none; transition: border-color .15s, box-shadow .15s; background: #fff;
+}
+.faq-search-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+
+.faq-layout { display: flex; gap: 16px; align-items: flex-start; }
+.faq-sidebar {
+    flex: 0 0 180px; background: #fff; border: 1px solid #eef0f3; border-radius: 10px;
+    padding: 12px; position: sticky; top: 8px;
+}
+.faq-cat-title { font-size: 12px; color: #94a3b8; font-weight: 600; margin-bottom: 8px; padding-left: 4px; letter-spacing: .5px; }
+.faq-cat-list { display: flex; flex-direction: column; gap: 2px; }
+.faq-cat-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 10px; border-radius: 7px; font-size: 13px; color: #475569;
+    cursor: pointer; transition: background .12s, color .12s; user-select: none;
+}
+.faq-cat-item:hover { background: #f1f5f9; }
+.faq-cat-item.active { background: #eef4ff; color: #2563eb; font-weight: 600; }
+.faq-cat-count {
+    font-size: 11px; background: #f1f5f9; color: #64748b;
+    border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center;
+}
+.faq-cat-item.active .faq-cat-count { background: #dbeafe; color: #2563eb; }
+
+.faq-main { flex: 1; min-width: 0; }
+.faq-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.faq-card {
+    background: #fff; border: 1px solid #eef0f3; border-radius: 12px;
+    padding: 16px 18px; transition: box-shadow .15s, transform .12s, border-color .15s;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+}
+.faq-card:hover { box-shadow: 0 6px 20px rgba(15,23,42,.08); border-color: #dbe3ef; transform: translateY(-1px); }
+.faq-card.pinned { border-color: #fcd9a8; background: linear-gradient(180deg,#fffaf2 0%,#fff 40%); }
+.faq-card-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.faq-card-cat {
+    flex: 0 0 auto; font-size: 11px; font-weight: 600; color: #2563eb;
+    background: #eef4ff; border-radius: 6px; padding: 2px 8px;
+}
+.faq-pin-mark { color: #f59e0b; font-size: 13px; }
+.faq-card-q { font-size: 15px; font-weight: 600; color: #1e293b; line-height: 1.45; margin: 2px 0 10px; }
+.faq-card-a {
+    font-size: 13px; color: #475569; line-height: 1.7; white-space: pre-wrap;
+    max-height: 4.8em; overflow: hidden; position: relative; transition: max-height .25s;
+}
+.faq-card-a.expanded { max-height: 2000px; }
+.faq-card-a:not(.expanded).clamp::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1.6em;
+    background: linear-gradient(transparent, #fff);
+}
+.faq-card.pinned .faq-card-a:not(.expanded).clamp::after { background: linear-gradient(transparent, #fffdf8); }
+.faq-card-toggle { font-size: 12px; color: #3b82f6; cursor: pointer; margin-top: 6px; align-self: flex-start; user-select: none; }
+.faq-card-toggle:hover { text-decoration: underline; }
+.faq-card-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed #eef0f3;
+    font-size: 11px; color: #94a3b8;
+}
+.faq-card-meta { display: flex; align-items: center; gap: 10px; }
+.faq-card-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
+.faq-card:hover .faq-card-actions { opacity: 1; }
+.faq-act-btn {
+    border: none; background: #f1f5f9; color: #64748b; border-radius: 6px;
+    padding: 3px 9px; font-size: 11px; cursor: pointer; transition: background .12s, color .12s;
+}
+.faq-act-btn:hover { background: #e2e8f0; color: #334155; }
+.faq-act-btn.danger:hover { background: #fee2e2; color: #dc2626; }
+.faq-act-btn.pin:hover { background: #fef3c7; color: #d97706; }
+
+.faq-empty { text-align: center; padding: 60px 20px; color: #94a3b8; }
+.faq-empty-icon { font-size: 42px; margin-bottom: 12px; }
+.faq-empty-text { font-size: 14px; }
+
+mark.faq-hl { background: #fff2a8; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* FAQ 深色模式 */
+[data-theme="dark"] .faq-search-input { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+[data-theme="dark"] .faq-sidebar { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .faq-cat-item { color: #cbd5e1; }
+[data-theme="dark"] .faq-cat-item:hover { background: #334155; }
+[data-theme="dark"] .faq-cat-item.active { background: rgba(37,99,235,.2); color: #93c5fd; }
+[data-theme="dark"] .faq-cat-count { background: #334155; color: #94a3b8; }
+[data-theme="dark"] .faq-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .faq-card:hover { border-color: #475569; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+[data-theme="dark"] .faq-card.pinned { background: linear-gradient(180deg,rgba(120,80,20,.18) 0%,#1e293b 40%); border-color: rgba(252,211,77,.3); }
+[data-theme="dark"] .faq-card-q { color: #f1f5f9; }
+[data-theme="dark"] .faq-card-a { color: #cbd5e1; }
+[data-theme="dark"] .faq-card-a:not(.expanded).clamp::after { background: linear-gradient(transparent, #1e293b); }
+[data-theme="dark"] .faq-card-cat { background: rgba(37,99,235,.2); color: #93c5fd; }
+[data-theme="dark"] .faq-card-foot { border-color: #334155; }
+[data-theme="dark"] .faq-act-btn { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] mark.faq-hl { background: #b45309; color: #fff; }
+
+@media (max-width: 760px) {
+    .faq-layout { flex-direction: column; }
+    .faq-sidebar { flex: none; width: 100%; position: static; }
+    .faq-search-input { width: 200px; }
+}

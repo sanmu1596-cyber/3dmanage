@@ -14,6 +14,7 @@ const interlaceIssuesRouter = require('./interlace-issues');
 const interlaceVersionsRouter = require('./interlace-versions');
 const clientIssuesRouter = require('./client-issues');
 const tencentBoardRouter = require('./tencent-board');
+const faqRouter = require('./faq');
 const { validate, rules } = require('./validator');
 
 const app = express();
@@ -135,13 +136,27 @@ const newModuleTables = [
     value TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // FAQ 知识库表 (P2-1)
+  `CREATE TABLE IF NOT EXISTS faqs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT DEFAULT '未分类',
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    keywords TEXT DEFAULT '',
+    is_pinned INTEGER DEFAULT 0,
+    view_count INTEGER DEFAULT 0,
+    author TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
   // 索引
   'CREATE INDEX IF NOT EXISTS idx_game_versions_game ON game_versions(game_id)',
   'CREATE INDEX IF NOT EXISTS idx_game_versions_status ON game_versions(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_issues_status ON interlace_issues(status)',
   'CREATE INDEX IF NOT EXISTS idx_interlace_versions_status ON interlace_versions(status)',
   'CREATE INDEX IF NOT EXISTS idx_client_issues_status ON client_issues(status)',
-  'CREATE INDEX IF NOT EXISTS idx_tx_board_rows_group ON tx_board_rows(group_id)'
+  'CREATE INDEX IF NOT EXISTS idx_tx_board_rows_group ON tx_board_rows(group_id)',
+  'CREATE INDEX IF NOT EXISTS idx_faqs_category ON faqs(category)'
 ];
 newModuleTables.forEach((sql, i) => {
   db.run(sql, (err) => {
@@ -2871,6 +2886,7 @@ app.use('/api/game-versions', gameVersionsRouter);
 app.use('/api/interlace-issues', interlaceIssuesRouter);
 app.use('/api/interlace-versions', interlaceVersionsRouter);
 app.use('/api/client-issues', clientIssuesRouter);
+app.use('/api/faq', faqRouter);
 app.use('/api/tencent-board', tencentBoardRouter);
 app.use('/api/focus-items', focusItemsRouter);
 

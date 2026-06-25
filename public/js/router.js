@@ -250,6 +250,9 @@ async function _doLoadTabData(tabId, switchId) {
             // 默认进入「各客户适配进展」看板子页
             if (typeof switchReportSubTab === 'function') switchReportSubTab('report-customer');
             break;
+        case 'faq':
+            if (typeof loadFaq === 'function') loadFaq();
+            break;
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -736,7 +739,8 @@ const BREADCRUMB_MAP = {
     'interlace-issues':{label:'交织问题', icon: '⚠️', parent: 'games' },
     'interlace-versions':{label:'交织版本', icon: '🔀', parent: 'devices' },
     'client-issues':{label: '客户端问题', icon: '⚠️', parent: 'games' },
-    'reports':    { label: '汇报报表', icon: '📊', parent: null }
+    'reports':    { label: '汇报报表', icon: '📊', parent: null },
+    'faq':        { label: 'FAQ知识库', icon: '💡', parent: null }
 };
 
 function updateBreadcrumb(tabId) {
