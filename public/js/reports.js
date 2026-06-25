@@ -923,3 +923,130 @@ function saveReportRowOrder() {
     })
     .catch(() => {});
 }
+
+// ==================== P1-4 经营报表驾驶舱 ====================
+var _bizCharts = {};
+
+async function loadBizReport() {
+    try {
+        const resp = await authFetch(`${API_BASE}/stats/report-summary`);
+        const json = await resp.json();
+        if (!json.success || !json.data) { return; }
+        renderBizReport(json.data);
+        const upd = document.getElementById('biz-report-updated');
+        if (upd) upd.textContent = '更新于 ' + new Date().toLocaleString('zh-CN', { hour12: false });
+    } catch (e) {
+        console.warn('加载经营报表失败:', e);
+    }
+}
+
+function renderBizReport(d) {
+    if (typeof Chart === 'undefined') return;
+    const ad = d.adaptation || {}, bg = d.bugs || {}, rq = d.requirements || {};
+    const custs = d.customers || [], plats = d.platforms || [];
+
+    // ---- KPI 卡片 ----
+    const bs = ad.byStatus || {};
+    setBizText('kpi-completion', (ad.completionRate != null ? ad.completionRate : 0) + '%');
+    setBizText('kpi-completion-sub', '已上线 ' + (bs.completed || 0) + ' / 应适配 ' + ((ad.total || 0) - (bs.not_applicable || 0)) + ' 款');
+    setBizText('kpi-online', bs.completed || 0);
+    setBizText('kpi-online-sub', '适配明细共 ' + (ad.total || 0) + ' 条');
+    setBizText('kpi-bugs', bg.open != null ? bg.open : 0);
+    setBizText('kpi-bugs-sub', '缺陷总数 ' + (bg.total || 0) + ' 个');
+    setBizText('kpi-pending', rq.pendingReview != null ? rq.pendingReview : 0);
+    setBizText('kpi-pending-sub', '需求总数 ' + (rq.total || 0) + ' 条');
+
+    // ---- 1. 适配状态环图 ----
+    const adaptLabels = { completed: '已上线', developing: '开发中', undeveloped: '未开始', not_applicable: '不适用' };
+    const adaptColors = { completed: '#2e9e5a', developing: '#d4880f', undeveloped: '#8c96a8', not_applicable: '#a0aec0' };
+    const adaptKeys = Object.keys(bs);
+    bizChart('bizChartStatus', 'status', {
+        type: 'doughnut',
+        data: {
+            labels: adaptKeys.map(k => adaptLabels[k] || k),
+            datasets: [{ data: adaptKeys.map(k => bs[k]), backgroundColor: adaptKeys.map(k => adaptColors[k] || '#8c96a8'), borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } } } }
+    });
+
+    // ---- 2. 平台分布饼图 ----
+    const platColors = ['#2f7fbb', '#d4880f', '#2e9e5a', '#8c96a8', '#4355a7', '#d44040'];
+    bizChart('bizChartPlatform', 'platform', {
+        type: 'pie',
+        data: {
+            labels: plats.map(p => p.name),
+            datasets: [{ data: plats.map(p => p.count), backgroundColor: platColors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } } } }
+    });
+
+    // ---- 3. 各客户进度对比(堆叠横向柱状) ----
+    bizChart('bizChartCustomers', 'customers', {
+        type: 'bar',
+        data: {
+            labels: custs.map(c => c.name),
+            datasets: [
+                { label: '已上线', data: custs.map(c => c.completed), backgroundColor: '#2e9e5a' },
+                { label: '开发中', data: custs.map(c => c.developing), backgroundColor: '#d4880f' },
+                { label: '未开始', data: custs.map(c => c.undeveloped), backgroundColor: '#8c96a8' },
+                { label: '不适用', data: custs.map(c => c.not_applicable), backgroundColor: '#d9e0e8' }
+            ]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }
+        }
+    });
+
+    // ---- 4. 缺陷状态分布 ----
+    const bugLabels = { new: '待处理', in_progress: '处理中', fixed: '已修复', verified: '已验证', closed: '已关闭', wontfix: '不修复', reopened: '重新打开' };
+    const bugColors = { new: '#d44040', in_progress: '#d4880f', fixed: '#2e9e5a', verified: '#3182ce', closed: '#8c96a8', wontfix: '#a0aec0', reopened: '#805ad5' };
+    const bugArr = bg.byStatus || [];
+    bizChart('bizChartBugs', 'bugs', {
+        type: 'doughnut',
+        data: {
+            labels: bugArr.map(b => bugLabels[b.status] || b.status),
+            datasets: [{ data: bugArr.map(b => b.count), backgroundColor: bugArr.map(b => bugColors[b.status] || '#8c96a8'), borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } } }
+    });
+
+    // ---- 5. 需求审批进度 ----
+    const reqLabels = { draft: '草稿', published: '已发布', in_progress: '进行中', pending_review: '待审批', approved: '已通过', rejected: '已驳回', closed: '已完成', assigned: '已指派' };
+    const reqColors = { draft: '#8c96a8', published: '#3182ce', in_progress: '#d4880f', pending_review: '#dd6b20', approved: '#2e9e5a', rejected: '#d44040', closed: '#4355a7', assigned: '#38b2ac' };
+    const reqArr = rq.byStatus || [];
+    if (reqArr.length === 0) {
+        // 无需求数据时画占位
+        bizChart('bizChartReqs', 'reqs', {
+            type: 'doughnut',
+            data: { labels: ['暂无需求数据'], datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    } else {
+        bizChart('bizChartReqs', 'reqs', {
+            type: 'doughnut',
+            data: {
+                labels: reqArr.map(r => reqLabels[r.status] || r.status),
+                datasets: [{ data: reqArr.map(r => r.count), backgroundColor: reqArr.map(r => reqColors[r.status] || '#8c96a8'), borderWidth: 2, borderColor: '#fff' }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } } }
+        });
+    }
+}
+
+function setBizText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function bizChart(canvasId, key, config) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (_bizCharts[key]) { try { _bizCharts[key].destroy(); } catch (e) {} }
+    _bizCharts[key] = new Chart(ctx, config);
+}
+
+function printBizReport() {
+    window.print();
+}

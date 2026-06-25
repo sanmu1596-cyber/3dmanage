@@ -1986,6 +1986,126 @@ statsRouter.get('/matrix', (req, res) => {
   });
 });
 
+// ==================== P1-4 经营报表聚合 API (老板驾驶舱) ====================
+// 数据源: adaptation_records 明细表(乔老师拍板) + bugs + requirements
+// online_status 取值(运行库实测): completed/developing/undeveloped/not_applicable
+statsRouter.get('/report-summary', (req, res) => {
+  const result = {
+    adaptation: { total: 0, byStatus: {}, completionRate: 0 },
+    customers: [],      // 各客户进度对比
+    platforms: [],      // 平台分布
+    bugs: { total: 0, open: 0, byStatus: [], byPriority: [] },
+    requirements: { total: 0, byStatus: [], pendingReview: 0 },
+    generatedAt: new Date().toISOString()
+  };
+
+  // 适配状态归一化映射(兼容历史脏值)
+  const normAdaptStatus = (s) => {
+    if (!s) return 'undeveloped';
+    const v = String(s).toLowerCase();
+    if (['completed', 'online', '已上线', '已完成'].includes(v)) return 'completed';
+    if (['developing', 'in_progress', '开发中', '适配中'].includes(v)) return 'developing';
+    if (['not_applicable', 'na', '不适用'].includes(v)) return 'not_applicable';
+    return 'undeveloped'; // undeveloped/未开始/空 等
+  };
+
+  db.serialize(() => {
+    // 1. 适配明细 —— adaptation_records 只有外键device_id/game_id, 需JOIN拿客户名/游戏平台(实测验证)
+    db.all(`SELECT ar.online_status, ar.adapter_progress,
+                   d.name as device_name, g.platform as game_platform
+            FROM adaptation_records ar
+            LEFT JOIN devices d ON ar.device_id = d.id
+            LEFT JOIN games g ON ar.game_id = g.id`, [], (err, rows) => {
+      if (err) console.error('[report-summary] 适配查询失败:', err.message);
+      rows = rows || [];
+      result.adaptation.total = rows.length;
+      const statusCnt = { completed: 0, developing: 0, undeveloped: 0, not_applicable: 0 };
+      const custMap = {};   // device_name -> {total, completed, developing, undeveloped, na, progressSum}
+      const platMap = {};   // platform -> count
+
+      rows.forEach(r => {
+        const st = normAdaptStatus(r.online_status);
+        statusCnt[st] = (statusCnt[st] || 0) + 1;
+
+        const cust = r.device_name || '(未关联客户)';
+        if (!custMap[cust]) custMap[cust] = { name: cust, total: 0, completed: 0, developing: 0, undeveloped: 0, not_applicable: 0, progressSum: 0 };
+        custMap[cust].total++;
+        custMap[cust][st]++;
+        custMap[cust].progressSum += (Number(r.adapter_progress) || 0);
+
+        const plat = r.game_platform || '(未知平台)';
+        platMap[plat] = (platMap[plat] || 0) + 1;
+      });
+
+      result.adaptation.byStatus = statusCnt;
+      // 整体完成率 = 已上线 / (总数 - 不适用)
+      const denom = rows.length - statusCnt.not_applicable;
+      result.adaptation.completionRate = denom > 0 ? Math.round((statusCnt.completed / denom) * 100) : 0;
+
+      result.customers = Object.values(custMap).map(c => ({
+        name: c.name,
+        total: c.total,
+        completed: c.completed,
+        developing: c.developing,
+        undeveloped: c.undeveloped,
+        not_applicable: c.not_applicable,
+        avgProgress: c.total > 0 ? Math.round(c.progressSum / c.total) : 0,
+        onlineRate: (c.total - c.not_applicable) > 0 ? Math.round((c.completed / (c.total - c.not_applicable)) * 100) : 0
+      })).sort((a, b) => b.completed - a.completed);
+
+      result.platforms = Object.entries(platMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+
+      // 2. 缺陷状态/优先级分布
+      db.all(`SELECT bug_status, COUNT(*) as count FROM bugs GROUP BY bug_status`, [], (e2, bugRows) => {
+        bugRows = bugRows || [];
+        // 归一化缺陷状态(兼容历史open/中文脏值)
+        const normBug = (s) => {
+          if (!s) return 'new';
+          const v = String(s).toLowerCase();
+          if (['open', '待处理', '新建'].includes(v)) return 'new';
+          if (['处理中', '适配中'].includes(v)) return 'in_progress';
+          if (['已验证'].includes(v)) return 'verified';
+          if (['已修复'].includes(v)) return 'fixed';
+          if (['已关闭'].includes(v)) return 'closed';
+          return v;
+        };
+        const bugStatusCnt = {};
+        let bugTotal = 0, bugOpen = 0;
+        bugRows.forEach(b => {
+          const st = normBug(b.bug_status);
+          bugStatusCnt[st] = (bugStatusCnt[st] || 0) + b.count;
+          bugTotal += b.count;
+          if (['new', 'in_progress', 'reopened'].includes(st)) bugOpen += b.count;
+        });
+        result.bugs.total = bugTotal;
+        result.bugs.open = bugOpen;
+        result.bugs.byStatus = Object.entries(bugStatusCnt).map(([status, count]) => ({ status, count }));
+
+        db.all(`SELECT priority, COUNT(*) as count FROM bugs WHERE priority IS NOT NULL AND priority != '' GROUP BY priority`, [], (e3, priRows) => {
+          result.bugs.byPriority = (priRows || []).map(p => ({ priority: p.priority, count: p.count }));
+
+          // 3. 需求审批进度分布
+          db.all(`SELECT status, COUNT(*) as count FROM requirements GROUP BY status`, [], (e4, reqRows) => {
+            reqRows = reqRows || [];
+            let reqTotal = 0, pendingReview = 0;
+            const reqStatusCnt = {};
+            reqRows.forEach(r => {
+              reqStatusCnt[r.status || 'draft'] = (reqStatusCnt[r.status || 'draft'] || 0) + r.count;
+              reqTotal += r.count;
+              if (r.status === 'pending_review') pendingReview += r.count;
+            });
+            result.requirements.total = reqTotal;
+            result.requirements.pendingReview = pendingReview;
+            result.requirements.byStatus = Object.entries(reqStatusCnt).map(([status, count]) => ({ status, count }));
+
+            res.json({ success: true, data: result });
+          });
+        });
+      });
+    });
+  });
+});
+
 // ==================== 全局搜索 API ====================
 statsRouter.get('/search', (req, res) => {
   const q = (req.query.q || '').trim();

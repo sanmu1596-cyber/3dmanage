@@ -49,6 +49,12 @@ function switchReportSubTab(subtab) {
         if (m) m.style.display = 'flex';
         return;
     }
+    if (subtab === 'report-dashboard') {
+        const d = document.getElementById('report-sub-dashboard');
+        if (d) d.style.display = 'flex';
+        if (typeof loadBizReport === 'function') loadBizReport();
+        return;
+    }
     // 腾讯系看板 / 各客户适配进展：共用同一看板引擎，仅切换 _txBoardId + 标题 + 数据
     const isCustomer = (subtab === 'report-customer');
     _txBoardId = isCustomer ? 'customer' : 'tencent';
