@@ -153,7 +153,7 @@ function renderProgressTable(deviceIndex) {
     if (!progressData[deviceIndex] || progressData[deviceIndex].games.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="empty-state">
+                <td colspan="11" class="empty-state">
                     <div class="empty-icon">📊</div>
                     <div class="empty-text">该设备暂无适配记录</div>
                     <div class="empty-sub">请先在「配置计划」中添加游戏，或点击下方按钮手动添加</div>
@@ -191,7 +191,7 @@ function renderProgressTable(deviceIndex) {
     if (filteredProgressGames.length === 0 && games.length > 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="empty-state">
+                <td colspan="11" class="empty-state">
                     <div class="empty-icon">🔍</div>
                     <div class="empty-text">没有匹配的适配记录</div>
                     <div class="empty-sub">试试调整筛选条件，或点击「重置」清空筛选</div>
@@ -217,6 +217,7 @@ function renderProgressTable(deviceIndex) {
         var originalIndex = games.indexOf(gameData);
         return `
         <tr>
+            <td class="batch-td"><input type="checkbox" class="row-checkbox" data-id="${gameData.id}" data-resource="adaptations" onchange="batchToggleRow(this)"></td>
             <td class="text-center"><strong>${index + 1}</strong></td>
             <td>${escapeHtml(gameData.gameName)}</td>
             <td>${escapeHtml(gameData.gamePlatform || '-')}</td>
