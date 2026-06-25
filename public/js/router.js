@@ -132,7 +132,7 @@ function switchTab(tabId, fromHash) {
 // 按需加载当前Tab数据
 async function loadTabData(tabId, switchId) {
     // 显示刷新指示器
-    const tabLabels = { games:'游戏列表', members:'项目成员', devices:'客户列表', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
+    const tabLabels = { games:'游戏库', members:'项目成员库', devices:'客户库', tests:'测试列表', bugs:'缺陷列表', progress:'适配进展' };
     if (tabLabels[tabId]) showRefreshIndicator(`正在加载${tabLabels[tabId]}...`);
 
     // 确保字段选项已加载（全局依赖）
@@ -253,6 +253,10 @@ async function _doLoadTabData(tabId, switchId) {
         case 'faq':
             if (typeof loadFaq === 'function') loadFaq();
             break;
+    }
+    // 基础数据三库：非管理员只读控制
+    if (typeof applyLibraryPermission === 'function') {
+        applyLibraryPermission(tabId);
     }
     // 仅在非dashboard tab时更新侧边栏统计（dashboard自带完整统计）
     if (tabId !== 'dashboard') {
@@ -720,9 +724,9 @@ let filteredDevicesData = null;
  */
 const BREADCRUMB_MAP = {
     'dashboard': { label: '项目概览', icon: '📊', parent: null },
-    'games':     { label: '游戏列表', icon: '🎮', parent: 'dashboard' },
-    'devices':   { label: '客户列表', icon: '📱', parent: 'dashboard' },
-    'members':   { label: '项目成员', icon: '👥', parent: 'dashboard' },
+    'games':     { label: '游戏库', icon: '🎮', parent: 'dashboard' },
+    'devices':   { label: '客户库', icon: '📱', parent: 'dashboard' },
+    'members':   { label: '项目成员库', icon: '👥', parent: 'dashboard' },
     'progress':  { label: '适配进展', icon: '📈', parent: 'games' },
     'matrix':    { label: '适配矩阵', icon: '🔲', parent: 'progress' },
     'tests':     { label: '测试列表', icon: '🧪', parent: 'games' },

@@ -184,7 +184,6 @@ var visibleColumns = {
     operator: true,
     release_date: true,
     config_path: true,
-    adapter_progress: true,
     owner: true,
     online_status: true,
     quality: true,

@@ -1651,7 +1651,6 @@ function renderGameDetail(game) {
             <div class="detail-section-title">适配状态</div>
             ${detailField('适配状态', `<span class="status-badge ${status.class}">${status.text}</span>`, true)}
             ${detailField('品质', `<span class="priority-badge ${quality.class}">${quality.text}</span>`, true)}
-            ${detailField('适配进度', game.adapter_progress ? game.adapter_progress + '%' : '-')}
             ${detailField('负责人', game.owner_name || '-')}
         </div>
         <div class="detail-section">

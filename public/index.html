@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260625c">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260625e">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
     <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -53,13 +53,13 @@
                     <div class="sidebar-section-title">基础数据模块</div>
                     <div class="sidebar-nav">
                         <a class="sidebar-item" data-tab="games" onclick="switchTab('games')">
-                            <span class="sidebar-icon">🎮</span>游戏列表<span class="shortcut-badge">⌘2</span>
+                            <span class="sidebar-icon">🎮</span>游戏库<span class="shortcut-badge">⌘2</span>
                         </a>
                         <a class="sidebar-item" data-tab="devices" onclick="switchTab('devices')">
-                            <span class="sidebar-icon">📱</span>客户列表<span class="shortcut-badge">⌘3</span>
+                            <span class="sidebar-icon">📱</span>客户库<span class="shortcut-badge">⌘3</span>
                         </a>
                         <a class="sidebar-item" data-tab="members" onclick="switchTab('members')">
-                            <span class="sidebar-icon">👥</span>项目成员列表<span class="shortcut-badge">⌘4</span>
+                            <span class="sidebar-icon">👥</span>项目成员库<span class="shortcut-badge">⌘4</span>
                         </a>
                     </div>
                 </div>
@@ -324,19 +324,19 @@
                     <!-- 工具栏 -->
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <button class="tool-btn tool-btn-primary lib-edit-action" onclick="openModal('game-modal')"><span class="tool-icon">＋</span>创建</button>
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
                                     <div class="dropdown-item" onclick="toggleColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
                                     <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
-                                    <div class="dropdown-item" onclick="document.getElementById('excel-upload').click(); closeAllMoreActions();"><span class="drop-icon">📥</span>导入</div>
+                                    <div class="dropdown-item lib-edit-action" onclick="document.getElementById('excel-upload').click(); closeAllMoreActions();"><span class="drop-icon">📥</span>导入</div>
                                     <div class="dropdown-item" onclick="exportToExcel('games'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
-                                    <div class="dropdown-item" onclick="exportToPDF('游戏列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('games'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('游戏库'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-divider lib-edit-action"></div>
+                                    <div class="dropdown-item danger lib-edit-action" onclick="batchDeletePrompt('games'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
                         </div>
@@ -413,7 +413,6 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="operator" checked><span>运营商</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="release_date" checked><span>上线日期</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="config_path" checked><span>配置路径</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="adapter_progress" checked><span>适配进度</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="owner" checked><span>负责人</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_status" checked><span>适配状态</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quality" checked><span>品质</span></label></div>
@@ -440,7 +439,6 @@
                                     <th data-field="operator">运营商</th>
                                     <th data-field="release_date">上线日期</th>
                                     <th data-field="config_path">配置路径</th>
-                                    <th data-field="adapter_progress">适配进度</th>
                                     <th data-field="owner">负责人</th>
                                     <th data-field="online_status">适配状态</th>
                                     <th data-field="quality">品质</th>
@@ -462,18 +460,18 @@
                 <section id="members" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <button class="tool-btn tool-btn-primary lib-edit-action" onclick="openModal('member-modal')"><span class="tool-icon">＋</span>创建</button>
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
                                     <div class="dropdown-item" onclick="exportToExcel('members'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
-                                    <div class="dropdown-item" onclick="exportToPDF('项目成员'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('项目成员库'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="toggleMemberColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                    <div class="dropdown-divider lib-edit-action"></div>
+                                    <div class="dropdown-item danger lib-edit-action" onclick="batchDeletePrompt('members'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
                             <span class="toolbar-divider"></span>
@@ -645,18 +643,18 @@
                 <section id="devices" class="tab-content">
                     <div class="toolbar">
                         <div class="toolbar-left">
-                            <button class="tool-btn tool-btn-primary" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>创建</button>
+                            <button class="tool-btn tool-btn-primary lib-edit-action" onclick="openModal('device-modal')"><span class="tool-icon">＋</span>创建</button>
                             <div class="more-actions-wrapper">
                                 <button class="more-actions-btn" onclick="toggleMoreActions(this)">更多操作 <span class="arrow">▾</span></button>
                                 <div class="more-actions-dropdown">
                                     <div class="dropdown-item" onclick="exportToExcel('devices'); closeAllMoreActions();"><span class="drop-icon">📤</span>导出Excel</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="printCurrentPage(); closeAllMoreActions();"><span class="drop-icon">🖨</span>打印</div>
-                                    <div class="dropdown-item" onclick="exportToPDF('客户列表'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
+                                    <div class="dropdown-item" onclick="exportToPDF('客户库'); closeAllMoreActions();"><span class="drop-icon">📄</span>导出PDF</div>
                                     <div class="dropdown-divider"></div>
                                     <div class="dropdown-item" onclick="toggleDeviceColumnSettings(); closeAllMoreActions();"><span class="drop-icon">⚙</span>字段设置</div>
-                                    <div class="dropdown-divider"></div>
-                                    <div class="dropdown-item danger" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
+                                    <div class="dropdown-divider lib-edit-action"></div>
+                                    <div class="dropdown-item danger lib-edit-action" onclick="batchDeletePrompt('devices'); closeAllMoreActions();"><span class="drop-icon">🗑</span>批量删除</div>
                                 </div>
                             </div>
                             <span class="toolbar-divider"></span>
@@ -3475,7 +3473,6 @@
                     <div class="form-group"><label>游戏开发商</label><input type="text" id="game-developer"></div>
                     <div class="form-group"><label>游戏运营商</label><input type="text" id="game-operator"></div>
                     <div class="form-group"><label>配置文件路径</label><input type="text" id="game-config-path"></div>
-                    <div class="form-group"><label>适配进度</label><input type="text" id="game-adapter-progress" placeholder="例如：80%"></div>
                     <div class="form-group"><label>游戏版本</label><input type="text" id="game-version"></div>
                     <div class="form-group"><label>安装包大小</label><input type="text" id="game-package-size" placeholder="例如：500MB"></div>
                     <div class="form-group"><label>负责人</label><select id="game-owner"><option value="">未分配</option></select></div>
@@ -3673,8 +3670,8 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260624d"></script>
-    <script src="js/auth.js?v=20260624c"></script>
+    <script src="js/core.js?v=20260625e"></script>
+    <script src="js/auth.js?v=20260625e"></script>
     <!-- ★ 通用UI组件 -->
     <script src="js/components/searchable-select.js?v=20260624c"></script>
     <script src="js/components/media-viewer.js?v=20260624c"></script>
@@ -3682,14 +3679,14 @@
     <script src="js/components/ui-dialog.js?v=20260624c"></script>
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
-    <script src="js/router.js?v=20260625c"></script>
-    <script src="js/entities.js?v=20260625a"></script>
+    <script src="js/router.js?v=20260625e"></script>
+    <script src="js/entities.js?v=20260625e"></script>
     <script src="js/plans.js?v=20260625d"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
     <script src="js/ui-features.js?v=20260624c"></script>
     <script src="js/admin.js?v=20260624c"></script>
     <script src="js/requirements.js?v=20260624f"></script>
-    <script src="js/testcases.js?v=20260624c"></script>
+    <script src="js/testcases.js?v=20260625e"></script>
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260624c"></script>
     <script src="js/reports.js?v=20260625b"></script>

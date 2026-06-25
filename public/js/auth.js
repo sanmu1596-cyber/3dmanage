@@ -199,6 +199,39 @@ function hasPermission(module, action) {
     }
 }
 
+// 判断当前用户是否为超级管理员或管理员
+// 用于：游戏库/客户库/项目成员库 三个基础数据模块的编辑权限控制
+// 仅这两类身份可编辑，其余角色只读
+function isAdminOrSuper() {
+    if (IS_DEV_MODE) return true; // 开发模式视为超级管理员
+    const user = getCurrentUser();
+    if (!user) return false;
+    // 超级管理员判定（与项目其它处保持一致）
+    if (user.is_super_admin === true) return true;
+    if (user.role_id === 1) return true;
+    if (user.role_key === 'super_admin') return true;
+    if (user.username === 'admin') return true;
+    // 角色名包含「超级管理员」或「管理员」
+    if (typeof user.role === 'string' && (user.role.indexOf('超级管理员') !== -1 || user.role.indexOf('管理员') !== -1)) return true;
+    return false;
+}
+window.isAdminOrSuper = isAdminOrSuper;
+
+// 基础数据三库（游戏库/客户库/项目成员库）只读控制
+// 非管理员进入时给容器加 .lib-readonly，CSS 隐藏所有编辑入口
+const LIBRARY_TABS = ['games', 'devices', 'members'];
+function applyLibraryPermission(tabId) {
+    if (!LIBRARY_TABS.includes(tabId)) return;
+    const section = document.getElementById(tabId);
+    if (!section) return;
+    if (isAdminOrSuper()) {
+        section.classList.remove('lib-readonly');
+    } else {
+        section.classList.add('lib-readonly');
+    }
+}
+window.applyLibraryPermission = applyLibraryPermission;
+
 // 根据权限显示/隐藏元素
 // 用法: <div data-permission="games.edit">编辑按钮</div>
 function applyPermissionControl() {

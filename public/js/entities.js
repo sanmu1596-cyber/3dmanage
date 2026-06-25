@@ -74,7 +74,7 @@ function saveColumnOrderForTable(tableId) {
 // 游戏模块列顺序（保持向后兼容）
 registerColumnConfig('games-table',
     ['name', 'english_name', 'platform', 'game_id', 'game_type', 'description',
-     'developer', 'operator', 'release_date', 'config_path', 'adapter_progress',
+     'developer', 'operator', 'release_date', 'config_path',
      'owner', 'online_status', 'quality', 'game_account', 'storage_location', 'game_engine'],
     'gamesColumnOrder'
 );
@@ -133,6 +133,8 @@ let _inlineEditCurrentTd = null;
  * @param {string} inputType - 输入类型 (text/number)
  */
 function startInlineEdit(td, deviceId, field, inputType) {
+    // 只读模式（非管理员）禁止行内编辑
+    if (td.closest('.lib-readonly')) return;
     // 防止重复激活
     if (td.querySelector('input, textarea, select')) return;
 
@@ -400,9 +402,6 @@ function renderGamesPage() {
                     case 'config_path':
                         rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'config_path')" title="双击编辑">${escapeHtml(game.config_path || '-')}</td>`;
                         break;
-                    case 'adapter_progress':
-                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'adapter_progress')" title="双击编辑">${escapeHtml(game.adapter_progress || '0%')}</td>`;
-                        break;
                     case 'owner':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
                         break;
@@ -535,6 +534,7 @@ window._dumpSnaps = function() {
 
 // 双击文本编辑（游戏简介、游戏账号）
 function startGameTextEdit(td, gameId, field) {
+    if (td.closest('.lib-readonly')) return; // 只读模式禁止编辑
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
@@ -639,6 +639,7 @@ function startGameTextEdit(td, gameId, field) {
 
 // 点击下拉编辑（游戏平台、游戏类型、负责人、品质）
 function startGameDropdownEdit(td, gameId, field, optionSource, currentRawValue) {
+    if (td.closest('.lib-readonly')) return; // 只读模式禁止编辑
     if (td.classList.contains('editing')) return;
     td.classList.add('editing');
 
@@ -1000,7 +1001,7 @@ const exportConfigs = {
             { key: 'game_type', label: '游戏类型' }, { key: 'description', label: '游戏简介' },
             { key: 'developer', label: '开发商' }, { key: 'operator', label: '运营商' },
             { key: 'release_date', label: '上线日期' }, { key: 'config_path', label: '配置路径' },
-            { key: 'adapter_progress', label: '适配进度' }, { key: 'owner_name', label: '负责人' },
+            { key: 'owner_name', label: '负责人' },
             { key: 'online_status', label: '适配状态' }, { key: 'quality', label: '品质' },
             { key: 'game_account', label: '游戏账号' }, { key: 'storage_location', label: '存储位置' }
         ]
@@ -1183,7 +1184,6 @@ function handleExcelUpload(event) {
                             operator: row['运营商'] || row['operator'] || '',
                             release_date: row['上线日期'] || row['release_date'] || '',
                             config_path: row['配置路径'] || row['config_path'] || '',
-                            adapter_progress: row['适配进度'] || row['adapter_progress'] || '',
                             online_status: row['适配状态'] || row['hook开发状态'] || row['online_status'] || 'undeveloped',
                             quality: row['品质'] || row['quality'] || 'normal',
                             game_account: row['游戏账号'] || row['game_account'] || '',
@@ -1803,7 +1803,6 @@ function initForms() {
             operator: document.getElementById('game-operator').value,
             release_date: document.getElementById('game-release-date').value,
             config_path: document.getElementById('game-config-path').value,
-            adapter_progress: document.getElementById('game-adapter-progress').value,
             version: document.getElementById('game-version').value,
             package_size: document.getElementById('game-package-size').value,
             adaptation_notes: document.getElementById('game-adaptation-notes').value,
@@ -2005,6 +2004,8 @@ function resetForm(formId) {
  * @param {string} inputType - 输入类型 (text/select/textarea)
  */
 function startMemberInlineEdit(td, memberId, field, inputType) {
+    // 只读模式（非管理员）禁止行内编辑
+    if (td.closest('.lib-readonly')) return;
     // 防止重复激活
     if (td.querySelector('input, textarea, select')) return;
 
@@ -2295,7 +2296,6 @@ async function editGame(id) {
             document.getElementById('game-operator').value = game.operator || '';
             document.getElementById('game-release-date').value = game.release_date || '';
             document.getElementById('game-config-path').value = game.config_path || '';
-            document.getElementById('game-adapter-progress').value = game.adapter_progress || '';
             document.getElementById('game-version').value = game.version || '';
             document.getElementById('game-package-size').value = game.package_size || '';
             document.getElementById('game-adaptation-notes').value = game.adaptation_notes || '';
@@ -3404,7 +3404,7 @@ function applyTableSort(tableId) {
         let valB = b[field];
 
         // 数字类型字段的特殊处理
-        const numFields = ['adapter_progress', 'quantity', 'total_bugs', 'completed_adaptations', 'online_games', 'bugs_count'];
+        const numFields = ['quantity', 'total_bugs', 'completed_adaptations', 'online_games', 'bugs_count'];
         if (numFields.includes(field)) {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;
@@ -3539,8 +3539,7 @@ function initFormValidations() {
             { rule: 'required', message: '请输入游戏名称' },
             { rule: 'minLength', param: 2, message: '游戏名称至少2个字符' }
         ],
-        'game-release-date': [{ rule: 'isDate', message: '日期格式不正确（如 2024-01-15）' }],
-        'game-adapter-progress': [{ rule: 'isNumber', message: '适配进度必须是数字' }]
+        'game-release-date': [{ rule: 'isDate', message: '日期格式不正确（如 2024-01-15）' }]
     });
 
     // 测试表单：测试名称必填

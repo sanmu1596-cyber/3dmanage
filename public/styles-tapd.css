@@ -7529,3 +7529,21 @@ mark.faq-hl { background: #fff2a8; color: inherit; border-radius: 2px; padding: 
     .faq-sidebar { flex: none; width: 100%; position: static; }
     .faq-search-input { width: 200px; }
 }
+
+/* ========== 基础数据三库（游戏库/客户库/项目成员库）只读模式 ========== */
+/* 非超级管理员/管理员进入时，section 加 .lib-readonly，隐藏所有编辑入口 */
+/* 隐藏：创建/导入/批量删除等工具栏编辑动作 */
+.lib-readonly .lib-edit-action { display: none !important; }
+/* 隐藏行内"编辑/删除"操作列按钮 */
+.lib-readonly .action-icons .btn-edit,
+.lib-readonly .action-icons .btn-delete { display: none !important; }
+.lib-readonly .action-icons::after {
+    content: '只读'; color: var(--text-light, #94a3b8); font-size: 12px;
+}
+/* 隐藏批量选择复选框列（表头全选 + 行内复选框） */
+.lib-readonly .batch-th,
+.lib-readonly .batch-td { display: none !important; }
+/* 取消行内可编辑单元格的"双击编辑"视觉提示（仍可查看文本） */
+.lib-readonly .editable-cell { cursor: default; }
+.lib-readonly .editable-cell:hover { background: transparent !important; }
+.lib-readonly .editable-cell::after { display: none !important; }
