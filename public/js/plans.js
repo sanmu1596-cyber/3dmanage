@@ -3050,22 +3050,28 @@ function initColumnResize() {
 
                 const startX = e.pageX;
                 const startColWidth = th.offsetWidth;
-                const startTableWidth = table.offsetWidth;
 
                 handle.classList.add('resizing');
                 document.body.classList.add('col-resizing');
 
+                // ★ 修复串列：以「其他列宽度精确之和」为基准，而非 table.offsetWidth(含边框)。
+                //   否则 offsetWidth 与各列 style.width 之和的差额会被 table-layout:fixed 分摊到其他列。
+                const allThs = table.querySelectorAll('thead th');
+                let baseOtherW = 0;
+                allThs.forEach(other => {
+                    if (other !== th) baseOtherW += (parseInt(other.style.width) || other.offsetWidth);
+                });
+
                 const onMouseMove = (moveEvt) => {
                     const delta = moveEvt.pageX - startX;
                     const newColWidth = Math.max(40, startColWidth + delta);
-                    const widthChange = newColWidth - startColWidth;
 
                     // 只改当前列的宽度
                     th.style.width = newColWidth + 'px';
                     th.style.minWidth = newColWidth + 'px';
 
-                    // 同步调整表格总宽度，使其他列保持不变
-                    table.style.width = (startTableWidth + widthChange) + 'px';
+                    // 总宽 = 其他列之和(固定) + 当前列新宽 —— 其他列绝对不受影响
+                    table.style.width = (baseOtherW + newColWidth) + 'px';
                 };
 
                 const onMouseUp = () => {

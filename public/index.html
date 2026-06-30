@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260630d">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260630e">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
     <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -2565,9 +2565,9 @@
                         .tx-board-table thead .tx-sub-h.s-适配进行中, .tx-board-table thead .tx-sub-h.s-未来排期 { background:#eff6ff; }
                         .tx-board-table thead .tx-sub-h.s-已适配-修复BUG { background:#fffbeb; }
                         .tx-board-table thead .tx-sub-h.s-已适配游戏列表 { background:#f0fdf4; }
-                        /* 列宽拖拽手柄（hover 列头时显示，参考游戏列表；th overflow:hidden 故贴 right:0 内侧） */
-                        .tx-board-table thead .tx-sub-h { overflow:visible; }
-                        .tx-col-resize { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:6; }
+                        /* 列宽拖拽手柄（hover 列头时显示）；th 保持 overflow:hidden 防长列名溢出串列，手柄贴 right:0 内侧 */
+                        .tx-board-table thead .tx-sub-h .tx-colname { display:inline-block; max-width:calc(100% - 6px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
+                        .tx-col-resize { position:absolute; right:0; top:0; bottom:0; width:6px; cursor:col-resize; z-index:6; }
                         .tx-col-resize:hover, body.col-resizing .tx-col-resize { background:rgba(22,119,255,0.45); }
                         body.col-resizing, body.row-resizing { cursor:col-resize; user-select:none; }
                         body.row-resizing { cursor:row-resize; }
@@ -3660,8 +3660,8 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260630d"></script>
-    <script src="js/auth.js?v=20260630d"></script>
+    <script src="js/core.js?v=20260630e"></script>
+    <script src="js/auth.js?v=20260630e"></script>
     <!-- ★ 通用UI组件 -->
     <script src="js/components/searchable-select.js?v=20260624c"></script>
     <script src="js/components/media-viewer.js?v=20260624c"></script>
@@ -3669,20 +3669,20 @@
     <script src="js/components/ui-dialog.js?v=20260624c"></script>
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
-    <script src="js/router.js?v=20260630d"></script>
-    <script src="js/entities.js?v=20260630d"></script>
-    <script src="js/plans.js?v=20260630d"></script>
+    <script src="js/router.js?v=20260630e"></script>
+    <script src="js/entities.js?v=20260630e"></script>
+    <script src="js/plans.js?v=20260630e"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
     <script src="js/ui-features.js?v=20260624c"></script>
     <script src="js/admin.js?v=20260624c"></script>
     <script src="js/requirements.js?v=20260624f"></script>
-    <script src="js/testcases.js?v=20260630d"></script>
+    <script src="js/testcases.js?v=20260630e"></script>
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260624c"></script>
-    <script src="js/reports.js?v=20260630d"></script>
-    <script src="js/tencent-games.js?v=20260630d"></script>
+    <script src="js/reports.js?v=20260630e"></script>
+    <script src="js/tencent-games.js?v=20260630e"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
-    <script src="js/faq.js?v=20260630d"></script>
+    <script src="js/faq.js?v=20260630e"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260624b"></script>
 </body>

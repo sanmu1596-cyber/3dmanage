@@ -487,15 +487,22 @@ function startTxColResize(e, leafIdx) {
     if (!col) return;
     const startX = e.pageX;
     const startW = parseInt(col.style.width) || 150;
-    const startTableW = table.offsetWidth;
     document.body.classList.add('col-resizing');
+
+    // ★ 修复串列：table 总宽必须始终等于「所有 col 宽度精确之和」，
+    //   不能用 table.offsetWidth（含边框）做基准——否则 offsetWidth 与 col 之和的差额
+    //   会被 table-layout:fixed 按比例分摊到其他列，造成"调一列影响其他列"。
+    const baseOtherW = Array.from(cols).reduce((sum, c, i) => {
+        return i === leafIdx ? sum : sum + (parseInt(c.style.width) || 150);
+    }, 0);
 
     const onMove = (ev) => {
         const delta = ev.pageX - startX;
         const w = Math.max(60, startW + delta);
-        const realDelta = w - startW;
         col.style.width = w + 'px';
-        table.style.width = (startTableW + realDelta) + 'px';
+        // 总宽 = 其他列之和(固定不变) + 当前列新宽 —— 其他列绝对不受影响
+        table.style.width = (baseOtherW + w) + 'px';
+        table.style.minWidth = (baseOtherW + w) + 'px';
     };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
