@@ -483,28 +483,28 @@ function renderDevicesTable(data) {
 
                 switch (field) {
                     case 'manufacturer':
-                        rowHtml += `<td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
+                        rowHtml += `<td class="text-center">${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
                         break;
                     case 'device_type':
-                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'device_type', 'select')" title="单击选择">${highlightSearch(device.device_type || '-', 'devices-table')}</td>`;
+                        rowHtml += `<td class="editable-cell text-center" onclick="startInlineEdit(this, ${device.id}, 'device_type', 'select')" title="单击选择">${highlightSearch(device.device_type || '-', 'devices-table')}</td>`;
                         break;
                     case 'name':
-                        rowHtml += `<td>${highlightSearch(device.name, 'devices-table')}</td>`;
+                        rowHtml += `<td class="text-center">${highlightSearch(device.name, 'devices-table')}</td>`;
                         break;
                     case 'requirements':
                         rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'requirements', 'text')" title="双击编辑">${escapeHtml(device.requirements || '-')}</td>`;
                         break;
                     case 'quantity':
-                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>`;
+                        rowHtml += `<td class="editable-cell text-center" ondblclick="startInlineEdit(this, ${device.id}, 'quantity', 'number')" title="双击编辑">${escapeHtml(String(device.quantity || 1))}</td>`;
                         break;
                     case 'keeper':
-                        rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell text-center" ondblclick="startInlineEdit(this, ${device.id}, 'keeper', 'select')" title="双击选择">${escapeHtml(device.keeper || '-')}</td>`;
                         break;
                     case 'notes':
                         rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>`;
                         break;
                     case 'completed_adaptations':
-                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(String(device.completed_adaptations || 0))}</td>`;
+                        rowHtml += `<td class="editable-cell text-center" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(String(device.completed_adaptations || 0))}</td>`;
                         break;
                 }
             });
