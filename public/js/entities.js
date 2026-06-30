@@ -88,8 +88,7 @@ registerColumnConfig('members-table',
 // 设备模块列顺序
 registerColumnConfig('devices-table',
     ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
-     'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
-     'completed_adaptations', 'online_games'],
+     'keeper', 'notes', 'online_games'],
     'devicesColumnOrder'
 );
 
@@ -151,8 +150,38 @@ function startInlineEdit(td, deviceId, field, inputType) {
     // 改用 position:relative + 占位符 + absolute 浮层
     td.style.position = 'relative';
 
+    // 设备类型：固定下拉选项
+    if (field === 'device_type') {
+        const DEVICE_TYPE_OPTIONS = ['显示器', '显示器(带交织)', '笔电', '掌机', '其他'];
+        const select = document.createElement('select');
+        select.className = 'inline-edit-select';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '-- 选择设备类型 --';
+        select.appendChild(emptyOpt);
+        DEVICE_TYPE_OPTIONS.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            if (t === displayValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+        td.innerHTML = '';
+        td.appendChild(select);
+        select.focus();
+        try { select.showPicker(); } catch(e) { select.click(); }
+        select.addEventListener('change', () => saveInlineEdit(td, deviceId, field, select.value));
+        select.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (td.querySelector('select')) cancelInlineEdit(td, currentValue);
+            }, 150);
+        });
+        select.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') cancelInlineEdit(td, currentValue);
+        });
+    }
     // 保管者：下拉选择（从成员列表获取）
-    if (field === 'keeper') {
+    else if (field === 'keeper') {
         const select = document.createElement('select');
         select.className = 'inline-edit-select';
         // 空选项
@@ -1022,8 +1051,7 @@ const exportConfigs = {
             { key: 'manufacturer', label: '客户名称' }, { key: 'device_type', label: '设备类型' },
             { key: 'name', label: '设备名称' }, { key: 'requirements', label: '设备需求' },
             { key: 'quantity', label: '数量' }, { key: 'keeper', label: '保管者' },
-            { key: 'notes', label: '备注' }, { key: 'adapter_completion_rate', label: '适配完成率' },
-            { key: 'total_bugs', label: '总BUG数' }, { key: 'completed_adaptations', label: '适配完成数' },
+            { key: 'notes', label: '备注' },
             { key: 'total_games', label: '适配游戏数' }, { key: 'status', label: '状态' }
         ]
     },
@@ -1754,9 +1782,6 @@ function initForms() {
             quantity: document.getElementById('device-quantity').value,
             keeper: document.getElementById('device-keeper').value,
             notes: document.getElementById('device-notes').value,
-            adapter_completion_rate: document.getElementById('device-adapter-rate').value,
-            total_bugs: document.getElementById('device-total-bugs').value,
-            completed_adaptations: document.getElementById('device-completed-adaptations').value,
             total_games: document.getElementById('device-total-games').value,
             status: document.getElementById('device-status').value,
             assigned_to: document.getElementById('device-assigned').value || null
@@ -2231,6 +2256,30 @@ async function deleteMember(id) {
 }
 
 // 编辑设备
+// 用「项目成员库」成员填充设备保管者下拉
+function populateDeviceKeeperSelect(selectedName) {
+    const sel = document.getElementById('device-keeper');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- 选择保管者 --</option>';
+    (window.allMembersData || []).forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        if (m.name === selectedName) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+// 打开「添加设备」弹窗（重置表单 + 填充保管者下拉）
+function openDeviceModal() {
+    const form = document.getElementById('device-form');
+    if (form) form.reset();
+    const idEl = document.getElementById('device-id');
+    if (idEl) idEl.value = '';
+    populateDeviceKeeperSelect('');
+    openModal('device-modal');
+}
+
 async function editDevice(id) {
     try {
         const response = await authFetch(`${API_BASE}/devices`);
@@ -2244,11 +2293,9 @@ async function editDevice(id) {
             document.getElementById('device-name').value = device.name;
             document.getElementById('device-requirements').value = device.requirements || '';
             document.getElementById('device-quantity').value = device.quantity || 1;
+            populateDeviceKeeperSelect(device.keeper || '');
             document.getElementById('device-keeper').value = device.keeper || '';
             document.getElementById('device-notes').value = device.notes || '';
-            document.getElementById('device-adapter-rate').value = device.adapter_completion_rate || '';
-            document.getElementById('device-total-bugs').value = device.total_bugs || 0;
-            document.getElementById('device-completed-adaptations').value = device.completed_adaptations || 0;
             document.getElementById('device-total-games').value = device.total_games || 0;
             document.getElementById('device-status').value = device.status;
             document.getElementById('device-assigned').value = device.assigned_to || '';
@@ -3404,7 +3451,7 @@ function applyTableSort(tableId) {
         let valB = b[field];
 
         // 数字类型字段的特殊处理
-        const numFields = ['quantity', 'total_bugs', 'completed_adaptations', 'online_games', 'bugs_count'];
+        const numFields = ['quantity', 'online_games', 'bugs_count'];
         if (numFields.includes(field)) {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;

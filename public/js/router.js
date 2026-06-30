@@ -455,8 +455,7 @@ function renderDevicesTable(data) {
 
     // 设备表默认列顺序（与表头th的data-field一一对应）
     const defaultDeviceColOrder = ['manufacturer', 'device_type', 'name', 'requirements',
-        'quantity', 'keeper', 'notes', 'adapter_completion_rate', 'total_bugs',
-        'completed_adaptations', 'online_games'];
+        'quantity', 'keeper', 'notes', 'online_games'];
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function'
@@ -487,7 +486,7 @@ function renderDevicesTable(data) {
                         rowHtml += `<td>${highlightSearch(device.manufacturer || '-', 'devices-table')}</td>`;
                         break;
                     case 'device_type':
-                        rowHtml += `<td>${highlightSearch(device.device_type || '-', 'devices-table')}</td>`;
+                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'device_type', 'select')" title="单击选择">${highlightSearch(device.device_type || '-', 'devices-table')}</td>`;
                         break;
                     case 'name':
                         rowHtml += `<td>${highlightSearch(device.name, 'devices-table')}</td>`;
@@ -503,15 +502,6 @@ function renderDevicesTable(data) {
                         break;
                     case 'notes':
                         rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>`;
-                        break;
-                    case 'adapter_completion_rate':
-                        rowHtml += `<td>${escapeHtml(device.adapter_completion_rate || '0%')}</td>`;
-                        break;
-                    case 'total_bugs':
-                        rowHtml += `<td>${escapeHtml(device.total_bugs || 0)}</td>`;
-                        break;
-                    case 'completed_adaptations':
-                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(device.completed_adaptations || 0)}</td>`;
                         break;
                     case 'online_games':
                         rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
@@ -546,7 +536,7 @@ function renderDevicesTable(data) {
                     <div class="empty-text">还没有客户</div>
                     <div class="empty-sub">添加客户以便管理适配测试和分配任务</div>
                     <div class="empty-action">
-                        <button class="btn btn-primary" onclick="openModal('device-modal')">➕ 添加第一个设备</button>
+                        <button class="btn btn-primary" onclick="openDeviceModal()">➕ 添加第一个设备</button>
                     </div>
                 </td>
             </tr>

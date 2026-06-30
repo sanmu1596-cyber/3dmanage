@@ -1084,7 +1084,8 @@ body {
 /* TAPD 风格表头 - 不透明背景（粘性定位需要不透明，否则下方行内容会透出） */
 .data-table th {
     padding: 12px 14px;
-    text-align: left;
+    text-align: center;
+    vertical-align: middle;
     font-family: var(--font-title);
     font-weight: 600;
     color: var(--text-secondary);

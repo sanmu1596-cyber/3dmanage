@@ -201,9 +201,6 @@ var deviceVisibleColumns = {
     quantity: true,
     keeper: true,
     notes: true,
-    adapter_completion_rate: true,
-    total_bugs: true,
-    completed_adaptations: true,
     online_games: true
 };
 
