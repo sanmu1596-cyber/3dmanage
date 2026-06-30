@@ -87,8 +87,8 @@ function renderVersionsTable(status, data) {
                 <td>${escapeHtml(v.version_date || '-')}</td>
                 <td>${escapeHtml(v.updater_name || '-')}</td>
                 <td>${escapeHtml(v.file_size || '-')}</td>
-                <td class="editable-cell" ondblclick="startVersionInlineEdit(this, ${v.id}, 'changelog')" title="双击编辑">${escapeHtml(v.changelog || '-')}</td>
-                <td class="editable-cell" ondblclick="startVersionInlineEdit(this, ${v.id}, 'notes')" title="双击编辑">${escapeHtml(v.notes || '-')}</td>
+                <td class="editable-cell text-left" ondblclick="startVersionInlineEdit(this, ${v.id}, 'changelog')" title="双击编辑">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell text-left" ondblclick="startVersionInlineEdit(this, ${v.id}, 'notes')" title="双击编辑">${escapeHtml(v.notes || '-')}</td>
                 <td class="text-center action-icons">${actions}</td>
             </tr>`;
         }).join('');
@@ -1144,8 +1144,8 @@ function renderGameVersionsTable(status, data) {
                 <td><strong>${escapeHtml(v.version_number)}</strong></td>
                 <td>${escapeHtml(v.version_date || '-')}</td>
                 <td>${escapeHtml(v.updater_name || '-')}</td>
-                <td class="editable-cell" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
-                <td class="editable-cell" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
+                <td class="editable-cell text-left" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell text-left" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
                 <td class="text-center action-icons">${actions}</td>
             </tr>`;
         }).join('');
@@ -1549,8 +1549,8 @@ function renderInterlaceVersionsTable(status, data) {
                 <td><strong>${escapeHtml(v.version_number)}</strong></td>
                 <td>${escapeHtml(v.version_date || '-')}</td>
                 <td>${escapeHtml(v.updater_name || '-')}</td>
-                <td class="editable-cell" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
-                <td class="editable-cell" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
+                <td class="editable-cell text-left" title="${escapeHtml(v.changelog || '-')}">${escapeHtml(v.changelog || '-')}</td>
+                <td class="editable-cell text-left" title="${escapeHtml(v.notes || '-')}">${escapeHtml(v.notes || '-')}</td>
                 <td class="text-center action-icons">${actions}</td>
             </tr>`;
         }).join('');

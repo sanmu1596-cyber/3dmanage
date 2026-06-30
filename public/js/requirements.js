@@ -157,7 +157,7 @@ function renderReqTable(filtered) {
         return `<tr>
             <td class="text-center"><strong>${i + 1}</strong></td>
             <td><span style="color:var(--text-muted);font-size:12px;">${escapeHtml(r.req_no || '')}</span></td>
-            <td><a href="javascript:void(0)" onclick="openReqDetail(${r.id})" style="color:var(--primary);font-weight:500;">${escapeHtml(r.title)}</a></td>
+            <td class="text-left"><a href="javascript:void(0)" onclick="openReqDetail(${r.id})" style="color:var(--primary);font-weight:500;">${escapeHtml(r.title)}</a></td>
             <td>${priorityBadge}</td>
             <td>${escapeHtml(r.assigned_name || '-')}</td>
             <td>${statusLabel}</td>
@@ -836,7 +836,7 @@ function renderMyTasksTable() {
         return `
         <tr>
             <td class="text-center"><strong>${index + 1}</strong></td>
-            <td>
+            <td class="text-left">
                 ${escapeHtml(task.game_name || '')}
                 <div style="margin-top:4px;">${tcBadge}</div>
             </td>

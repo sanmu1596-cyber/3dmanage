@@ -1278,6 +1278,7 @@ body.col-resizing * {
     color: var(--text-primary);
     font-weight: 400;
     vertical-align: middle;
+    text-align: center; /* 全系统默认：单元格值水平居中（长文本列用 .text-left 例外） */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1321,6 +1322,18 @@ body.col-resizing * {
 
 .text-center {
     text-align: center !important;
+}
+
+/* 长字段列左对齐：显式 .text-left 类 + 现有长文本专属 class 自动左对齐 */
+.text-left,
+.data-table td.text-left,
+.data-table td.cell-game-name,
+.data-table td.cell-wrap,
+.data-table td.cell-description,
+.data-table td.desc-cell,
+.data-table td.remarks-cell,
+.data-table td.allow-wrap {
+    text-align: left !important;
 }
 
 /* TAPD 风格隔行 - 白色 / 极淡灰 */

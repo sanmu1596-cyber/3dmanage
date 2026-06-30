@@ -429,7 +429,7 @@ function renderGamesPage() {
                         rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'release_date')" title="双击编辑">${escapeHtml(game.release_date || '-')}</td>`;
                         break;
                     case 'config_path':
-                        rowHtml += `<td class="editable-cell" ondblclick="startGameTextEdit(this, ${game.id}, 'config_path')" title="双击编辑">${escapeHtml(game.config_path || '-')}</td>`;
+                        rowHtml += `<td class="editable-cell text-left" ondblclick="startGameTextEdit(this, ${game.id}, 'config_path')" title="双击编辑">${escapeHtml(game.config_path || '-')}</td>`;
                         break;
                     case 'owner':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'owner_id', 'members', '${escapeHtml(game.owner_id || '')}')" title="点击选择">${escapeHtml(game.owner_name || '-')}</td>`;
@@ -443,7 +443,7 @@ function renderGamesPage() {
                     case 'game_account':
                         const acctText = game.game_account || '-';
                         const acctHtml = acctText.split('\n').map(a => escapeHtml(a.trim())).filter(Boolean).join('<br>');
-                        rowHtml += `<td class="editable-cell" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
+                        rowHtml += `<td class="editable-cell text-left" style="white-space:nowrap;font-size:12px;" ondblclick="startGameTextEdit(this, ${game.id}, 'game_account')" title="双击编辑">${acctHtml}</td>`;
                         break;
                     case 'storage_location':
                         rowHtml += `<td class="editable-cell" onclick="startGameDropdownEdit(this, ${game.id}, 'storage_location', 'storage_location')" title="点击选择">${escapeHtml(game.storage_location || '硬盘1号')}</td>`;
@@ -1277,13 +1277,13 @@ function renderTestsTable(data) {
                 if (typeof testVisibleColumns !== 'undefined' && !testVisibleColumns[field]) return;
                 switch (field) {
                     case 'name':
-                        rowHtml += `<td>${highlightSearch(test.name, 'tests-table')}</td>`;
+                        rowHtml += `<td class="text-left">${highlightSearch(test.name, 'tests-table')}</td>`;
                         break;
                     case 'game_name':
-                        rowHtml += `<td>${highlightSearch(test.game_name || '-', 'tests-table')}</td>`;
+                        rowHtml += `<td class="text-left">${highlightSearch(test.game_name || '-', 'tests-table')}</td>`;
                         break;
                     case 'device_name':
-                        rowHtml += `<td>${highlightSearch(test.device_name || '-', 'tests-table')}</td>`;
+                        rowHtml += `<td class="text-left">${highlightSearch(test.device_name || '-', 'tests-table')}</td>`;
                         break;
                     case 'tester_name':
                         rowHtml += `<td>${highlightSearch(test.tester_name || '-', 'tests-table')}</td>`;
@@ -1410,7 +1410,7 @@ function renderBugsTable(data) {
                         rowHtml += `<td>${highlightSearch(bug.problem_type || '-', 'bugs-table')}</td>`;
                         break;
                     case 'description':
-                        rowHtml += `<td>${highlightSearch(bug.description || '-', 'bugs-table')}</td>`;
+                        rowHtml += `<td class="text-left">${highlightSearch(bug.description || '-', 'bugs-table')}</td>`;
                         break;
                 }
             });

@@ -147,12 +147,12 @@ function renderTestCases() {
             <td><input type="checkbox" class="tc-checkbox" data-id="${tc.id}" ${selectedTestCaseIds.has(tc.id) ? 'checked' : ''} onchange="toggleTestCaseSelect(${tc.id})"></td>
             <td>${i + 1}</td>
             <td><span class="tc-code">${escapeHtml(tc.code || '-')}</span></td>
-            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'name')" title="双击编辑"><strong>${escapeHtml(tc.name)}</strong></td>
+            <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'name')" title="双击编辑"><strong>${escapeHtml(tc.name)}</strong></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'category')" title="双击选择"><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'priority')" title="双击选择"><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
-            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'precondition')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
-            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'steps')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
-            <td class="editable-cell" ondblclick="startTcTextEdit(this, ${tc.id}, 'expected_result')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
+            <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'precondition')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
+            <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'steps')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
+            <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'expected_result')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'is_template')" title="双击选择"><span class="tc-type-tag ${tc.is_template ? 'template' : 'normal'}">${tc.is_template ? '模板' : '普通'}</span></td>
             <td class="text-center action-icons">
                 <button class="action-icon-btn edit" onclick="editTestCase(${tc.id})" title="编辑">✏️</button>
@@ -1158,13 +1158,13 @@ function renderExecTestCaseTable() {
             <tr>
                 <td class="text-center">${i + 1}</td>
                 <td>${escapeHtml(tc.code || '-')}</td>
-                <td>
+                <td class="text-left">
                     <strong>${escapeHtml(tc.name)}</strong>
                     ${tc.precondition ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">前置: ${escapeHtml(tc.precondition)}</div>` : ''}
                 </td>
                 <td><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
-                <td><span class="tc-cell-text">${escapeHtml(tc.steps || '-')}</span></td>
-                <td><span class="tc-cell-text">${escapeHtml(tc.expected_result || '-')}</span></td>
+                <td class="text-left"><span class="tc-cell-text">${escapeHtml(tc.steps || '-')}</span></td>
+                <td class="text-left"><span class="tc-cell-text">${escapeHtml(tc.expected_result || '-')}</span></td>
                 <td>
                     <select class="exec-status-select ${statusClass}" data-ptc-id="${tc.id}" onchange="onExecStatusChange(${tc.id}, this)">
                         <option value="pending" ${currentStatus === 'pending' ? 'selected' : ''}>⏳ 待执行</option>
