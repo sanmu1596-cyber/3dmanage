@@ -455,7 +455,7 @@ function renderDevicesTable(data) {
 
     // 设备表默认列顺序（与表头th的data-field一一对应）
     const defaultDeviceColOrder = ['manufacturer', 'device_type', 'name', 'requirements',
-        'quantity', 'keeper', 'notes', 'online_games'];
+        'quantity', 'keeper', 'notes', 'completed_adaptations'];
 
     if (data && data.length > 0) {
         const colOrder = typeof getColumnOrder === 'function'
@@ -503,8 +503,8 @@ function renderDevicesTable(data) {
                     case 'notes':
                         rowHtml += `<td class="editable-cell" ondblclick="startInlineEdit(this, ${device.id}, 'notes', 'text')" title="双击编辑">${escapeHtml(device.notes || '-')}</td>`;
                         break;
-                    case 'online_games':
-                        rowHtml += `<td>${getDeviceOnlineGameCount(device.name)}</td>`;
+                    case 'completed_adaptations':
+                        rowHtml += `<td class="editable-cell" onclick="startInlineEdit(this, ${device.id}, 'completed_adaptations', 'number')" title="单击编辑">${escapeHtml(String(device.completed_adaptations || 0))}</td>`;
                         break;
                 }
             });

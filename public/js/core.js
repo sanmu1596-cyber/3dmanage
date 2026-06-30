@@ -201,7 +201,7 @@ var deviceVisibleColumns = {
     quantity: true,
     keeper: true,
     notes: true,
-    online_games: true
+    completed_adaptations: true
 };
 
 // 成员列表显示列配置（var 声明确保挂载到 window）

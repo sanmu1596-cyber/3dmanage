@@ -88,7 +88,7 @@ registerColumnConfig('members-table',
 // 设备模块列顺序
 registerColumnConfig('devices-table',
     ['manufacturer', 'device_type', 'name', 'requirements', 'quantity',
-     'keeper', 'notes', 'online_games'],
+     'keeper', 'notes', 'completed_adaptations'],
     'devicesColumnOrder'
 );
 
@@ -1052,7 +1052,7 @@ const exportConfigs = {
             { key: 'name', label: '设备名称' }, { key: 'requirements', label: '设备需求' },
             { key: 'quantity', label: '数量' }, { key: 'keeper', label: '保管者' },
             { key: 'notes', label: '备注' },
-            { key: 'total_games', label: '适配游戏数' }, { key: 'status', label: '状态' }
+            { key: 'completed_adaptations', label: '适配完成数' }, { key: 'status', label: '状态' }
         ]
     },
     tests: {
@@ -1782,7 +1782,6 @@ function initForms() {
             quantity: document.getElementById('device-quantity').value,
             keeper: document.getElementById('device-keeper').value,
             notes: document.getElementById('device-notes').value,
-            total_games: document.getElementById('device-total-games').value,
             status: document.getElementById('device-status').value,
             assigned_to: document.getElementById('device-assigned').value || null
         };
@@ -2296,7 +2295,6 @@ async function editDevice(id) {
             populateDeviceKeeperSelect(device.keeper || '');
             document.getElementById('device-keeper').value = device.keeper || '';
             document.getElementById('device-notes').value = device.notes || '';
-            document.getElementById('device-total-games').value = device.total_games || 0;
             document.getElementById('device-status').value = device.status;
             document.getElementById('device-assigned').value = device.assigned_to || '';
             openModal('device-modal');
@@ -3451,7 +3449,7 @@ function applyTableSort(tableId) {
         let valB = b[field];
 
         // 数字类型字段的特殊处理
-        const numFields = ['quantity', 'online_games', 'bugs_count'];
+        const numFields = ['quantity', 'completed_adaptations', 'online_games', 'bugs_count'];
         if (numFields.includes(field)) {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;

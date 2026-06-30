@@ -6,7 +6,7 @@
     <title>裸眼3D游戏适配项目管理</title>
     <!-- 原版样式（蓝灰切角风格）: styles.css -->
     <!-- TAPD 风格（纯白圆角扁平）: styles-tapd.css -->
-    <link rel="stylesheet" href="styles-tapd.css?v=20260630a">
+    <link rel="stylesheet" href="styles-tapd.css?v=20260630b">
     <!-- ★ GUI 设计规范（最后加载，全局统一） -->
     <link rel="stylesheet" href="design-system.css?v=20260624c">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -687,7 +687,7 @@
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="quantity" checked><span>数量</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="keeper" checked><span>保管者</span></label></div>
                             <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label></div>
-                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="online_games" checked><span>适配游戏数</span></label></div>
+                            <div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" value="completed_adaptations" checked><span>适配完成数</span></label></div>
                         </div>
                     </div>
                     <div class="table-container">
@@ -703,7 +703,7 @@
                                     <th data-field="quantity">数量</th>
                                     <th data-field="keeper">保管者</th>
                                     <th data-field="notes">备注</th>
-                                    <th data-field="online_games">适配游戏数</th>
+                                    <th data-field="completed_adaptations">适配完成数</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -3435,7 +3435,6 @@
                     <div class="form-group"><label>设备名称 *</label><input type="text" id="device-name" required></div>
                     <div class="form-group"><label>设备数量</label><input type="number" id="device-quantity" value="1"></div>
                     <div class="form-group"><label>设备保管者</label><select id="device-keeper"><option value="">-- 选择保管者 --</option></select></div>
-                    <div class="form-group"><label>适配游戏数</label><input type="number" id="device-total-games" value="0"></div>
                     <div class="form-group"><label>状态</label><select id="device-status"><option value="available">可用</option><option value="assigned">已分配</option><option value="maintenance">维护中</option><option value="broken">损坏</option></select></div>
                     <div class="form-group"><label>分配给</label><select id="device-assigned"><option value="">未分配</option></select></div>
                     <div class="form-group full-width"><label>设备需求</label><textarea id="device-requirements" rows="2"></textarea></div>
@@ -3661,8 +3660,8 @@
 
     <script src="gameAccountsData.js"></script>
     <!-- 模块化JS（按依赖顺序加载） -->
-    <script src="js/core.js?v=20260630a"></script>
-    <script src="js/auth.js?v=20260630a"></script>
+    <script src="js/core.js?v=20260630b"></script>
+    <script src="js/auth.js?v=20260630b"></script>
     <!-- ★ 通用UI组件 -->
     <script src="js/components/searchable-select.js?v=20260624c"></script>
     <script src="js/components/media-viewer.js?v=20260624c"></script>
@@ -3670,20 +3669,20 @@
     <script src="js/components/ui-dialog.js?v=20260624c"></script>
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
-    <script src="js/router.js?v=20260630a"></script>
-    <script src="js/entities.js?v=20260630a"></script>
-    <script src="js/plans.js?v=20260630a"></script>
+    <script src="js/router.js?v=20260630b"></script>
+    <script src="js/entities.js?v=20260630b"></script>
+    <script src="js/plans.js?v=20260630b"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
     <script src="js/ui-features.js?v=20260624c"></script>
     <script src="js/admin.js?v=20260624c"></script>
     <script src="js/requirements.js?v=20260624f"></script>
-    <script src="js/testcases.js?v=20260630a"></script>
+    <script src="js/testcases.js?v=20260630b"></script>
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260624c"></script>
-    <script src="js/reports.js?v=20260630a"></script>
-    <script src="js/tencent-games.js?v=20260630a"></script>
+    <script src="js/reports.js?v=20260630b"></script>
+    <script src="js/tencent-games.js?v=20260630b"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
-    <script src="js/faq.js?v=20260630a"></script>
+    <script src="js/faq.js?v=20260630b"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
     <script src="modules-extra.js?v=20260624b"></script>
 </body>
