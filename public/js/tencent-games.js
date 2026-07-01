@@ -56,7 +56,7 @@ function _normalizeBoardKey(v) {
 // ===== 报表标签栏：从注册表拉取并动态渲染 =====
 async function loadReportBoards(activeKey) {
     try {
-        const r = await fetch(txUrl('/boards'));
+        const r = await authFetch(txUrl('/boards'));
         const d = await r.json();
         _reportBoards = Array.isArray(d.boards) ? d.boards : [];
     } catch (e) {
@@ -173,7 +173,7 @@ async function submitBoardEdit() {
     if (!name) { if (typeof showToast === 'function') showToast('请输入标签名称', 'warning'); return; }
     try {
         if (_boardEditMode === 'add') {
-            const r = await fetch(txUrl('/boards'), {
+            const r = await authFetch(txUrl('/boards'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: name, icon: icon })
             });
@@ -184,7 +184,7 @@ async function submitBoardEdit() {
             await loadReportBoards(d.key);
             switchReportSubTab(d.key);   // 直接切到新看板（空白，用＋新增分组建内容）
         } else {
-            const r = await fetch(txUrl('/boards/' + encodeURIComponent(_boardEditKey)), {
+            const r = await authFetch(txUrl('/boards/' + encodeURIComponent(_boardEditKey)), {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: name, icon: icon })
             });
@@ -211,7 +211,7 @@ async function deleteReportBoard(key) {
         : window.confirm('删除标签「' + board.title + '」将同时删除它下面的全部分组和数据，且不可恢复。确定删除吗？');
     if (!ok) return;
     try {
-        const r = await fetch(txUrl('/boards/' + encodeURIComponent(key)), { method: 'DELETE' });
+        const r = await authFetch(txUrl('/boards/' + encodeURIComponent(key)), { method: 'DELETE' });
         const d = await r.json();
         if (!r.ok || !d.success) throw new Error(d.error || '删除失败');
         if (typeof showToast === 'function') showToast('已删除标签「' + board.title + '」', 'success');
@@ -279,7 +279,7 @@ async function reorderBoards(dragKey, targetKey) {
     _reportBoards = movable.map(function (k) { return map[k]; }).concat(locked);
     renderReportTabs(_txBoardId);
     try {
-        await fetch(txUrl('/boards/reorder'), {
+        await authFetch(txUrl('/boards/reorder'), {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ keys: movable })
         });
