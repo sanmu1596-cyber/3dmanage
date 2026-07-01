@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RichEditor 通用富文本组件 · 演示</title>
+  <link rel="stylesheet" href="styles-tapd.css?v=20260701a">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@wangeditor/editor@5.1.23/dist/css/style.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@wangeditor/editor@5.1.23/dist/index.js"></script>
+  <script src="js/components/rich-editor.js?v=20260701a"></script>
+  <style>
+    body { font-family: -apple-system, "Microsoft YaHei", sans-serif; margin: 0; background: #f5f6f8; }
+    .page { max-width: 900px; margin: 24px auto; padding: 0 20px; }
+    h1 { font-size: 20px; }
+    .card { background: #fff; border: 1px solid #e4e7ed; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .label { font-weight: 600; margin-bottom: 10px; font-size: 14px; color: #333; }
+    .btns { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+    button { padding: 6px 16px; border: 1px solid #409eff; background: #409eff; color: #fff; border-radius: 4px; cursor: pointer; }
+    button.ghost { background: #fff; color: #409eff; }
+    pre { background: #2d2d2d; color: #e6e6e6; padding: 14px; border-radius: 6px; overflow: auto; max-height: 240px; font-size: 12px; }
+    .status { font-size: 12px; color: #888; margin-top: 8px; }
+    .ok { color: #67c23a; } .err { color: #f56c6c; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>RichEditor 通用富文本组件 · 验证</h1>
+    <div class="status" id="cdn-status">检测 CDN 加载状态…</div>
+
+    <div class="card">
+      <div class="label">① 全功能模式（default）— 文字格式化 / 图片粘贴上传 / 插入表格</div>
+      <div id="editor-full"></div>
+      <div class="btns">
+        <button onclick="dumpHtml()">获取 HTML</button>
+        <button class="ghost" onclick="setSample()">写入示例内容</button>
+        <button class="ghost" onclick="clearIt()">清空</button>
+      </div>
+      <div class="status">试试：粘贴一张截图 / 工具栏点「表格」图标插入表格 / 选中文字改颜色字号</div>
+    </div>
+
+    <div class="card">
+      <div class="label">② 精简模式（simple）</div>
+      <div id="editor-simple"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">输出 HTML（保存到数据库的内容）</div>
+      <pre id="output">（点上方"获取 HTML"）</pre>
+    </div>
+  </div>
+
+  <script>
+    var edFull, edSimple;
+    function boot() {
+      if (!RichEditor.isReady()) {
+        document.getElementById('cdn-status').innerHTML = '<span class="err">✗ wangEditor CDN 未加载，请检查网络</span>';
+        return;
+      }
+      document.getElementById('cdn-status').innerHTML = '<span class="ok">✓ wangEditor CDN 已就绪</span>';
+      edFull = RichEditor.create({
+        containerId: 'editor-full',
+        height: 300,
+        placeholder: '在此输入…支持加粗、颜色、列表、表格、图片粘贴',
+        onChange: function (html) { /* 实时可同步到隐藏域 */ }
+      });
+      edSimple = RichEditor.create({
+        containerId: 'editor-simple',
+        mode: 'simple',
+        height: 160,
+        value: '<p>精简模式：只保留常用格式化功能。</p>'
+      });
+    }
+    function dumpHtml() {
+      document.getElementById('output').textContent = edFull ? edFull.getHtml() : '(未初始化)';
+    }
+    function setSample() {
+      edFull && edFull.setHtml('<h2>裸眼3D适配方案</h2><p>这是<strong>加粗</strong>与<span style="color:#e60000;">红色文字</span>示例。</p><table><tbody><tr><th>设备</th><th>状态</th></tr><tr><td>显示器A</td><td>已适配</td></tr></tbody></table>');
+    }
+    function clearIt() { edFull && edFull.setHtml('<p><br></p>'); }
+    if (document.readyState !== 'loading') boot();
+    else document.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>

@@ -7561,3 +7561,48 @@ mark.faq-hl { background: #fff2a8; color: inherit; border-radius: 2px; padding: 
 .lib-readonly .editable-cell { cursor: default; }
 .lib-readonly .editable-cell:hover { background: transparent !important; }
 .lib-readonly .editable-cell::after { display: none !important; }
+
+/* ==================== RichEditor 通用富文本编辑器（wangEditor v5） ==================== */
+.rich-editor-wrap {
+  border: 1px solid var(--border-color, #dcdfe6);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 100; /* 确保下拉/弹层浮于内容之上 */
+  background: var(--card-bg, #fff);
+}
+.rich-editor-toolbar {
+  border-bottom: 1px solid var(--border-color, #dcdfe6);
+  background: var(--bg-secondary, #fafafa);
+}
+.rich-editor-body {
+  min-height: 180px;
+  overflow-y: auto;
+}
+/* wangEditor 内部默认字号/行高，贴合系统正文 */
+.rich-editor-body .w-e-text-container [data-slate-editor] {
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 8px 12px;
+}
+/* wangEditor 表格边框（默认较淡，加清晰边线） */
+.rich-editor-body table td,
+.rich-editor-body table th,
+.rte-readonly table td,
+.rte-readonly table th {
+  border: 1px solid var(--border-color, #dcdfe6);
+  padding: 4px 8px;
+}
+/* 只读展示区（renderReadonly 输出容器可挂此类） */
+.rte-readonly { font-size: 14px; line-height: 1.7; word-break: break-word; }
+.rte-readonly img { max-width: 100%; height: auto; border-radius: 4px; }
+.rte-readonly table { border-collapse: collapse; }
+
+/* ---- 深色模式适配 ---- */
+body.dark-mode .rich-editor-wrap { border-color: #3a3f4b; background: #232733; }
+body.dark-mode .rich-editor-toolbar { background: #1d2029; border-bottom-color: #3a3f4b; }
+body.dark-mode .rich-editor-body .w-e-text-container { background: #232733 !important; color: #e6e8eb !important; }
+body.dark-mode .rich-editor-body .w-e-text-container [data-slate-editor] { color: #e6e8eb; }
+body.dark-mode .rich-editor-toolbar .w-e-bar { background: #1d2029 !important; }
+body.dark-mode .rich-editor-toolbar .w-e-bar-item button { color: #c4c8cf !important; }
+body.dark-mode .rich-editor-toolbar .w-e-bar-item button:hover { background: #2c313c !important; }
+body.dark-mode .rte-readonly { color: #e6e8eb; }

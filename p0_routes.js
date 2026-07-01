@@ -274,6 +274,20 @@ function mountP0Routes(app) {
       });
   });
 
+  // ========== 富文本编辑器专用图片上传（直接返回 url，不写附件表） ==========
+  // 富文本里的图片是正文内容的一部分（存进 HTML 字符串），无需在 attachments 表登记
+  app.post('/api/upload/image', auth.verifyToken, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: '请选择图片' });
+    const imgExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (!imgExt.includes(ext)) {
+      // 非图片：删掉刚落盘的文件并拒绝
+      fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+      return res.status(400).json({ error: '仅支持图片文件（jpg/png/gif/webp/svg）' });
+    }
+    res.json({ success: true, url: `/uploads/${req.file.filename}`, alt: req.file.originalname });
+  });
+
   app.get('/api/attachments/list/:entityType/:entityId', auth.verifyToken, (req, res) => {
     db.all('SELECT * FROM attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC',
       [req.params.entityType, req.params.entityId], (err, rows) => {
