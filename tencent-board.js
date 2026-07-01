@@ -271,19 +271,42 @@ router.get('/boards', (req, res) => {
 });
 
 // ---- 新增看板（生成唯一 board_key，返回 key） ----
+//   kind: 'richtext'(默认,新建标签=一块富文本) | 'board'(表格分组看板) | 'dashboard'(锁定)
 router.post('/boards', (req, res) => {
   const title = (req.body && req.body.title || '').trim();
   const icon = (req.body && req.body.icon || '📋').trim() || '📋';
+  let kind = (req.body && req.body.kind || 'richtext').trim();
+  if (kind !== 'board' && kind !== 'richtext') kind = 'richtext'; // dashboard 只能内置
   if (!title) return res.status(400).json({ error: '看板名称不能为空' });
   const key = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   db.get('SELECT MAX(sort_order) AS mx FROM tx_boards WHERE locked = 0', [], (e0, r0) => {
     const nextSort = (r0 && typeof r0.mx === 'number' ? r0.mx : 0) + 1;
     db.run('INSERT INTO tx_boards (board_key, title, icon, kind, locked, sort_order) VALUES (?, ?, ?, ?, 0, ?)',
-      [key, title, icon, 'board', nextSort], function (e) {
+      [key, title, icon, kind, nextSort], function (e) {
         if (e) return res.status(500).json({ error: e.message });
-        res.json({ success: true, key, title, icon });
+        res.json({ success: true, key, title, icon, kind });
       });
   });
+});
+
+// ---- 富文本看板内容：读 / 写（存 tx_board_meta，key=richtext:<board>） ----
+const rtKeyOf = (board) => 'richtext:' + String(board).replace(/[^a-z0-9_-]/gi, '');
+router.get('/boards/:key/richtext', (req, res) => {
+  const key = String(req.params.key);
+  db.get('SELECT value FROM tx_board_meta WHERE key = ?', [rtKeyOf(key)], (e, row) => {
+    if (e) return res.status(500).json({ error: e.message });
+    res.json({ success: true, html: (row && row.value) || '' });
+  });
+});
+router.put('/boards/:key/richtext', (req, res) => {
+  const key = String(req.params.key);
+  const html = (req.body && typeof req.body.html === 'string') ? req.body.html : '';
+  db.run(`INSERT INTO tx_board_meta (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+    [rtKeyOf(key), html], function (e) {
+      if (e) return res.status(500).json({ error: e.message });
+      res.json({ success: true });
+    });
 });
 
 // ---- 改名 / 改图标 ----
@@ -316,6 +339,7 @@ router.delete('/boards/:key', (req, res) => {
       db.run('DELETE FROM tx_board_rows WHERE group_id IN (SELECT id FROM tx_board_groups WHERE board = ?)', [key]);
       db.run('DELETE FROM tx_board_groups WHERE board = ?', [key]);
       db.run('DELETE FROM tx_board_meta WHERE key = ?', [metaKeyOf(key)]);
+      db.run('DELETE FROM tx_board_meta WHERE key = ?', ['richtext:' + String(key).replace(/[^a-z0-9_-]/gi, '')]);
       db.run('DELETE FROM tx_boards WHERE board_key = ?', [key], function (e) {
         if (e) return res.status(500).json({ error: e.message });
         res.json({ success: true });

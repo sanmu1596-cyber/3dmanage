@@ -45,6 +45,8 @@ function txKey(gi, r, ci) { return gi + ':' + r + ':' + ci; }
 var _reportBoards = [];         // [{key,title,icon,kind,locked}]（后端 /boards 返回，按 sort_order）
 var _boardEditMode = 'add';     // 'add' 新增 | 'rename' 改名
 var _boardEditKey = null;       // rename 时目标 board_key
+var _rtEditor = null;           // 富文本看板 RichEditor 实例
+var _rtBoardKey = null;         // 当前富文本看板 board_key
 // 旧 subtab 值 → board_key 兼容映射（历史调用点 router.js 传 report-customer 等）
 function _normalizeBoardKey(v) {
     if (v === 'report-customer') return 'customer';
@@ -105,6 +107,8 @@ function switchReportSubTab(subtab) {
         b.classList.toggle('active', b.dataset.subtab === key);
     });
     document.querySelectorAll('.report-sub-panel').forEach(p => { p.style.display = 'none'; });
+    // 离开任何面板前先销毁富文本编辑器（防多实例/内存泄漏）
+    destroyBoardRichEditor();
 
     const board = _reportBoards.find(function (b) { return b.key === key; });
     // 经营报表（独立图表页）
@@ -112,6 +116,15 @@ function switchReportSubTab(subtab) {
         const d = document.getElementById('report-sub-dashboard');
         if (d) d.style.display = 'flex';
         if (typeof loadBizReport === 'function') loadBizReport();
+        return;
+    }
+    // 富文本看板（新增标签默认形态）：整块 RichEditor
+    if (board && board.kind === 'richtext') {
+        const rp = document.getElementById('report-sub-richtext');
+        if (rp) rp.style.display = 'flex';
+        const rtTitle = document.getElementById('rt-board-title');
+        if (rtTitle) rtTitle.textContent = board.title || '富文本看板';
+        loadBoardRichtext(key);
         return;
     }
     // 普通看板（含内置 customer/tencent 及任意新建看板）：共用同一引擎
@@ -123,6 +136,73 @@ function switchReportSubTab(subtab) {
     // 切看板前清空当前选区/编辑态，避免跨看板串状态
     _txSelected = []; _txAnchor = null; _txEditingCell = null;
     loadTxBoard();
+}
+
+// ===== 富文本看板：加载 / 保存 / 销毁 =====
+async function loadBoardRichtext(key) {
+    _rtBoardKey = key;
+    const upd = document.getElementById('rt-board-updated');
+    if (upd) upd.textContent = '加载中...';
+    let html = '';
+    try {
+        const r = await authFetch(txUrl('/boards/' + encodeURIComponent(key) + '/richtext'));
+        const d = await r.json();
+        html = (d && typeof d.html === 'string') ? d.html : '';
+    } catch (e) { html = ''; }
+    // 销毁旧实例，重建
+    destroyBoardRichEditor();
+    const container = document.getElementById('rt-board-editor');
+    if (!container) return;
+    container.innerHTML = '';
+    if (typeof RichEditor !== 'undefined' && RichEditor.isReady && RichEditor.isReady()) {
+        _rtEditor = RichEditor.create({
+            containerId: 'rt-board-editor',
+            value: html,
+            height: 460,
+            placeholder: '在此编辑内容：可插入表格、图片、设置字号/颜色/对齐等...'
+        });
+    } else {
+        // 降级：可编辑 div
+        const div = document.createElement('div');
+        div.id = 'rt-board-editor-fallback';
+        div.contentEditable = 'true';
+        div.style.cssText = 'min-height:460px;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:12px;background:var(--bg-card,#fff);';
+        div.innerHTML = html;
+        container.appendChild(div);
+    }
+    if (upd) upd.textContent = '';
+}
+function getBoardRichtextHtml() {
+    if (_rtEditor && typeof _rtEditor.getHtml === 'function') return _rtEditor.getHtml();
+    const fb = document.getElementById('rt-board-editor-fallback');
+    return fb ? fb.innerHTML : '';
+}
+async function saveBoardRichtext() {
+    if (!_rtBoardKey) return;
+    const html = getBoardRichtextHtml();
+    const upd = document.getElementById('rt-board-updated');
+    if (upd) upd.textContent = '保存中...';
+    try {
+        const r = await authFetch(txUrl('/boards/' + encodeURIComponent(_rtBoardKey) + '/richtext'), {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html: html })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || '保存失败');
+        if (upd) upd.textContent = '已保存 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        if (typeof showToast === 'function') showToast('内容已保存', 'success');
+    } catch (e) {
+        if (upd) upd.textContent = '';
+        if (typeof showToast === 'function') showToast(e.message || '保存失败', 'error');
+    }
+}
+function destroyBoardRichEditor() {
+    if (_rtEditor && typeof _rtEditor.destroy === 'function') {
+        try { _rtEditor.destroy(); } catch (e) {}
+    }
+    _rtEditor = null;
+    const c = document.getElementById('rt-board-editor');
+    if (c) c.innerHTML = '';
 }
 
 // ===== 新增 / 改名 看板弹窗 =====
