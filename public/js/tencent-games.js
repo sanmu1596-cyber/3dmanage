@@ -35,6 +35,9 @@ var _txAnchor = null;           // 选区锚点 { gi, r, ci }（Shift/拖拽起�
 var _txSelecting = false;       // 鼠标拖拽框选中
 var _txEditingCell = null;      // 当前正在「格内编辑」的 td（null=无格内编辑，仅选中态）
 var _txTextSelecting = false;   // ★ 编辑态：正在编辑器内长按拖选文字（期间禁止 blur 退出/框选接管）
+// ===== 单元格富文本弹层编辑（RichEditor）=====
+var _txCellEditor = null;       // 当前 RichEditor 实例
+var _txCellEditCtx = null;      // { rowObj, gi, r, ci, orig } 当前编辑上下文
 // 单元格唯一 key
 function txKey(gi, r, ci) { return gi + ':' + r + ':' + ci; }
 
@@ -386,11 +389,11 @@ function txBindSelectionOnce(table) {
         txSelectRange(_txAnchor, cell);
     });
 
-    // 双击：进入格内编辑
+    // 双击：打开富文本弹层编辑（保留就地批量格式化/列宽行高拖拽等能力）
     container.addEventListener('dblclick', (e) => {
         const td = e.target.closest('td.tx-editable');
         if (!td || e.target.closest('thead, .tx-col-resize, .tx-row-resize')) return;
-        txEnterCellEdit(td);
+        txOpenCellEditor(td);
     });
 }
 
@@ -1028,7 +1031,95 @@ function txSyncFmtState() {
     });
 }
 
-// ===== 双击进入「格内编辑」（Excel 式）=====
+// ===== 双击打开「富文本弹层编辑」（RichEditor 统一体验）=====
+// 保留就地批量格式化/列宽行高拖拽；单格深度编辑走弹窗（表格/图片/字号等 39 项能力）
+async function txOpenCellEditor(td) {
+    if (document.body.classList.contains('row-resizing') || document.body.classList.contains('col-resizing')) return;
+
+    const gi = +td.dataset.g, r = +td.dataset.r, ci = +td.dataset.c;
+    const group = txBoard.groups[gi];
+    if (!group) return;
+
+    // 空白格：补足空行后重渲染，再对新 td 打开
+    if (!group.rows[r]) {
+        const created = await txEnsureRowsUpTo(group, r);
+        if (!created) return;
+        renderTxBoard();
+        const newTd = document.querySelector(
+            `#tx-board-table td.tx-editable[data-g="${gi}"][data-r="${r}"][data-c="${ci}"]`);
+        if (newTd) return txOpenCellEditor(newTd);
+        return;
+    }
+
+    const rowObj = group.rows[r];
+    const cur = (rowObj.cells && rowObj.cells[ci]) || '';
+    const html = txIsHtml(cur) ? cur : (cur ? escapeHtml(cur).replace(/\n/g, '<br>') : '');
+
+    _txCellEditCtx = { rowObj, gi, r, ci, orig: cur };
+
+    // 弹窗标题：分组名 + 列名
+    const colName = (group.cols && group.cols[ci]) ? group.cols[ci] : ('第' + (ci + 1) + '列');
+    const titleEl = document.getElementById('tx-cell-modal-title');
+    if (titleEl) titleEl.textContent = '编辑：' + (group.title || '') + ' · ' + colName;
+
+    const modal = document.getElementById('tx-cell-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    // 挂载 RichEditor（销毁旧实例）
+    if (_txCellEditor && typeof _txCellEditor.destroy === 'function') {
+        try { _txCellEditor.destroy(); } catch (e) {}
+        _txCellEditor = null;
+    }
+    const container = document.getElementById('tx-cell-editor');
+    if (container) container.innerHTML = '';
+    if (typeof RichEditor !== 'undefined' && RichEditor.isReady && RichEditor.isReady()) {
+        _txCellEditor = RichEditor.create({
+            containerId: 'tx-cell-editor',
+            value: html,
+            height: 300,
+            placeholder: '在此编辑单元格内容…'
+        });
+    } else if (container) {
+        // 降级：可编辑 div
+        container.innerHTML = '<div contenteditable="true" id="tx-cell-fallback" style="min-height:200px;border:1px solid var(--border,#e5e6eb);border-radius:6px;padding:10px;">' + html + '</div>';
+    }
+}
+
+// 关闭弹层编辑器（save=true 保存回写并 PATCH）
+async function txCloseCellEditor(save) {
+    const ctx = _txCellEditCtx;
+    const modal = document.getElementById('tx-cell-modal');
+    if (save && ctx) {
+        let html;
+        if (_txCellEditor && typeof _txCellEditor.getHtml === 'function') {
+            html = _txCellEditor.getHtml();
+        } else {
+            const fb = document.getElementById('tx-cell-fallback');
+            html = fb ? fb.innerHTML : ctx.orig;
+        }
+        html = txCleanHtml(html);
+        if (html !== ctx.orig) {
+            const rowObj = ctx.rowObj;
+            while (rowObj.cells.length <= ctx.ci) rowObj.cells.push('');
+            rowObj.cells[ctx.ci] = html;
+            await txApiPatchCell(rowObj.id, ctx.ci, html);
+            renderTxBoard();
+            if (typeof showToast === 'function') showToast('已保存', 'success');
+        }
+    }
+    // 清理
+    if (_txCellEditor && typeof _txCellEditor.destroy === 'function') {
+        try { _txCellEditor.destroy(); } catch (e) {}
+    }
+    _txCellEditor = null;
+    _txCellEditCtx = null;
+    const container = document.getElementById('tx-cell-editor');
+    if (container) container.innerHTML = '';
+    if (modal) modal.style.display = 'none';
+}
+
+// ===== 双击进入「格内编辑」（Excel 式）— 已由 txOpenCellEditor 弹层取代，保留作降级 =====
 var _txCellFinish = null;   // 当前编辑格的 finish 函数
 async function txEnterCellEdit(td) {
     if (_txEditingCell === td) return;
