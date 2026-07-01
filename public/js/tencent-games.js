@@ -1239,6 +1239,102 @@ async function addTxRow(gi) {
     }
 }
 
+// ===== 新增分组（创建新子表格块）=====
+function txOpenAddGroupModal() {
+    const modal = document.getElementById('tx-add-group-modal');
+    if (!modal) return;
+    const titleInput = document.getElementById('tx-ag-title');
+    if (titleInput) titleInput.value = '';
+    const colsBox = document.getElementById('tx-ag-cols');
+    if (colsBox) {
+        colsBox.innerHTML = '';
+        // 默认给两列输入
+        txAddGroupColInput('游戏名称');
+        txAddGroupColInput('备注');
+    }
+    modal.style.display = 'flex';
+    if (titleInput) setTimeout(() => titleInput.focus(), 50);
+}
+
+function txCloseAddGroupModal() {
+    const modal = document.getElementById('tx-add-group-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// 添加一个列名输入行
+function txAddGroupColInput(value) {
+    const box = document.getElementById('tx-ag-cols');
+    if (!box) return;
+    const row = document.createElement('div');
+    row.className = 'tx-ag-col-row';
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-control tx-ag-col-input';
+    input.placeholder = '列名，如 游戏名称 / 备注';
+    input.maxLength = 30;
+    input.value = value || '';
+    input.style.flex = '1';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'tool-btn';
+    del.textContent = '×';
+    del.title = '删除此列';
+    del.onclick = function () {
+        const rows = box.querySelectorAll('.tx-ag-col-row');
+        if (rows.length <= 1) { if (typeof showToast === 'function') showToast('至少保留 1 列', 'warning'); return; }
+        row.remove();
+    };
+    row.appendChild(input);
+    row.appendChild(del);
+    box.appendChild(row);
+}
+
+// 提交新增分组
+async function txSubmitAddGroup() {
+    const title = (document.getElementById('tx-ag-title').value || '').trim();
+    if (!title) { if (typeof showToast === 'function') showToast('请填写分组标题', 'warning'); return; }
+    const cols = Array.from(document.querySelectorAll('#tx-ag-cols .tx-ag-col-input'))
+        .map(i => (i.value || '').trim()).filter(Boolean);
+    if (!cols.length) { if (typeof showToast === 'function') showToast('请至少填写 1 列', 'warning'); return; }
+    try {
+        const resp = await authFetch(txUrl('/group'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, cols })
+        });
+        const result = await resp.json();
+        if (result && result.id) {
+            txCloseAddGroupModal();
+            await loadTxBoard();
+            if (typeof showToast === 'function') showToast('分组已创建', 'success');
+        } else {
+            if (typeof showToast === 'function') showToast(result.error || '创建失败', 'danger');
+        }
+    } catch (e) {
+        console.error('[tx] 新增分组失败', e);
+        if (typeof showToast === 'function') showToast('创建失败', 'danger');
+    }
+}
+
+// ===== 删除分组（可选：从组标题菜单调用）=====
+async function txDeleteGroup(gi) {
+    if (!txBoard || !txBoard.groups[gi]) return;
+    const group = txBoard.groups[gi];
+    const ok = (typeof uiConfirm === 'function')
+        ? await uiConfirm('确定删除分组「' + (group.title || '') + '」及其所有行吗？此操作不可恢复。', { danger: true, okText: '删除' })
+        : confirm('确定删除该分组及所有行吗？');
+    if (!ok) return;
+    try {
+        await authFetch(txUrl('/group/' + group.id), { method: 'DELETE' });
+        await loadTxBoard();
+        if (typeof showToast === 'function') showToast('分组已删除', 'success');
+    } catch (e) {
+        console.error('[tx] 删除分组失败', e);
+        if (typeof showToast === 'function') showToast('删除失败', 'danger');
+    }
+}
+
 // ===== 为分组补足空行到指定行索引（含中间缺失行）=====
 // 用于"双击空白格直接编辑"：该分组 rows 不足 targetRow+1 时，逐行 POST 创建空行
 async function txEnsureRowsUpTo(group, targetRow) {

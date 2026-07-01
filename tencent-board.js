@@ -175,6 +175,47 @@ router.delete('/row/:id', (req, res) => {
   });
 });
 
+// ============ 新增分组（创建新子表格块） ============
+// body: { title, cols:[列名...], rows?:[[c0,c1],...] }
+router.post('/group', (req, res) => {
+  const board = boardOf(req);
+  const title = (req.body && req.body.title != null) ? String(req.body.title).trim() : '';
+  let cols = (req.body && Array.isArray(req.body.cols)) ? req.body.cols.map(c => String(c || '').trim()).filter(Boolean) : [];
+  if (!title) return res.status(400).json({ error: '分组标题不能为空' });
+  if (!cols.length) cols = ['游戏名称', '备注']; // 兜底默认两列
+  const initRows = (req.body && Array.isArray(req.body.rows)) ? req.body.rows : [];
+  const groupKey = title + '_' + Date.now();
+  db.get('SELECT MAX(sort_order) AS m FROM tx_board_groups WHERE board = ?', [board], (err, r) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const nextOrder = (r && r.m != null ? r.m : -1) + 1;
+    db.run('INSERT INTO tx_board_groups (board, group_key, title, cols, sort_order) VALUES (?, ?, ?, ?, ?)',
+      [board, groupKey, title, JSON.stringify(cols), nextOrder], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        const groupId = this.lastID;
+        // 写入初始行（若提供）；否则给一个空行方便直接编辑
+        const rowsToInsert = initRows.length ? initRows : [cols.map(() => '')];
+        const rStmt = db.prepare('INSERT INTO tx_board_rows (group_id, cells, sort_order) VALUES (?, ?, ?)');
+        rowsToInsert.forEach((cells, ri) => rStmt.run([groupId, JSON.stringify(cells || []), ri]));
+        rStmt.finalize((fe) => {
+          if (fe) return res.status(500).json({ error: fe.message });
+          res.json({ success: true, id: groupId, key: groupKey });
+        });
+      });
+  });
+});
+
+// ============ 删除分组（连带删除其所有行） ============
+router.delete('/group/:id', (req, res) => {
+  const gid = req.params.id;
+  db.serialize(() => {
+    db.run('DELETE FROM tx_board_rows WHERE group_id = ?', [gid]);
+    db.run('DELETE FROM tx_board_groups WHERE id = ?', [gid], function (e) {
+      if (e) return res.status(500).json({ error: e.message });
+      res.json({ success: true });
+    });
+  });
+});
+
 // ============ 更新分组标题 / 列名 ============
 // body: { title? , cols? }
 router.patch('/group/:id', (req, res) => {

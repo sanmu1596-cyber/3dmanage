@@ -2759,6 +2759,7 @@
                                 <span id="tx-board-title" style="font-weight:600;color:var(--text-primary);">腾讯系游戏开发进展</span>
                             </div>
                             <div class="toolbar-right">
+                                <button class="tool-btn" onclick="txOpenAddGroupModal()" title="新增一个分组（可自定义列）"><span class="tool-icon">＋</span>新增分组</button>
                                 <button class="tool-btn" onclick="resetTxBoard()" title="恢复为初始数据">重置</button>
                                 <button class="tool-btn tool-btn-primary" onclick="exportTxBoard()" title="导出当前看板"><span class="tool-icon">⬇</span>导出</button>
                             </div>
@@ -2881,6 +2882,31 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" onclick="txCloseCellEditor(false)">取消</button>
                                 <button type="button" class="btn btn-primary" onclick="txCloseCellEditor(true)">保存</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 进展表新增分组弹窗（客户/腾讯两看板共用） -->
+                    <div id="tx-add-group-modal" class="modal" style="display:none;">
+                        <div class="modal-content" style="max-width:520px;width:92%;">
+                            <div class="modal-header">
+                                <h3>新增分组</h3>
+                                <button class="modal-close" type="button" onclick="txCloseAddGroupModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>分组标题 <span style="color:var(--danger,#e23b3b);">*</span></label>
+                                    <input type="text" id="tx-ag-title" class="form-control" placeholder="如：新立项游戏 / 已下线游戏 …" maxlength="40">
+                                </div>
+                                <div class="form-group">
+                                    <label>列（至少 1 列，可增删）</label>
+                                    <div id="tx-ag-cols"></div>
+                                    <button type="button" class="tool-btn" style="margin-top:6px;" onclick="txAddGroupColInput()"><span class="tool-icon">＋</span>添加一列</button>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="txCloseAddGroupModal()">取消</button>
+                                <button type="button" class="btn btn-primary" onclick="txSubmitAddGroup()">创建分组</button>
                             </div>
                         </div>
                     </div>
@@ -3705,7 +3731,7 @@
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260701d"></script>
     <script src="js/reports.js?v=20260630e"></script>
-    <script src="js/tencent-games.js?v=20260701d"></script>
+    <script src="js/tencent-games.js?v=20260701e"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
     <script src="js/faq.js?v=20260630e"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->
