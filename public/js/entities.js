@@ -5,6 +5,48 @@
  */
 var App = window.App;
 
+// ========== 缺陷描述/复现步骤 富文本编辑器（RichEditor） ==========
+var _bugDescEditor = null;
+var _bugStepsEditor = null;
+
+// 挂载缺陷富文本编辑器（描述+复现步骤），RichEditor 未就绪时降级 textarea
+function mountBugEditors(descHtml, stepsHtml) {
+    destroyBugEditors();
+    if (window.RichEditor && RichEditor.isReady && RichEditor.isReady()) {
+        try {
+            _bugDescEditor = RichEditor.create({ containerId: 'bug-description-editor', value: descHtml || '', height: 200, placeholder: '请输入缺陷描述...' });
+            _bugStepsEditor = RichEditor.create({ containerId: 'bug-steps-editor', value: stepsHtml || '', height: 200, placeholder: '请输入复现步骤...' });
+        } catch (e) { console.error('缺陷富文本挂载失败:', e); }
+    }
+    // 降级：编辑器未挂载则显示原 textarea
+    if (!_bugDescEditor) { var t1 = document.getElementById('bug-description'); if (t1) { t1.style.display = ''; t1.value = descHtml || ''; } }
+    if (!_bugStepsEditor) { var t2 = document.getElementById('bug-steps'); if (t2) { t2.style.display = ''; t2.value = stepsHtml || ''; } }
+}
+
+function getBugDescValue() {
+    if (_bugDescEditor) return _bugDescEditor.getHtml();
+    var t = document.getElementById('bug-description'); return t ? t.value : '';
+}
+function getBugStepsValue() {
+    if (_bugStepsEditor) return _bugStepsEditor.getHtml();
+    var t = document.getElementById('bug-steps'); return t ? t.value : '';
+}
+
+function destroyBugEditors() {
+    try { if (_bugDescEditor) _bugDescEditor.destroy(); } catch (e) {}
+    try { if (_bugStepsEditor) _bugStepsEditor.destroy(); } catch (e) {}
+    _bugDescEditor = null; _bugStepsEditor = null;
+    var c1 = document.getElementById('bug-description-editor'); if (c1) c1.innerHTML = '';
+    var c2 = document.getElementById('bug-steps-editor'); if (c2) c2.innerHTML = '';
+}
+
+// 剥离 HTML 标签取纯文本（列表摘要用，防标签乱码）
+function bugPlain(html) {
+    if (!html) return '';
+    if (html.indexOf('<') < 0) return html;
+    var d = document.createElement('div'); d.innerHTML = html; return (d.textContent || d.innerText || '').trim();
+}
+
 // ========== 通用表头拖拽排序系统（TAPD风格）==========
 
 // 全局标志：是否刚完成长按拖拽（用于阻止click排序）
@@ -1410,7 +1452,7 @@ function renderBugsTable(data) {
                         rowHtml += `<td>${highlightSearch(bug.problem_type || '-', 'bugs-table')}</td>`;
                         break;
                     case 'description':
-                        rowHtml += `<td class="text-left">${highlightSearch(bug.description || '-', 'bugs-table')}</td>`;
+                        rowHtml += `<td class="text-left">${highlightSearch(bugPlain(bug.description) || '-', 'bugs-table')}</td>`;
                         break;
                 }
             });
@@ -1909,6 +1951,9 @@ function initForms() {
     document.getElementById('bug-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!acquireSubmitLock('bug-form')) return;
+        // 富文本值回写隐藏 textarea，供必填校验（校验看的是纯文本非空）
+        var _bd = document.getElementById('bug-description');
+        if (_bd) _bd.value = bugPlain(getBugDescValue());
         if (!validateForm('bug-form')) { releaseSubmitLock('bug-form'); return; }
         const id = document.getElementById('bug-id').value;
         const data = {
@@ -1921,8 +1966,8 @@ function initForms() {
             bug_status: document.getElementById('bug-status').value,
             priority: document.getElementById('bug-priority').value,
             problem_type: document.getElementById('bug-problem-type').value,
-            description: document.getElementById('bug-description').value,
-            steps: document.getElementById('bug-steps').value,
+            description: getBugDescValue(),
+            steps: getBugStepsValue(),
             planned_fix_time: document.getElementById('bug-planned-fix-time').value,
             actual_fix_time: document.getElementById('bug-actual-fix-time').value
         };
@@ -1982,6 +2027,9 @@ function openModal(modalId) {
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.style.display = 'none';
+    // 富文本编辑器随弹窗关闭销毁，防内存泄漏
+    if (modalId === 'bug-modal' && typeof destroyBugEditors === 'function') destroyBugEditors();
+    if (modalId === 'test-case-modal' && typeof destroyTcStepsEditor === 'function') destroyTcStepsEditor();
     resetForm(modalId.replace('-modal', '-form'));
     
     // P1.8: 弹窗关闭后恢复焦点到之前保存的元素
@@ -2486,6 +2534,7 @@ async function openBugModal() {
     const scopeSel = document.getElementById('bug-impact-scope');
     if (scopeSel) scopeSel.value = 'single';
     onBugScopeChange();
+    mountBugEditors('', '');
 }
 
 // P1-2: 影响范围切换 —— 选「影响所有客户」时禁用并清空客户选择
@@ -2576,11 +2625,10 @@ async function editBug(id) {
             document.getElementById('bug-status').value = bug.bug_status;
             document.getElementById('bug-priority').value = bug.priority;
             document.getElementById('bug-problem-type').value = bug.problem_type || '';
-            document.getElementById('bug-description').value = bug.description || '';
-            document.getElementById('bug-steps').value = bug.steps || '';
             document.getElementById('bug-planned-fix-time').value = bug.planned_fix_time || '';
             document.getElementById('bug-actual-fix-time').value = bug.actual_fix_time || '';
             openModal('bug-modal');
+            mountBugEditors(bug.description || '', bug.steps || '');
         }
     } catch (error) {
         console.error('加载缺陷失败:', error);

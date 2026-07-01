@@ -5,6 +5,33 @@
  */
 var App = window.App;
 
+// ==================== 计划目标说明 富文本编辑器（RichEditor） ====================
+var _planGoalEditor = null;
+
+function mountPlanGoalEditor(html) {
+    destroyPlanGoalEditor();
+    if (window.RichEditor && RichEditor.isReady && RichEditor.isReady()) {
+        try {
+            _planGoalEditor = RichEditor.create({ containerId: 'plan-goal-editor', value: html || '', height: 180, placeholder: '请输入目标说明...' });
+        } catch (e) { console.error('计划目标富文本挂载失败:', e); }
+    }
+    if (!_planGoalEditor) { var t = document.getElementById('plan-goal'); if (t) { t.style.display = ''; t.value = html || ''; } }
+}
+function getPlanGoalValue() {
+    if (_planGoalEditor) return _planGoalEditor.getHtml();
+    var t = document.getElementById('plan-goal'); return t ? t.value : '';
+}
+function destroyPlanGoalEditor() {
+    try { if (_planGoalEditor) _planGoalEditor.destroy(); } catch (e) {}
+    _planGoalEditor = null;
+    var c = document.getElementById('plan-goal-editor'); if (c) c.innerHTML = '';
+}
+function planGoalPlain(html) {
+    if (!html) return '';
+    if (html.indexOf('<') < 0) return html;
+    var d = document.createElement('div'); d.innerHTML = html; return (d.textContent || d.innerText || '').trim();
+}
+
 // ==================== 适配进展功能 ====================
 
 // 筛选状态（必须用 var，踩坑 #1）
@@ -1014,6 +1041,9 @@ function showCreatePlanView() {
     planSelectedTcMode = null;
     planSelectedTcIds = new Set();
     updatePlanTcSummary();
+
+    // 目标说明富文本（创建模式挂空）
+    mountPlanGoalEditor('');
 }
 
 // 编辑已有计划
@@ -1044,7 +1074,7 @@ function editPlan(planIndex) {
     document.getElementById('plan-date').value = plan.date || '';
     document.getElementById('plan-interlace-version').value = plan.interlaceVersion || '';
     document.getElementById('plan-client-version').value = plan.clientVersion || '';
-    document.getElementById('plan-goal').value = plan.goal || '';
+    mountPlanGoalEditor(plan.goal || '');
 
     // 填充已选机型
     planSelectedDevices = (plan.devices || []).map(d => typeof d === 'string' ? { id: null, name: d } : { id: d.id, name: d.name });
@@ -1359,6 +1389,7 @@ async function autoLinkTestCasesToPlan(planId) {
 
 function showPlanListView() {
     editingPlanId = null;
+    if (typeof destroyPlanGoalEditor === 'function') destroyPlanGoalEditor();
     document.getElementById('plan-create-view').style.display = 'none';
     document.getElementById('plan-detail-view').style.display = 'none';
     document.getElementById('plan-list-view').style.display = 'block';
@@ -1410,7 +1441,7 @@ async function submitPlan(event, planStatus) {
     const date = document.getElementById('plan-date').value;
     const interlaceVersion = document.getElementById('plan-interlace-version').value.trim();
     const clientVersion = document.getElementById('plan-client-version').value.trim();
-    const goal = document.getElementById('plan-goal').value.trim();
+    const goal = getPlanGoalValue();
 
     if (!title || !date) {
         showToast('请填写标题和时间', 'warning');
@@ -1814,7 +1845,7 @@ async function openPlanDetail(planIndex) {
         <span class="info-tag"><span class="tag-label">机型：</span><span class="tag-value">${deviceNames || '-'}</span></span>
         ${plan.interlaceVersion ? `<span class="info-tag"><span class="tag-label">交织版本：</span><span class="tag-value">${escapeHtml(plan.interlaceVersion)}</span></span>` : ''}
         ${plan.clientVersion ? `<span class="info-tag"><span class="tag-label">客户端版本：</span><span class="tag-value">${escapeHtml(plan.clientVersion)}</span></span>` : ''}
-        ${plan.goal ? `<span class="info-tag"><span class="tag-label">目标：</span><span class="tag-value">${escapeHtml(plan.goal)}</span></span>` : ''}
+        ${plan.goal ? `<span class="info-tag"><span class="tag-label">目标：</span><span class="tag-value">${escapeHtml(planGoalPlain(plan.goal))}</span></span>` : ''}
     `;
 
     // 加载游戏列表详情

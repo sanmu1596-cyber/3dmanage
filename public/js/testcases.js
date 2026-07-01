@@ -5,6 +5,33 @@
  */
 var App = window.App;
 
+// ==================== 测试步骤 富文本编辑器（RichEditor） ====================
+var _tcStepsEditor = null;
+
+function mountTcStepsEditor(html) {
+    destroyTcStepsEditor();
+    if (window.RichEditor && RichEditor.isReady && RichEditor.isReady()) {
+        try {
+            _tcStepsEditor = RichEditor.create({ containerId: 'tc-steps-editor', value: html || '', height: 200, placeholder: '1. 第一步操作\n2. 第二步操作\n3. 第三步操作' });
+        } catch (e) { console.error('测试步骤富文本挂载失败:', e); }
+    }
+    if (!_tcStepsEditor) { var t = document.getElementById('tc-steps'); if (t) { t.style.display = ''; t.value = html || ''; } }
+}
+function getTcStepsValue() {
+    if (_tcStepsEditor) return _tcStepsEditor.getHtml();
+    var t = document.getElementById('tc-steps'); return t ? t.value : '';
+}
+function destroyTcStepsEditor() {
+    try { if (_tcStepsEditor) _tcStepsEditor.destroy(); } catch (e) {}
+    _tcStepsEditor = null;
+    var c = document.getElementById('tc-steps-editor'); if (c) c.innerHTML = '';
+}
+function tcPlain(html) {
+    if (!html) return '';
+    if (html.indexOf('<') < 0) return html;
+    var d = document.createElement('div'); d.innerHTML = html; return (d.textContent || d.innerText || '').trim();
+}
+
 // ==================== 测试用例模块 ====================
 let allTestCasesData = [];
 let filteredTestCasesData = [];
@@ -151,7 +178,7 @@ function renderTestCases() {
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'category')" title="双击选择"><span class="tc-category-tag">${escapeHtml(tc.category || '功能测试')}</span></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'priority')" title="双击选择"><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
             <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'precondition')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.precondition || '')}">${escapeHtml(tc.precondition || '-')}</span></td>
-            <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'steps')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.steps || '')}">${escapeHtml(tc.steps || '-')}</span></td>
+            <td class="text-left" title="点击编辑按钮打开富文本编辑"><span class="tc-cell-text" title="${escapeHtml(tcPlain(tc.steps))}">${escapeHtml(tcPlain(tc.steps) || '-')}</span></td>
             <td class="editable-cell text-left" ondblclick="startTcTextEdit(this, ${tc.id}, 'expected_result')" title="双击编辑"><span class="tc-cell-text" title="${escapeHtml(tc.expected_result || '')}">${escapeHtml(tc.expected_result || '-')}</span></td>
             <td class="editable-cell" ondblclick="startTcDropdownEdit(this, ${tc.id}, 'is_template')" title="双击选择"><span class="tc-type-tag ${tc.is_template ? 'template' : 'normal'}">${tc.is_template ? '模板' : '普通'}</span></td>
             <td class="text-center action-icons">
@@ -474,7 +501,6 @@ function openTestCaseModal(tc = null) {
         document.getElementById('tc-category').value = tc.category || '功能测试';
         document.getElementById('tc-priority').value = tc.priority || 'medium';
         document.getElementById('tc-precondition').value = tc.precondition || '';
-        document.getElementById('tc-steps').value = tc.steps || '';
         document.getElementById('tc-expected').value = tc.expected_result || '';
         document.getElementById('tc-tags').value = tc.tags || '';
         document.getElementById('tc-is-template').checked = !!tc.is_template;
@@ -491,6 +517,7 @@ function openTestCaseModal(tc = null) {
     }
     
     openModal('test-case-modal');
+    mountTcStepsEditor(tc ? (tc.steps || '') : '');
 }
 
 // 编辑测试用例
@@ -511,7 +538,7 @@ async function submitTestCaseForm(event) {
         category: document.getElementById('tc-category').value,
         priority: document.getElementById('tc-priority').value,
         precondition: document.getElementById('tc-precondition').value.trim(),
-        steps: document.getElementById('tc-steps').value.trim(),
+        steps: getTcStepsValue(),
         expected_result: document.getElementById('tc-expected').value.trim(),
         tags: document.getElementById('tc-tags').value.trim(),
         is_template: document.getElementById('tc-is-template').checked ? 1 : 0,
@@ -726,7 +753,7 @@ function exportTestCasesToExcel() {
         '分类': tc.category || '',
         '优先级': getPriorityLabel(tc.priority),
         '前置条件': tc.precondition || '',
-        '测试步骤': tc.steps || '',
+        '测试步骤': tcPlain(tc.steps) || '',
         '预期结果': tc.expected_result || '',
         '类型': tc.is_template ? '模板' : '普通',
         '标签': tc.tags || ''
@@ -1163,7 +1190,7 @@ function renderExecTestCaseTable() {
                     ${tc.precondition ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">前置: ${escapeHtml(tc.precondition)}</div>` : ''}
                 </td>
                 <td><span class="tc-priority-tag ${sanitizeCssClass(tc.priority || 'medium')}">${getPriorityLabel(tc.priority)}</span></td>
-                <td class="text-left"><span class="tc-cell-text">${escapeHtml(tc.steps || '-')}</span></td>
+                <td class="text-left"><span class="tc-cell-text">${escapeHtml(tcPlain(tc.steps) || '-')}</span></td>
                 <td class="text-left"><span class="tc-cell-text">${escapeHtml(tc.expected_result || '-')}</span></td>
                 <td>
                     <select class="exec-status-select ${statusClass}" data-ptc-id="${tc.id}" onchange="onExecStatusChange(${tc.id}, this)">
