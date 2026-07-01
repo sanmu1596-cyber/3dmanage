@@ -136,6 +136,19 @@ const newModuleTables = [
     value TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // 看板注册表：报表模块下的子标签（可动态增删改+排序）
+  //   board_key 与 tx_board_groups.board 对应；locked=1 的看板禁止删除/改名（如经营报表 dashboard）
+  //   kind: 'board'=普通看板引擎；'dashboard'=独立图表页（经营报表）
+  `CREATE TABLE IF NOT EXISTS tx_boards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_key TEXT UNIQUE,
+    title TEXT,
+    icon TEXT DEFAULT '📋',
+    kind TEXT DEFAULT 'board',
+    locked INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
   // FAQ 知识库表 (P2-1)
   `CREATE TABLE IF NOT EXISTS faqs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,6 +216,37 @@ db.all("PRAGMA table_info(tx_board_groups)", [], (err, columns) => {
 
 // 兼容旧库：旧的 meta key='board' 迁移为 key='board:tencent'
 db.run("UPDATE tx_board_meta SET key = 'board:tencent' WHERE key = 'board'", () => {});
+
+// 预置报表模块内置看板注册项（幂等：仅当对应 board_key 不存在时插入）
+//   customer/tencent 走看板引擎；dashboard 是独立图表页(locked，禁删禁改名)
+//   ★ 独立 serialize 块：先确保 tx_boards 建表完成（不依赖上方 forEach 的异步时序），再 INSERT
+const _builtinBoards = [
+  { key: 'customer',  title: '各客户适配进展',     icon: '📋', kind: 'board',     locked: 0, sort: 0 },
+  { key: 'tencent',   title: '腾讯系游戏开发进展', icon: '🐧', kind: 'board',     locked: 0, sort: 1 },
+  { key: 'dashboard', title: '经营报表',           icon: '📈', kind: 'dashboard', locked: 1, sort: 999 }
+];
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS tx_boards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_key TEXT UNIQUE,
+    title TEXT,
+    icon TEXT DEFAULT '📋',
+    kind TEXT DEFAULT 'board',
+    locked INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, (ce) => {
+    if (ce) { console.error('  [启动] tx_boards 建表失败:', ce.message); return; }
+    _builtinBoards.forEach(b => {
+      db.run(
+        `INSERT INTO tx_boards (board_key, title, icon, kind, locked, sort_order)
+         SELECT ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM tx_boards WHERE board_key = ?)`,
+        [b.key, b.title, b.icon, b.kind, b.locked, b.sort, b.key],
+        (e) => { if (e) console.error('  [启动] 预置看板注册项失败:', b.key, e.message); }
+      );
+    });
+  });
+});
 
 // 兼容旧库：确保 devices 表有 sort_order 列
 db.all("PRAGMA table_info(devices)", [], (err, columns) => {

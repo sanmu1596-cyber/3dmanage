@@ -41,33 +41,249 @@ var _txCellEditCtx = null;      // { rowObj, gi, r, ci, orig } 当前编辑上�
 // 单元格唯一 key
 function txKey(gi, r, ci) { return gi + ':' + r + ':' + ci; }
 
-// ===== 子 Tab 切换 =====
-function switchReportSubTab(subtab) {
-    document.querySelectorAll('.report-sub-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.subtab === subtab);
+// ===== 报表标签（看板注册表）动态化 =====
+var _reportBoards = [];         // [{key,title,icon,kind,locked}]（后端 /boards 返回，按 sort_order）
+var _boardEditMode = 'add';     // 'add' 新增 | 'rename' 改名
+var _boardEditKey = null;       // rename 时目标 board_key
+// 旧 subtab 值 → board_key 兼容映射（历史调用点 router.js 传 report-customer 等）
+function _normalizeBoardKey(v) {
+    if (v === 'report-customer') return 'customer';
+    if (v === 'report-tencent') return 'tencent';
+    if (v === 'report-dashboard') return 'dashboard';
+    return v; // 已是 board_key（customer/tencent/dashboard/bxxxx）
+}
+
+// ===== 报表标签栏：从注册表拉取并动态渲染 =====
+async function loadReportBoards(activeKey) {
+    try {
+        const r = await fetch(txUrl('/boards'));
+        const d = await r.json();
+        _reportBoards = Array.isArray(d.boards) ? d.boards : [];
+    } catch (e) {
+        // 兜底：拉取失败时用内置三看板，保证页面可用
+        _reportBoards = [
+            { key: 'customer', title: '各客户适配进展', icon: '📋', kind: 'board', locked: false },
+            { key: 'tencent', title: '腾讯系游戏开发进展', icon: '🐧', kind: 'board', locked: false },
+            { key: 'dashboard', title: '经营报表', icon: '📈', kind: 'dashboard', locked: true }
+        ];
+    }
+    renderReportTabs(activeKey);
+}
+
+// 渲染 .report-sub-tab 按钮（含拖拽/双击改名/右键菜单）
+function renderReportTabs(activeKey) {
+    const wrap = document.getElementById('report-sub-tabs-list');
+    if (!wrap) return;
+    wrap.innerHTML = _reportBoards.map(function (b) {
+        const locked = b.locked ? ' data-locked="1"' : '';
+        const drag = b.locked ? '' : ' draggable="true"';
+        return '<button class="report-sub-tab" data-subtab="' + b.key + '"' + locked + drag +
+            ' onclick="switchReportSubTab(\'' + b.key + '\')"' +
+            (b.locked ? '' : ' ondblclick="openRenameBoardModal(\'' + b.key + '\')" oncontextmenu="return onBoardContextMenu(event,\'' + b.key + '\')"') +
+            ' title="' + (b.locked ? '锁定标签，不可修改/删除' : '双击改名 · 右键删除 · 可拖拽排序') + '">' +
+            (b.icon || '📋') + ' ' + escHtml(b.title) +
+            (b.locked ? '' : ' <span class="board-del-x" onclick="event.stopPropagation();deleteReportBoard(\'' + b.key + '\')" title="删除该标签" style="margin-left:6px;opacity:.4;cursor:pointer;">✕</span>') +
+            '</button>';
+    }).join('');
+    // 高亮当前
+    const cur = activeKey || _txBoardId;
+    wrap.querySelectorAll('.report-sub-tab').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.subtab === cur);
     });
-    document.querySelectorAll('.report-sub-panel').forEach(p => { p.style.display = 'none'; });
-    if (subtab === 'report-main') {
-        const m = document.getElementById('report-sub-main');
-        if (m) m.style.display = 'flex';
+    initBoardTabDrag();
+}
+
+// ===== 子 Tab 切换（board_key 驱动，兼容旧 report-xxx 值）=====
+function switchReportSubTab(subtab) {
+    const key = _normalizeBoardKey(subtab);
+    // 标签栏未渲染（首次进报表）→ 先拉列表再切
+    if (!_reportBoards.length) {
+        loadReportBoards(key).then(function () { switchReportSubTab(key); });
         return;
     }
-    if (subtab === 'report-dashboard') {
+    document.querySelectorAll('.report-sub-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.subtab === key);
+    });
+    document.querySelectorAll('.report-sub-panel').forEach(p => { p.style.display = 'none'; });
+
+    const board = _reportBoards.find(function (b) { return b.key === key; });
+    // 经营报表（独立图表页）
+    if (key === 'dashboard' || (board && board.kind === 'dashboard')) {
         const d = document.getElementById('report-sub-dashboard');
         if (d) d.style.display = 'flex';
         if (typeof loadBizReport === 'function') loadBizReport();
         return;
     }
-    // 腾讯系看板 / 各客户适配进展：共用同一看板引擎，仅切换 _txBoardId + 标题 + 数据
-    const isCustomer = (subtab === 'report-customer');
-    _txBoardId = isCustomer ? 'customer' : 'tencent';
+    // 普通看板（含内置 customer/tencent 及任意新建看板）：共用同一引擎
+    _txBoardId = key;
     const title = document.getElementById('tx-board-title');
-    if (title) title.textContent = isCustomer ? '各客户适配进展' : '腾讯系游戏开发进展';
+    if (title) title.textContent = board ? board.title : '看板';
     const t = document.getElementById('report-sub-tencent');
     if (t) t.style.display = 'flex';
     // 切看板前清空当前选区/编辑态，避免跨看板串状态
     _txSelected = []; _txAnchor = null; _txEditingCell = null;
     loadTxBoard();
+}
+
+// ===== 新增 / 改名 看板弹窗 =====
+var _BOARD_ICONS = ['📋', '🐧', '📈', '📊', '🎮', '🕹️', '🚀', '⭐', '🔥', '💎', '🏆', '📅', '🗂️', '🧩', '🌐'];
+function _renderIconPicker() {
+    const box = document.getElementById('board-icon-picker');
+    if (!box) return;
+    box.innerHTML = _BOARD_ICONS.map(function (ic) {
+        return '<span class="board-icon-opt" onclick="pickBoardIcon(\'' + ic + '\')" style="cursor:pointer;font-size:20px;padding:3px 5px;border-radius:6px;border:1px solid transparent;">' + ic + '</span>';
+    }).join('');
+}
+function pickBoardIcon(ic) {
+    const inp = document.getElementById('board-edit-icon');
+    if (inp) inp.value = ic;
+    document.querySelectorAll('#board-icon-picker .board-icon-opt').forEach(function (s) {
+        s.style.borderColor = (s.textContent === ic) ? 'var(--primary,#1677ff)' : 'transparent';
+        s.style.background = (s.textContent === ic) ? 'var(--primary-light,rgba(22,119,255,.12))' : 'transparent';
+    });
+}
+function openAddBoardModal() {
+    _boardEditMode = 'add'; _boardEditKey = null;
+    _renderIconPicker();
+    const t = document.getElementById('board-edit-title'); if (t) t.textContent = '新增报表标签';
+    const s = document.getElementById('board-edit-submit'); if (s) s.textContent = '创建';
+    const nm = document.getElementById('board-edit-name'); if (nm) nm.value = '';
+    pickBoardIcon('📋');
+    const m = document.getElementById('board-edit-modal'); if (m) m.style.display = 'flex';
+    setTimeout(function () { if (nm) nm.focus(); }, 60);
+}
+function openRenameBoardModal(key) {
+    const board = _reportBoards.find(function (b) { return b.key === key; });
+    if (!board || board.locked) return;
+    _boardEditMode = 'rename'; _boardEditKey = key;
+    _renderIconPicker();
+    const t = document.getElementById('board-edit-title'); if (t) t.textContent = '重命名标签';
+    const s = document.getElementById('board-edit-submit'); if (s) s.textContent = '保存';
+    const nm = document.getElementById('board-edit-name'); if (nm) nm.value = board.title;
+    pickBoardIcon(board.icon || '📋');
+    const m = document.getElementById('board-edit-modal'); if (m) m.style.display = 'flex';
+    setTimeout(function () { if (nm) { nm.focus(); nm.select(); } }, 60);
+}
+function closeBoardEditModal() {
+    const m = document.getElementById('board-edit-modal'); if (m) m.style.display = 'none';
+}
+async function submitBoardEdit() {
+    const name = (document.getElementById('board-edit-name').value || '').trim();
+    const icon = (document.getElementById('board-edit-icon').value || '📋').trim() || '📋';
+    if (!name) { if (typeof showToast === 'function') showToast('请输入标签名称', 'warning'); return; }
+    try {
+        if (_boardEditMode === 'add') {
+            const r = await fetch(txUrl('/boards'), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: name, icon: icon })
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.error || '创建失败');
+            closeBoardEditModal();
+            if (typeof showToast === 'function') showToast('已新增标签「' + name + '」', 'success');
+            await loadReportBoards(d.key);
+            switchReportSubTab(d.key);   // 直接切到新看板（空白，用＋新增分组建内容）
+        } else {
+            const r = await fetch(txUrl('/boards/' + encodeURIComponent(_boardEditKey)), {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: name, icon: icon })
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.error || '保存失败');
+            closeBoardEditModal();
+            if (typeof showToast === 'function') showToast('已更新标签', 'success');
+            await loadReportBoards(_txBoardId);
+            // 若改的是当前看板，刷新标题
+            const title = document.getElementById('tx-board-title');
+            if (title && _boardEditKey === _txBoardId) title.textContent = name;
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(e.message || '操作失败', 'error');
+    }
+}
+
+// ===== 删除看板（二次确认 + 彻底删除）=====
+async function deleteReportBoard(key) {
+    const board = _reportBoards.find(function (b) { return b.key === key; });
+    if (!board || board.locked) return;
+    const ok = (typeof uiConfirm === 'function')
+        ? await uiConfirm('删除标签「' + board.title + '」将同时删除它下面的全部分组和数据，且不可恢复。确定删除吗？', '删除报表标签')
+        : window.confirm('删除标签「' + board.title + '」将同时删除它下面的全部分组和数据，且不可恢复。确定删除吗？');
+    if (!ok) return;
+    try {
+        const r = await fetch(txUrl('/boards/' + encodeURIComponent(key)), { method: 'DELETE' });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || '删除失败');
+        if (typeof showToast === 'function') showToast('已删除标签「' + board.title + '」', 'success');
+        // 删的是当前看板 → 切到列表里第一个可用看板
+        const wasCurrent = (key === _txBoardId);
+        await loadReportBoards();
+        if (wasCurrent) {
+            const first = _reportBoards[0];
+            if (first) switchReportSubTab(first.key);
+        } else {
+            renderReportTabs(_txBoardId);
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(e.message || '删除失败', 'error');
+    }
+}
+// 右键菜单：简单用 confirm 询问删除（避免额外造菜单组件）
+function onBoardContextMenu(ev, key) {
+    ev.preventDefault();
+    deleteReportBoard(key);
+    return false;
+}
+
+// ===== 标签拖拽排序（HTML5 DnD，locked 项不可拖、不可作为落点插到其后改变锁定项）=====
+var _boardDragKey = null;
+function initBoardTabDrag() {
+    const wrap = document.getElementById('report-sub-tabs-list');
+    if (!wrap) return;
+    wrap.querySelectorAll('.report-sub-tab').forEach(function (btn) {
+        if (btn.dataset.locked === '1') return;
+        btn.addEventListener('dragstart', function (e) {
+            _boardDragKey = btn.dataset.subtab;
+            btn.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        btn.addEventListener('dragend', function () { btn.style.opacity = ''; _boardDragKey = null; clearBoardDropHint(); });
+        btn.addEventListener('dragover', function (e) {
+            if (!_boardDragKey || btn.dataset.locked === '1') return;
+            e.preventDefault();
+            clearBoardDropHint();
+            btn.style.boxShadow = 'inset 3px 0 0 var(--primary,#1677ff)';
+        });
+        btn.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (!_boardDragKey || btn.dataset.locked === '1') return;
+            const targetKey = btn.dataset.subtab;
+            if (targetKey === _boardDragKey) return;
+            reorderBoards(_boardDragKey, targetKey);
+        });
+    });
+}
+function clearBoardDropHint() {
+    document.querySelectorAll('#report-sub-tabs-list .report-sub-tab').forEach(function (b) { b.style.boxShadow = ''; });
+}
+async function reorderBoards(dragKey, targetKey) {
+    // 仅对非锁定看板重排；锁定项(dashboard)保持在末尾不参与
+    const movable = _reportBoards.filter(function (b) { return !b.locked; }).map(function (b) { return b.key; });
+    const from = movable.indexOf(dragKey), to = movable.indexOf(targetKey);
+    if (from < 0 || to < 0) return;
+    movable.splice(from, 1);
+    movable.splice(to, 0, dragKey);
+    // 本地立即重排 _reportBoards（movable 顺序 + locked 保持末尾）
+    const locked = _reportBoards.filter(function (b) { return b.locked; });
+    const map = {}; _reportBoards.forEach(function (b) { map[b.key] = b; });
+    _reportBoards = movable.map(function (k) { return map[k]; }).concat(locked);
+    renderReportTabs(_txBoardId);
+    try {
+        await fetch(txUrl('/boards/reorder'), {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keys: movable })
+        });
+    } catch (e) { /* 排序失败不阻塞，下次刷新以后端为准 */ }
 }
 
 // ===== 种子数据（首次为空时写入后端，按当前看板返回）=====
@@ -157,8 +373,9 @@ async function loadTxBoard() {
     try {
         let resp = await authFetch(txUrl(''));
         let data = await resp.json();
-        // 空看板 → 推送种子初始化，再重新拉
-        if (!data || !Array.isArray(data.groups) || data.groups.length === 0) {
+        // 空看板 → 仅内置看板(tencent/customer)注入演示种子；用户新建看板保持空白
+        const isBuiltin = (_txBoardId === 'tencent' || _txBoardId === 'customer');
+        if (isBuiltin && (!data || !Array.isArray(data.groups) || data.groups.length === 0)) {
             await authFetch(txUrl('/init-seed'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

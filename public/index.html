@@ -2554,6 +2554,9 @@
                         .report-sub-tab { padding:8px 18px; border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:500; color:var(--text-secondary,#616161); border-bottom:2px solid transparent; transition:all .15s; border-radius:6px 6px 0 0; }
                         .report-sub-tab:hover { color:var(--primary,#1677ff); background:var(--primary-light,rgba(22,119,255,.06)); }
                         .report-sub-tab.active { color:var(--primary,#1677ff); border-bottom-color:var(--primary,#1677ff); }
+                        .report-sub-tab .board-del-x:hover { opacity:1 !important; color:var(--danger,#e23b3b); }
+                        .report-sub-tab[draggable="true"] { cursor:pointer; }
+                        #board-icon-picker .board-icon-opt:hover { background:var(--primary-light,rgba(22,119,255,.1)); }
                         .report-sub-panel { flex:1; display:flex; flex-direction:column; min-height:0; }
                         /* ===== 腾讯系游戏开发进展 — 4分组并排看板（忠实还原图片） ===== */
                         section#reports.tab-content.active { display:flex; flex-direction:column; }
@@ -2681,76 +2684,13 @@
                         [data-theme="dark"] .tx-board-table thead .tx-grp-h { color:#e8eaed; }
                         [data-theme="dark"] .tx-board-table thead .tx-sub-h { background:rgba(0,0,0,0.25); color:#cbd0d8; }
                     </style>
-                    <!-- 子 Tab 切换：汇报报表 / 腾讯系游戏开发进展 -->
+                    <!-- 子 Tab 切换：注册表驱动，可动态增删改+拖拽排序（JS 填充 #report-sub-tabs-list） -->
                     <div class="report-sub-tabs">
-                        <button class="report-sub-tab active" data-subtab="report-customer" onclick="switchReportSubTab('report-customer')">📋 各客户适配进展</button>
-                        <button class="report-sub-tab" data-subtab="report-tencent" onclick="switchReportSubTab('report-tencent')">🐧 腾讯系游戏开发进展</button>
-                        <button class="report-sub-tab" data-subtab="report-main" onclick="switchReportSubTab('report-main')">📊 汇报报表</button>
-                        <button class="report-sub-tab" data-subtab="report-dashboard" onclick="switchReportSubTab('report-dashboard')">📈 经营报表</button>
-                    </div>
-
-                    <!-- ========== 子面板1：汇报报表（原有内容；默认隐藏，默认显示「各客户适配进展」看板） ========== -->
-                    <div id="report-sub-main" class="report-sub-panel" style="display:none;">
-                    <div class="toolbar">
-                        <div class="toolbar-left">
-                            <div style="position:relative;">
-                                <input type="text" id="report-search-input" placeholder="🔍 搜索游戏名称/状态/平台..." onkeyup="filterReports()">
-                            </div>
-                            <button class="tool-btn" onclick="resetReportFilters()" title="重置筛选">重置</button>
+                        <div id="report-sub-tabs-list" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                            <!-- 由 loadReportBoards() 动态渲染 .report-sub-tab -->
                         </div>
-                        <div class="toolbar-right">
-                            <span id="report-page-info" class="text-muted" style="font-size:12px;margin-right:8px;"></span>
-                            <button class="tool-btn" id="report-prev-page" onclick="reportPrevPage()" title="上一页">◀</button>
-                            <button class="tool-btn" id="report-next-page" onclick="reportNextPage()" title="下一页">▶</button>
-                            <button class="tool-btn tool-btn-primary" onclick="refreshReports()" title="刷新数据"><i class="fas fa-sync-alt"></i> 刷新</button>
-                            <button class="tool-btn tool-btn-primary" onclick="addReportRow()" title="新增报表行"><span class="tool-icon">＋</span> 新增</button>
-                            <button class="tool-btn" onclick="exportReport()" title="导出Excel" style="background:#28a745;color:#fff;"><i class="fas fa-file-excel"></i> 导出Excel</button>
-                            <div class="more-actions-wrapper" style="display:inline-block;vertical-align:middle;margin-left:4px;">
-                                <button class="tool-btn more-actions-btn" onclick="toggleReportColumnSettings()" title="字段设置">⚙</button>
-                            </div>
-                            <span id="reports-updated" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
-                        </div>
+                        <button class="report-sub-tab" id="report-add-tab-btn" onclick="openAddBoardModal()" title="新增一个报表标签" style="color:var(--primary,#1677ff);font-weight:600;">＋ 新增标签</button>
                     </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th width="40" class="no-sort"></th>
-                                    <th width="50">序号</th>
-                                    <th data-field="name">游戏名称</th>
-                                    <th data-field="status" width="100">适配状态</th>
-                                    <th data-field="platform" width="100">平台</th>
-                                    <th data-field="notes">备注</th>
-                                    <th width="60">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="report-games-table">
-                                <tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <!-- 报表字段设置面板 -->
-                    <div id="report-column-settings" class="column-settings-panel" style="display:none;">
-                        <div class="settings-header">
-                            <h3>选择要显示的列</h3>
-                            <button class="settings-close-btn" onclick="closeReportColumnSettings()" title="收起">×</button>
-                            <div class="settings-actions">
-                                <button class="tool-btn" onclick="selectAllReportColumns()">全选</button>
-                                <button class="tool-btn" onclick="deselectAllReportColumns()">取消全选</button>
-                                <button class="tool-btn" onclick="cancelReportColumnSettings()">取消</button>
-                                <button class="tool-btn tool-btn-primary" onclick="applyReportColumnSettings()">应用</button>
-                            </div>
-                        </div>
-                        <div class="settings-content checkbox-group">
-                            <label class="checkbox-label"><input type="checkbox" value="seq" checked><span>序号</span></label>
-                            <label class="checkbox-label"><input type="checkbox" value="name" checked><span>游戏名称</span></label>
-                            <label class="checkbox-label"><input type="checkbox" value="status" checked><span>适配状态</span></label>
-                            <label class="checkbox-label"><input type="checkbox" value="platform" checked><span>平台</span></label>
-                            <label class="checkbox-label"><input type="checkbox" value="notes" checked><span>备注</span></label>
-                            <label class="checkbox-label"><input type="checkbox" value="action" checked><span>操作</span></label>
-                        </div>
-                    </div>
-                    </div><!-- /#report-sub-main -->
 
                     <!-- ========== 看板面板（腾讯系 / 各客户适配进展 共用同一引擎，按 _txBoardId 切换数据） ========== -->
                     <div id="report-sub-tencent" class="report-sub-panel" style="display:none;">
@@ -2907,6 +2847,33 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" onclick="txCloseAddGroupModal()">取消</button>
                                 <button type="button" class="btn btn-primary" onclick="txSubmitAddGroup()">创建分组</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== 新增/改名 报表标签(看板) 弹窗 ========== -->
+                    <div id="board-edit-modal" class="modal" style="display:none;">
+                        <div class="modal-content" style="max-width:460px;width:92%;">
+                            <div class="modal-header">
+                                <h3 id="board-edit-title">新增报表标签</h3>
+                                <button class="modal-close" type="button" onclick="closeBoardEditModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>标签图标</label>
+                                    <div id="board-icon-picker" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+                                        <!-- JS 填充 emoji 选项 -->
+                                    </div>
+                                    <input type="text" id="board-edit-icon" class="form-control" placeholder="或粘贴任意 emoji" maxlength="4" style="width:120px;text-align:center;font-size:18px;">
+                                </div>
+                                <div class="form-group">
+                                    <label>标签名称 <span style="color:var(--danger,#e23b3b);">*</span></label>
+                                    <input type="text" id="board-edit-name" class="form-control" placeholder="如：某某客户适配进展 / 2026Q3 排期 …" maxlength="30">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeBoardEditModal()">取消</button>
+                                <button type="button" class="btn btn-primary" id="board-edit-submit" onclick="submitBoardEdit()">创建</button>
                             </div>
                         </div>
                     </div>
@@ -3720,7 +3687,7 @@
     <script src="js/components/a11y.js?v=20260624c"></script>
     <script src="js/components/rich-editor.js?v=20260701b"></script>
     <script src="js/crud-module.js?v=20260624c"></script>
-    <script src="js/router.js?v=20260630e"></script>
+    <script src="js/router.js?v=20260701f"></script>
     <script src="js/entities.js?v=20260701c"></script>
     <script src="js/plans.js?v=20260701c"></script>
     <script src="js/dashboard.js?v=20260624c"></script>
@@ -3731,7 +3698,7 @@
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260701d"></script>
     <script src="js/reports.js?v=20260630e"></script>
-    <script src="js/tencent-games.js?v=20260701e"></script>
+    <script src="js/tencent-games.js?v=20260701f"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
     <script src="js/faq.js?v=20260630e"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->

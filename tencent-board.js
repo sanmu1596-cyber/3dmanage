@@ -258,4 +258,84 @@ router.post('/reset', (req, res) => {
   });
 });
 
+// ============================================================
+// 看板注册表（报表子标签）：列表 / 新增 / 改名改图标 / 删除 / 排序
+// ============================================================
+
+// ---- 看板列表（按 sort_order 升序） ----
+router.get('/boards', (req, res) => {
+  db.all('SELECT board_key AS key, title, icon, kind, locked, sort_order FROM tx_boards ORDER BY sort_order ASC, id ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ boards: (rows || []).map(r => ({ key: r.key, title: r.title, icon: r.icon || '📋', kind: r.kind || 'board', locked: !!r.locked })) });
+  });
+});
+
+// ---- 新增看板（生成唯一 board_key，返回 key） ----
+router.post('/boards', (req, res) => {
+  const title = (req.body && req.body.title || '').trim();
+  const icon = (req.body && req.body.icon || '📋').trim() || '📋';
+  if (!title) return res.status(400).json({ error: '看板名称不能为空' });
+  const key = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  db.get('SELECT MAX(sort_order) AS mx FROM tx_boards WHERE locked = 0', [], (e0, r0) => {
+    const nextSort = (r0 && typeof r0.mx === 'number' ? r0.mx : 0) + 1;
+    db.run('INSERT INTO tx_boards (board_key, title, icon, kind, locked, sort_order) VALUES (?, ?, ?, ?, 0, ?)',
+      [key, title, icon, 'board', nextSort], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json({ success: true, key, title, icon });
+      });
+  });
+});
+
+// ---- 改名 / 改图标 ----
+router.patch('/boards/:key', (req, res) => {
+  const key = String(req.params.key);
+  db.get('SELECT locked FROM tx_boards WHERE board_key = ?', [key], (e0, row) => {
+    if (e0) return res.status(500).json({ error: e0.message });
+    if (!row) return res.status(404).json({ error: '看板不存在' });
+    if (row.locked) return res.status(403).json({ error: '该看板已锁定，不可修改' });
+    const sets = [], vals = [];
+    if (typeof req.body.title === 'string' && req.body.title.trim()) { sets.push('title = ?'); vals.push(req.body.title.trim()); }
+    if (typeof req.body.icon === 'string' && req.body.icon.trim()) { sets.push('icon = ?'); vals.push(req.body.icon.trim()); }
+    if (!sets.length) return res.status(400).json({ error: '没有可更新的字段' });
+    vals.push(key);
+    db.run('UPDATE tx_boards SET ' + sets.join(', ') + ' WHERE board_key = ?', vals, function (e) {
+      if (e) return res.status(500).json({ error: e.message });
+      res.json({ success: true });
+    });
+  });
+});
+
+// ---- 删除看板（彻底删除：注册项 + 该 board 全部 groups/rows/meta） ----
+router.delete('/boards/:key', (req, res) => {
+  const key = String(req.params.key);
+  db.get('SELECT locked FROM tx_boards WHERE board_key = ?', [key], (e0, row) => {
+    if (e0) return res.status(500).json({ error: e0.message });
+    if (!row) return res.status(404).json({ error: '看板不存在' });
+    if (row.locked) return res.status(403).json({ error: '该看板已锁定，不可删除' });
+    db.serialize(() => {
+      db.run('DELETE FROM tx_board_rows WHERE group_id IN (SELECT id FROM tx_board_groups WHERE board = ?)', [key]);
+      db.run('DELETE FROM tx_board_groups WHERE board = ?', [key]);
+      db.run('DELETE FROM tx_board_meta WHERE key = ?', [metaKeyOf(key)]);
+      db.run('DELETE FROM tx_boards WHERE board_key = ?', [key], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json({ success: true });
+      });
+    });
+  });
+});
+
+// ---- 排序（拖拽后整体提交有序 key 数组，locked 项不参与但保持其位置值不变） ----
+router.put('/boards/reorder', (req, res) => {
+  const keys = Array.isArray(req.body && req.body.keys) ? req.body.keys : null;
+  if (!keys) return res.status(400).json({ error: '缺少 keys 数组' });
+  db.serialize(() => {
+    const stmt = db.prepare('UPDATE tx_boards SET sort_order = ? WHERE board_key = ? AND locked = 0');
+    keys.forEach((k, i) => stmt.run(i, String(k)));
+    stmt.finalize((e) => {
+      if (e) return res.status(500).json({ error: e.message });
+      res.json({ success: true });
+    });
+  });
+});
+
 module.exports = router;

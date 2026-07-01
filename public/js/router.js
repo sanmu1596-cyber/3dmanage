@@ -247,8 +247,16 @@ async function _doLoadTabData(tabId, switchId) {
             break;
         case 'reports':
             loadReports();
-            // 默认进入「各客户适配进展」看板子页
-            if (typeof switchReportSubTab === 'function') switchReportSubTab('report-customer');
+            // 加载看板注册表并默认进入第一个看板（注册表驱动，可动态增删）
+            if (typeof loadReportBoards === 'function') {
+                loadReportBoards().then(function () {
+                    if (typeof _reportBoards !== 'undefined' && _reportBoards.length && typeof switchReportSubTab === 'function') {
+                        switchReportSubTab(_reportBoards[0].key);
+                    }
+                });
+            } else if (typeof switchReportSubTab === 'function') {
+                switchReportSubTab('customer');
+            }
             break;
         case 'faq':
             if (typeof loadFaq === 'function') loadFaq();
