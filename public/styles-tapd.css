@@ -7606,3 +7606,28 @@ body.dark-mode .rich-editor-toolbar .w-e-bar { background: #1d2029 !important; }
 body.dark-mode .rich-editor-toolbar .w-e-bar-item button { color: #c4c8cf !important; }
 body.dark-mode .rich-editor-toolbar .w-e-bar-item button:hover { background: #2c313c !important; }
 body.dark-mode .rte-readonly { color: #e6e8eb; }
+
+/* ==================== RichEditor 表格增强（wangEditor-next 社区版） ==================== */
+/* 编辑区表格：确保有清晰边框、非全宽时列宽可拖 */
+.rich-editor-body table {
+  border-collapse: collapse;
+}
+.rich-editor-body table td,
+.rich-editor-body table th {
+  min-width: 40px;
+  position: relative;
+}
+/* 多选单元格高亮（社区版 with-selection 会给选中单元格加背景） */
+.rich-editor-body .w-e-selected-cell,
+.rich-editor-body td.selected-cell,
+.rich-editor-body th.selected-cell {
+  background-color: rgba(56, 132, 255, 0.18) !important;
+}
+/* 行高拖拽时的视觉提示（组件层 enhanceRowResize 会设 cursor:row-resize） */
+.rich-editor-body tr { transition: none; }
+
+/* 深色模式下表格增强 */
+body.dark-mode .rich-editor-body .w-e-selected-cell,
+body.dark-mode .rich-editor-body td.selected-cell {
+  background-color: rgba(56, 132, 255, 0.30) !important;
+}

@@ -1,14 +1,20 @@
 /**
  * RichEditor — 通用富文本编辑器组件
  *
- * 基于 wangEditor v5（国产 MIT，CDN 单文件，零构建），封装成与 SearchableSelect
- * 同级的可复用组件。适用于需求描述、评论、备注、方案说明等所有富文本输入场景。
+ * 基于 wangEditor-next 社区版（MIT，CDN 单文件，零构建，全局名仍为 wangEditor），
+ * 封装成与 SearchableSelect 同级的可复用组件。适用于需求描述、评论、备注、方案说明等
+ * 所有富文本输入场景。
  *
  * 依赖（在 index.html 中先于本文件引入）：
- *   <link href="https://cdn.jsdelivr.net/npm/@wangeditor/editor@5.1.23/dist/css/style.min.css" rel="stylesheet">
- *   <script src="https://cdn.jsdelivr.net/npm/@wangeditor/editor@5.1.23/dist/index.js"></script>
+ *   <link href="https://cdn.jsdelivr.net/npm/@wangeditor-next/editor@5.7.13/dist/css/style.min.css" rel="stylesheet">
+ *   <script src="https://cdn.jsdelivr.net/npm/@wangeditor-next/editor@5.7.13/dist/index.js"></script>
  *
  * 功能：文字格式化（加粗/斜体/颜色/字号/标题/列表/对齐等）、图片粘贴&上传、插入表格。
+ * 表格增强（社区版内置 + 组件层补强）：
+ *   - 列宽可拖（表格默认插入为“非全宽”，鼠标移到列边界拖拽即可调整）
+ *   - 行高可拖（组件层 enhanceRowResize：拖拽行下边界改行高）
+ *   - 多选单元格：编辑区内按住拖蓝选中多个单元格，工具栏格式化按钮批量作用
+ *   - 合并 / 拆分单元格（表格工具栏内置）
  * 图片上传走后端 POST /api/upload/image（带 token），返回 { success, url }，
  * 内容以 HTML 字符串形式保存到现有 text 字段。
  *
@@ -131,7 +137,79 @@
     return cfg;
   }
 
-  function makeInstance(editor, toolbar, wrapEl) {
+  /**
+   * 行高拖拽增强（组件层补强，wangEditor-next 原生只做列宽不做行高）。
+   * 原理：在编辑区容器上委托 mousemove 检测光标是否贴近某个 tr 的下边界，
+   * 是则显示 row-resize 光标；mousedown 进入拖拽，实时改该行所有 td/th 的 height。
+   * 返回一个 cleanup 函数用于 destroy 时解绑。
+   */
+  function enhanceRowResize(editorEl) {
+    if (!editorEl) return function () {};
+    var EDGE = 5;            // 触发区像素
+    var MIN_H = 24;          // 行最小高度
+    var hovering = null;     // 当前悬停可调整的 tr
+    var dragging = null;     // { tr, startY, startH }
+
+    function rowBottomHit(e) {
+      // 找到光标下方最近的 tr，判断是否贴近其下边界
+      var el = e.target;
+      while (el && el !== editorEl && el.tagName !== 'TR') el = el.parentElement;
+      if (!el || el.tagName !== 'TR') return null;
+      var rect = el.getBoundingClientRect();
+      if (Math.abs(e.clientY - rect.bottom) <= EDGE) return el;
+      return null;
+    }
+
+    function onMove(e) {
+      if (dragging) {
+        var dh = e.clientY - dragging.startY;
+        var nh = Math.max(MIN_H, dragging.startH + dh);
+        var cells = dragging.tr.querySelectorAll('td,th');
+        for (var i = 0; i < cells.length; i++) cells[i].style.height = nh + 'px';
+        e.preventDefault();
+        return;
+      }
+      var tr = rowBottomHit(e);
+      if (tr) {
+        hovering = tr;
+        editorEl.style.cursor = 'row-resize';
+      } else if (hovering) {
+        hovering = null;
+        editorEl.style.cursor = '';
+      }
+    }
+
+    function onDown(e) {
+      var tr = rowBottomHit(e);
+      if (!tr) return;
+      var firstCell = tr.querySelector('td,th');
+      var startH = firstCell ? firstCell.getBoundingClientRect().height : tr.getBoundingClientRect().height;
+      dragging = { tr: tr, startY: e.clientY, startH: startH };
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function onUp() {
+      if (dragging) {
+        dragging = null;
+        document.body.style.userSelect = '';
+        editorEl.style.cursor = '';
+      }
+    }
+
+    editorEl.addEventListener('mousemove', onMove, true);
+    editorEl.addEventListener('mousedown', onDown, true);
+    document.addEventListener('mouseup', onUp, true);
+
+    return function cleanup() {
+      editorEl.removeEventListener('mousemove', onMove, true);
+      editorEl.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('mouseup', onUp, true);
+    };
+  }
+
+  function makeInstance(editor, toolbar, wrapEl, rowResizeCleanup) {
     return {
       _editor: editor,
       _toolbar: toolbar,
@@ -142,6 +220,7 @@
       isEmpty: function () { return editor ? editor.isEmpty() : true; },
       focus: function () { if (editor) editor.focus(); },
       destroy: function () {
+        try { if (rowResizeCleanup) rowResizeCleanup(); } catch (e) {}
         try { if (toolbar) toolbar.destroy(); } catch (e) {}
         try { if (editor) editor.destroy(); } catch (e) {}
         this._editor = null; this._toolbar = null;
@@ -176,7 +255,9 @@
       config: buildToolbarConfig(opt.mode),
       mode: opt.mode === 'simple' ? 'simple' : 'default'
     });
-    return makeInstance(editor, toolbar, document.getElementById(baseId));
+    // 组件层行高拖拽增强（绑定在编辑区容器上，capture 捕获内部 tr 边界）
+    var rowResizeCleanup = enhanceRowResize(editorEl);
+    return makeInstance(editor, toolbar, document.getElementById(baseId), rowResizeCleanup);
   }
 
   /**
