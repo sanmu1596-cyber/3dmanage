@@ -9,6 +9,57 @@ var App = window.App;
 let requirementsData = [];
 let reqViewMode = 'list'; // 'list' or 'card'
 
+// ---- 需求描述富文本编辑器（RichEditor 通用组件） ----
+// 持有当前编辑器实例，切换视图/关闭表单时销毁防内存泄漏
+var _reqDescEditor = null;
+
+// 挂载需求描述富文本编辑器。value=初始HTML。
+// 若 RichEditor(CDN) 未就绪则降级为原生 textarea。
+function mountReqDescEditor(value) {
+    destroyReqDescEditor();
+    var wrap = document.getElementById('req-description-editor');
+    var ta = document.getElementById('req-description');
+    if (window.RichEditor && RichEditor.isReady() && wrap) {
+        wrap.style.display = '';
+        if (ta) ta.style.display = 'none';
+        _reqDescEditor = RichEditor.create({
+            containerId: 'req-description-editor',
+            value: value || '',
+            height: 260,
+            placeholder: '请输入需求描述…'
+        });
+    } else {
+        // 降级：CDN 未加载时用 textarea
+        if (wrap) wrap.style.display = 'none';
+        if (ta) { ta.style.display = ''; ta.value = value || ''; }
+    }
+}
+
+// 取需求描述内容（HTML 字符串）
+function getReqDescValue() {
+    if (_reqDescEditor) return _reqDescEditor.getHtml();
+    var ta = document.getElementById('req-description');
+    return ta ? ta.value : '';
+}
+
+// 从富文本 HTML 提取纯文本（用于列表/卡片摘要，避免显示标签）
+function reqDescPlain(html) {
+    if (!html) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+// 销毁编辑器实例（切换视图/取消时调用）
+function destroyReqDescEditor() {
+    if (_reqDescEditor) {
+        try { _reqDescEditor.destroy(); } catch (e) {}
+        _reqDescEditor = null;
+    }
+    var wrap = document.getElementById('req-description-editor');
+    if (wrap) wrap.innerHTML = '';
+}
+
 // 统一状态字典（P1-3：含审批闭环态）
 // draft 草稿 → published 已发布 → in_progress 进行中 → pending_review 待审批 → approved 通过 / rejected 驳回(可重做) → closed 已完成
 var REQ_STATUS_MAP = {
@@ -207,7 +258,7 @@ function renderReqCards(filtered) {
                 ${r.deadline ? `<span class="plan-card-meta-item"><span class="meta-icon">📅</span>${r.deadline}</span>` : ''}
                 <span class="plan-card-meta-item"><span class="meta-icon">📋</span>${r.plan_count || 0} 个计划</span>
             </div>
-            ${r.description ? `<div style="font-size:12px;color:var(--text-secondary);margin:6px 0;line-height:1.5;overflow:hidden;max-height:36px;">${escapeHtml(r.description).slice(0, 80)}${r.description.length > 80 ? '...' : ''}</div>` : ''}
+            ${r.description ? (function(){ var _t = reqDescPlain(r.description); return _t ? `<div style="font-size:12px;color:var(--text-secondary);margin:6px 0;line-height:1.5;overflow:hidden;max-height:36px;">${escapeHtml(_t.slice(0, 80))}${_t.length > 80 ? '...' : ''}</div>` : ''; })() : ''}
             <div class="plan-card-body">
                 <div class="plan-card-progress">
                     <div class="plan-card-progress-bar"><div class="plan-card-progress-fill" style="width:${progress}%"></div></div>
@@ -231,7 +282,7 @@ function showReqCreateView() {
     document.getElementById('req-form-title').textContent = '新增需求';
     document.getElementById('req-edit-id').value = '';
     document.getElementById('req-title').value = '';
-    document.getElementById('req-description').value = '';
+    mountReqDescEditor('');
     document.getElementById('req-priority').value = 'medium';
     document.getElementById('req-deadline').value = '';
     document.getElementById('req-assigned-to').value = '';
@@ -267,7 +318,7 @@ async function editRequirement(id) {
         document.getElementById('req-form-title').textContent = '编辑需求';
         document.getElementById('req-edit-id').value = r.id;
         document.getElementById('req-title').value = r.title || '';
-        document.getElementById('req-description').value = r.description || '';
+        mountReqDescEditor(r.description || '');
         document.getElementById('req-priority').value = r.priority || 'medium';
         document.getElementById('req-deadline').value = r.deadline || '';
         populateReqAssigneeSelect();
@@ -285,7 +336,7 @@ async function submitRequirement(status) {
 
     const data = {
         title,
-        description: document.getElementById('req-description').value,
+        description: getReqDescValue(),
         priority: document.getElementById('req-priority').value,
         assigned_to: document.getElementById('req-assigned-to').value || null,
         deadline: document.getElementById('req-deadline').value || null,
@@ -359,6 +410,7 @@ async function openReqDetail(id) {
         if (!result.success) return showToast('加载需求详情失败', 'danger');
         const r = result.data;
 
+        destroyReqDescEditor(); // 离开编辑表单，销毁富文本实例防泄漏
         document.getElementById('req-list-view').style.display = 'none';
         document.getElementById('req-create-view').style.display = 'none';
         document.getElementById('req-detail-view').style.display = 'flex';
@@ -389,7 +441,7 @@ async function openReqDetail(id) {
             ${r.approver_name ? `<span class="info-tag"><span class="tag-label">审批人：</span>${escapeHtml(r.approver_name)}</span>` : ''}
             ${r.approved_at ? `<span class="info-tag"><span class="tag-label">审批时间：</span>${(r.approved_at || '').slice(0, 16)}</span>` : ''}
             ${r.status === 'rejected' && r.reject_reason ? `<div style="margin-top:8px;padding:10px 14px;background:#fdecec;border:1px solid #f5c2c2;border-radius:6px;font-size:13px;line-height:1.6;color:#c53030;white-space:pre-wrap;"><strong>❌ 驳回理由：</strong>${escapeHtml(r.reject_reason)}</div>` : ''}
-            ${r.description ? `<div style="margin-top:8px;padding:10px 14px;background:var(--bg-card);border-radius:6px;font-size:13px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;">${escapeHtml(r.description)}</div>` : ''}
+            ${r.description ? `<div class="rte-readonly" style="margin-top:8px;padding:10px 14px;background:var(--bg-card);border-radius:6px;">${(window.RichEditor ? RichEditor.renderReadonly(r.description) : escapeHtml(r.description))}</div>` : ''}
         `;
 
         // 关联的配置计划
@@ -546,6 +598,7 @@ function createPlanFromReq(reqId) {
 
 // 返回需求列表
 function backToReqList() {
+    destroyReqDescEditor(); // 离开编辑表单，销毁富文本实例防泄漏
     document.getElementById('req-list-view').style.display = '';
     document.getElementById('req-detail-view').style.display = 'none';
     document.getElementById('req-create-view').style.display = 'none';
