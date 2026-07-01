@@ -2578,6 +2578,12 @@
                         .tx-board-table thead .tx-sub-h .tx-colname { display:inline-block; max-width:calc(100% - 6px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
                         .tx-col-resize { position:absolute; right:0; top:0; bottom:0; width:6px; cursor:col-resize; z-index:6; }
                         .tx-col-resize:hover, body.col-resizing .tx-col-resize { background:rgba(22,119,255,0.45); }
+                        /* 删列小×：绝对定位右上角（避开右侧6px resize手柄），hover列头才显示，不占几何尺寸防抖动 */
+                        .tx-col-del { position:absolute; top:1px; right:8px; width:15px; height:15px; line-height:14px; text-align:center; font-size:13px; color:#c0392b; background:rgba(255,255,255,0.9); border:1px solid rgba(192,57,43,0.4); border-radius:3px; cursor:pointer; z-index:7; display:none; }
+                        .tx-board-table thead .tx-sub-h:hover .tx-col-del { display:block; }
+                        .tx-col-del:hover { background:#c0392b; color:#fff; }
+                        [data-theme="dark"] .tx-col-del { background:rgba(30,32,38,0.9); color:#ff7875; border-color:rgba(255,120,117,0.5); }
+                        [data-theme="dark"] .tx-col-del:hover { background:#c0392b; color:#fff; }
                         body.col-resizing, body.row-resizing { cursor:col-resize; user-select:none; }
                         body.row-resizing { cursor:row-resize; }
                         /* 行高拖拽手柄（每行第一格底部，td overflow:hidden 故贴 bottom:0 内侧） */
@@ -3714,7 +3720,7 @@
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260701d"></script>
     <script src="js/reports.js?v=20260630e"></script>
-    <script src="js/tencent-games.js?v=20260701h"></script>
+    <script src="js/tencent-games.js?v=20260701i"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
     <script src="js/faq.js?v=20260630e"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->

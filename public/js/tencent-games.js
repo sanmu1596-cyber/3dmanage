@@ -576,6 +576,7 @@ function renderTxBoard() {
         g.cols.forEach((col, ci) => {
             thead += `<th class="tx-sub-h s-${txCls(g.key)}" data-g="${gi}" data-c="${ci}" data-leaf="${leafIdx}" ondblclick="startTxColNameEdit(this)">`
                 + `<span class="tx-colname">${escapeHtml(col)}</span>`
+                + `<span class="tx-col-del" title="删除此列" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteTxCol(${gi},${ci})">×</span>`
                 + `<span class="tx-col-resize" onmousedown="startTxColResize(event, ${leafIdx})"></span>`
                 + `</th>`;
             leafIdx++;
@@ -875,6 +876,31 @@ function startTxColNameEdit(th) {
         if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
         else if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
     });
+}
+
+// ===== 删除单列（→ DELETE /group/:id/col/:ci，后端事务同步删 cols + 各行 cells）=====
+async function deleteTxCol(gi, ci) {
+    if (!txBoard || !txBoard.groups[gi]) return;
+    const group = txBoard.groups[gi];
+    if (!group.cols || group.cols.length <= 1) {
+        if (typeof showToast === 'function') showToast('至少保留 1 列，无法删除', 'warning');
+        return;
+    }
+    const colName = group.cols[ci] || ('第' + (ci + 1) + '列');
+    const ok = (typeof uiConfirm === 'function')
+        ? await uiConfirm('确定删除分组「' + (group.title || '') + '」中的列「' + colName + '」吗？该列所有数据将一并删除，不可恢复。', { danger: true, okText: '删除' })
+        : confirm('确定删除列「' + colName + '」及其所有数据吗？');
+    if (!ok) return;
+    try {
+        const resp = await authFetch(txUrl('/group/' + group.id + '/col/' + ci), { method: 'DELETE' });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok || !result.success) throw new Error(result.error || '删除失败');
+        await loadTxBoard();
+        if (typeof showToast === 'function') showToast('列已删除', 'success');
+    } catch (e) {
+        console.error('[tx] 删除列失败', e);
+        if (typeof showToast === 'function') showToast(e.message || '删除失败', 'danger');
+    }
 }
 
 // ===== 分组名双击编辑（→ PATCH /group 改 title）=====

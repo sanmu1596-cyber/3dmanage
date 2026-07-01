@@ -231,6 +231,40 @@ router.patch('/group/:id', (req, res) => {
   });
 });
 
+// ============ 删除分组内的单列（连带删除所有行对应单元格） ============
+// DELETE /group/:id/col/:ci  —— ci 为列索引；事务内删 cols[ci] + 每行 cells[ci]
+router.delete('/group/:id/col/:ci', (req, res) => {
+  const gid = req.params.id;
+  const ci = parseInt(req.params.ci, 10);
+  if (isNaN(ci) || ci < 0) return res.status(400).json({ error: '列索引无效' });
+  db.get('SELECT cols FROM tx_board_groups WHERE id = ?', [gid], (err, g) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!g) return res.status(404).json({ error: '分组不存在' });
+    const cols = J(g.cols, []);
+    if (ci >= cols.length) return res.status(400).json({ error: '列索引超出范围' });
+    if (cols.length <= 1) return res.status(400).json({ error: '至少保留 1 列，无法删除' });
+    cols.splice(ci, 1);
+    db.all('SELECT id, cells FROM tx_board_rows WHERE group_id = ?', [gid], (err2, rows) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      db.serialize(() => {
+        db.run('BEGIN');
+        db.run('UPDATE tx_board_groups SET cols = ? WHERE id = ?', [JSON.stringify(cols), gid]);
+        const rStmt = db.prepare('UPDATE tx_board_rows SET cells = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+        (rows || []).forEach(r => {
+          const cells = J(r.cells, []);
+          if (ci < cells.length) cells.splice(ci, 1);
+          rStmt.run([JSON.stringify(cells), r.id]);
+        });
+        rStmt.finalize();
+        db.run('COMMIT', (ce) => {
+          if (ce) return res.status(500).json({ error: ce.message });
+          res.json({ success: true, cols });
+        });
+      });
+    });
+  });
+});
+
 // ============ 保存看板配置（列宽/行高等） ============
 // body: { colWidths?, rowHeights? }  — 整体覆盖式存 JSON（按 board 区分）
 router.put('/meta', (req, res) => {
