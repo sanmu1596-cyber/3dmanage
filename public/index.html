@@ -1144,9 +1144,9 @@
                             <div class="comment-input-area">
                                 <div class="comment-avatar" id="req-comment-avatar">👤</div>
                                 <div class="comment-input-wrapper">
-                                    <textarea class="comment-textarea" id="req-comment-input" placeholder="写下你的评论...（输入 @ 可提及成员）" rows="2"></textarea>
-                                    <button class="comment-submit-btn" onclick="submitComment('requirement', currentReqId, 'req')">发送</button>
-                                    <div class="mention-dropdown" id="req-mention-dropdown"></div>
+                                    <div id="req-comment-editor" class="comment-rte"></div>
+                                    <textarea class="comment-textarea" id="req-comment-input" style="display:none;"></textarea>
+                                    <button class="comment-submit-btn" onclick="submitEntityComment('requirement', currentReqId, 'req')">发送</button>
                                 </div>
                             </div>
                             <ul class="comments-list" id="req-comments-list">
@@ -1531,9 +1531,9 @@
                             <div class="comment-input-area">
                                 <div class="comment-avatar" id="plan-comment-avatar">👤</div>
                                 <div class="comment-input-wrapper">
-                                    <textarea class="comment-textarea" id="plan-comment-input" placeholder="写下你的评论...（输入 @ 可提及成员）" rows="2"></textarea>
-                                    <button class="comment-submit-btn" onclick="submitComment('plan', currentPlanId, 'plan')">发送</button>
-                                    <div class="mention-dropdown" id="plan-mention-dropdown"></div>
+                                    <div id="plan-comment-editor" class="comment-rte"></div>
+                                    <textarea class="comment-textarea" id="plan-comment-input" style="display:none;"></textarea>
+                                    <button class="comment-submit-btn" onclick="submitEntityComment('plan', currentPlanId, 'plan')">发送</button>
                                 </div>
                             </div>
                             <ul class="comments-list" id="plan-comments-list">
@@ -3686,7 +3686,7 @@
     <script src="js/requirements.js?v=20260701a"></script>
     <script src="js/testcases.js?v=20260701c"></script>
     <script src="js/issues-versions.js?v=20260624c"></script>
-    <script src="js/social.js?v=20260624c"></script>
+    <script src="js/social.js?v=20260701d"></script>
     <script src="js/reports.js?v=20260630e"></script>
     <script src="js/tencent-games.js?v=20260630e"></script>
     <script src="js/focus-items.js?v=20260624c"></script>

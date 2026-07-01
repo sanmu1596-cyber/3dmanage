@@ -8,7 +8,63 @@ var App = window.App;
 // ==================== 评论组件 Comments Module ====================
 let currentReqId = null;      // 当前查看的需求ID
 let currentPlanId = null;     // 当前查看的计划ID
-let _membersCache = [];       // 成员缓存（用于@提及）
+let _membersCache = [];       // 成员缓存（保留：其他模块可能引用）
+
+// ===== 评论富文本编辑器（需求/计划评论共用，按 prefix 区分实例）=====
+var _commentEditors = {};     // { req: instance, plan: instance }
+
+/** 挂载评论富文本编辑器（prefix: req | plan） */
+function mountCommentEditor(prefix, html) {
+    destroyCommentEditor(prefix);
+    var containerId = prefix + '-comment-editor';
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    if (typeof RichEditor !== 'undefined' && RichEditor.isReady && RichEditor.isReady()) {
+        _commentEditors[prefix] = RichEditor.create({
+            containerId: containerId,
+            value: html || '',
+            height: 90,
+            placeholder: '写下你的评论...'
+        });
+    } else {
+        // 降级：显示隐藏 textarea
+        var ta = document.getElementById(prefix + '-comment-input');
+        if (ta) { ta.style.display = ''; ta.value = commentPlain(html || ''); }
+    }
+}
+
+/** 取评论内容 HTML */
+function getCommentValue(prefix) {
+    var inst = _commentEditors[prefix];
+    if (inst && typeof inst.getHtml === 'function') return inst.getHtml();
+    var ta = document.getElementById(prefix + '-comment-input');
+    return ta ? (ta.value || '') : '';
+}
+
+/** 清空评论编辑器 */
+function clearCommentEditor(prefix) {
+    var inst = _commentEditors[prefix];
+    if (inst && typeof inst.setHtml === 'function') { inst.setHtml(''); return; }
+    var ta = document.getElementById(prefix + '-comment-input');
+    if (ta) ta.value = '';
+}
+
+/** 销毁评论编辑器 */
+function destroyCommentEditor(prefix) {
+    var inst = _commentEditors[prefix];
+    if (inst && typeof inst.destroy === 'function') {
+        try { inst.destroy(); } catch (e) { /* ignore */ }
+    }
+    _commentEditors[prefix] = null;
+}
+
+/** 剥离 HTML 标签，得到纯文本（用于校验/降级） */
+function commentPlain(html) {
+    if (!html) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').trim();
+}
 
 /**
  * 加载评论列表
@@ -16,7 +72,7 @@ let _membersCache = [];       // 成员缓存（用于@提及）
  * @param {number} entityId   - 实体ID
  * @param {string} prefix     - 前缀: req | plan (对应DOM ID)
  */
-async function loadComments(entityType, entityId, prefix) {
+async function loadEntityComments(entityType, entityId, prefix) {
     if (!entityId) return;
     try {
         const resp = await authFetch(`${API_BASE}/comments?entity_type=${entityType}&entity_id=${entityId}`);
@@ -27,7 +83,7 @@ async function loadComments(entityType, entityId, prefix) {
 
         if (result.success && result.data && result.data.length > 0) {
             countEl.textContent = result.data.length;
-            list.innerHTML = result.data.map(c => renderCommentItem(c, entityType, entityId, prefix)).join('');
+            list.innerHTML = result.data.map(c => renderEntityCommentItem(c, entityType, entityId, prefix)).join('');
         } else {
             countEl.textContent = '0';
             list.innerHTML = '<li class="comments-empty"><div class="comments-empty-icon">💬</div>暂无评论，来写第一条吧~</li>';
@@ -38,14 +94,22 @@ async function loadComments(entityType, entityId, prefix) {
 }
 
 /** 渲染单条评论 */
-function renderCommentItem(c, entityType, entityId, prefix) {
+function renderEntityCommentItem(c, entityType, entityId, prefix) {
     const user = getCurrentUser();
     const isOwner = (c.user_id === user.id);
     const isAdmin = IS_DEV_MODE || user.role_id === 1;
     const canDelete = isOwner || isAdmin;
-    // 处理@mention高亮
-    let textHtml = escHtml(c.content || '');
-    textHtml = textHtml.replace(/@(\d+)/g, '<span class="mention-highlight">@$1</span>');
+    // 评论内容：富文本只读渲染（兼容历史纯文本）
+    const raw = c.content || '';
+    let textHtml;
+    if (/<[a-z][\s\S]*>/i.test(raw)) {
+        // 已是 HTML（富文本评论）
+        textHtml = (typeof RichEditor !== 'undefined' && RichEditor.renderReadonly)
+            ? RichEditor.renderReadonly(raw) : raw;
+    } else {
+        // 历史纯文本评论：转义 + 换行
+        textHtml = escHtml(raw).replace(/\n/g, '<br>');
+    }
     // 格式化时间
     const timeStr = formatCommentTime(c.created_at);
     // 头像取名字首字
@@ -59,19 +123,20 @@ function renderCommentItem(c, entityType, entityId, prefix) {
                 <span class="comment-time">${timeStr}</span>
             </div>
             <div class="comment-text">${textHtml}</div>
-            ${canDelete ? `<div class="comment-actions"><button class="comment-action-btn" onclick="deleteComment(${c.id}, '${entityType}', ${entityId}, '${prefix}')">🗑️ 删除</button></div>` : ''}
+            ${canDelete ? `<div class="comment-actions"><button class="comment-action-btn" onclick="deleteEntityComment(${c.id}, '${entityType}', ${entityId}, '${prefix}')">🗑️ 删除</button></div>` : ''}
         </div></li>`;
 }
 
 /** 提交评论 */
-async function submitComment(entityType, entityId, prefix) {
-    const input = document.getElementById(`${prefix}-comment-input`);
-    const content = (input.value || '').trim();
-    if (!content) return showToast('请输入评论内容', 'warning');
+async function submitEntityComment(entityType, entityId, prefix) {
+    const content = getCommentValue(prefix);        // 富文本 HTML
+    const plain = commentPlain(content);            // 纯文本（用于空校验）
+    if (!plain) return showToast('请输入评论内容', 'warning');
     if (!entityId) return showToast('数据异常，请刷新页面', 'danger');
 
+    const wrapper = document.getElementById(`${prefix}-comment-editor`)?.closest('.comment-input-wrapper');
+    const btn = wrapper ? wrapper.querySelector('.comment-submit-btn') : null;
     try {
-        const btn = input.parentElement.querySelector('.comment-submit-btn');
         if (btn) { btn.disabled = true; btn.textContent = '发送中...'; }
 
         const resp = await authFetch(`${API_BASE}/comments`, {
@@ -82,29 +147,28 @@ async function submitComment(entityType, entityId, prefix) {
         const result = await resp.json();
 
         if (result.success) {
-            input.value = '';
+            clearCommentEditor(prefix);
             showToast('评论发表成功', 'success');
-            await loadComments(entityType, entityId, prefix);
+            await loadEntityComments(entityType, entityId, prefix);
         } else {
             showToast(result.error || '发送失败', 'danger');
         }
     } catch (e) {
         showToast('网络错误', 'danger');
     } finally {
-        const btn2 = input.parentElement.querySelector('.comment-submit-btn');
-        if (btn2) { btn2.disabled = false; btn2.textContent = '发送'; }
+        if (btn) { btn.disabled = false; btn.textContent = '发送'; }
     }
 }
 
 /** 删除评论 */
-async function deleteComment(commentId, entityType, entityId, prefix) {
+async function deleteEntityComment(commentId, entityType, entityId, prefix) {
     showConfirm('确定要删除这条评论吗？', async () => {
         try {
             const resp = await authFetch(`${API_BASE}/comments/${commentId}`, { method: 'DELETE' });
             const result = await resp.json();
             if (result.success) {
                 showToast('评论已删除', 'success');
-                await loadComments(entityType, entityId, prefix);
+                await loadEntityComments(entityType, entityId, prefix);
             } else {
                 showToast(result.error || '删除失败', 'danger');
             }
@@ -212,9 +276,8 @@ if (_origOpenReqDetail) {
     window.openReqDetail = async function(id) {
         currentReqId = id;
         await _origOpenReqDetail(id);
-        loadComments('requirement', id, 'req');
-        cacheMembersForMention();
-        initMentionPicker('req-comment-input', 'req-mention-dropdown');
+        loadEntityComments('requirement', id, 'req');
+        mountCommentEditor('req', '');
         // 设置头像
         const user = getCurrentUser();
         const avEl = document.getElementById('req-comment-avatar');
@@ -230,9 +293,8 @@ if (_origOpenPlanDetail) {
         if (!plan) return;
         currentPlanId = plan.id;
         await _origOpenPlanDetail(planIndex);
-        loadComments('plan', plan.id, 'plan');
-        cacheMembersForMention();
-        initMentionPicker('plan-comment-input', 'plan-mention-dropdown');
+        loadEntityComments('plan', plan.id, 'plan');
+        mountCommentEditor('plan', '');
         // 设置头像
         const user = getCurrentUser();
         const avEl = document.getElementById('plan-comment-avatar');
@@ -240,7 +302,23 @@ if (_origOpenPlanDetail) {
     };
 }
 
-console.log('✅ 评论组件模块已加载（支持需求/计划评论区 + @提及）');
+// ===== 离开详情视图时销毁评论编辑器，防止实例泄漏 =====
+if (typeof backToReqList === 'function') {
+    const _origBackToReqList = backToReqList;
+    window.backToReqList = function() {
+        destroyCommentEditor('req');
+        return _origBackToReqList.apply(this, arguments);
+    };
+}
+if (typeof showPlanListView === 'function') {
+    const _origShowPlanListView = showPlanListView;
+    window.showPlanListView = function() {
+        destroyCommentEditor('plan');
+        return _origShowPlanListView.apply(this, arguments);
+    };
+}
+
+console.log('✅ 评论组件模块已加载（需求/计划评论区 → 富文本，已停用 @提及）');
 
 
 // ==================== 操作日志 Activity Logs Module ====================

@@ -3924,6 +3924,9 @@ tr:hover .action-icon-btn:hover {
 }
 .comment-submit-btn:hover { opacity: 0.85; }
 .comment-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 评论富文本编辑器容器：给底部提交按钮留出空间，避免遮挡 */
+.comment-rte { margin-bottom: 44px; }
+.comment-input-wrapper .comment-submit-btn { z-index: 20; }
 /* @提及 */
 .comment-toolbar {
     display: flex;
