@@ -2565,7 +2565,7 @@
                         .tx-board-table { border-collapse:collapse; table-layout:fixed; }
                         .tx-board-table th, .tx-board-table td { border:1px solid #d7dce3; padding:8px 10px; font-size:13px; vertical-align:top; overflow:hidden; }
                         /* 大分组表头（第一行，彩色块） */
-                        .tx-board-table thead .tx-grp-h { text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; cursor:pointer; }
+                        .tx-board-table thead .tx-grp-h { position:relative; text-align:center; font-weight:700; font-size:14px; color:#1f2329; padding:10px; cursor:pointer; }
                         .tx-grp-适配进行中, .tx-grp-未来排期 { background:#dbeafe; }
                         .tx-grp-已适配-修复BUG { background:#fef3c7; }
                         .tx-grp-已适配游戏列表 { background:#dcfce7; }
@@ -2584,6 +2584,12 @@
                         .tx-col-del:hover { background:#c0392b; color:#fff; }
                         [data-theme="dark"] .tx-col-del { background:rgba(30,32,38,0.9); color:#ff7875; border-color:rgba(255,120,117,0.5); }
                         [data-theme="dark"] .tx-col-del:hover { background:#c0392b; color:#fff; }
+                        /* 删组小×：绝对定位组标题右上角，hover整个分组标题才显示，不占几何尺寸防抖动 */
+                        .tx-grp-del { position:absolute; top:4px; right:6px; width:17px; height:17px; line-height:16px; text-align:center; font-size:14px; color:#c0392b; background:rgba(255,255,255,0.92); border:1px solid rgba(192,57,43,0.45); border-radius:3px; cursor:pointer; z-index:7; display:none; }
+                        .tx-board-table thead .tx-grp-h:hover .tx-grp-del { display:block; }
+                        .tx-grp-del:hover { background:#c0392b; color:#fff; }
+                        [data-theme="dark"] .tx-grp-del { background:rgba(30,32,38,0.92); color:#ff7875; border-color:rgba(255,120,117,0.5); }
+                        [data-theme="dark"] .tx-grp-del:hover { background:#c0392b; color:#fff; }
                         body.col-resizing, body.row-resizing { cursor:col-resize; user-select:none; }
                         body.row-resizing { cursor:row-resize; }
                         /* 行高拖拽手柄（每行第一格底部，td overflow:hidden 故贴 bottom:0 内侧） */
@@ -3720,7 +3726,7 @@
     <script src="js/issues-versions.js?v=20260624c"></script>
     <script src="js/social.js?v=20260701d"></script>
     <script src="js/reports.js?v=20260630e"></script>
-    <script src="js/tencent-games.js?v=20260701i"></script>
+    <script src="js/tencent-games.js?v=20260702a"></script>
     <script src="js/focus-items.js?v=20260624c"></script>
     <script src="js/faq.js?v=20260630e"></script>
     <!-- 原app.js已拆分为上述模块，保留bak备份 -->

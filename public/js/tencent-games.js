@@ -567,7 +567,10 @@ function renderTxBoard() {
     let thead = '<thead>';
     thead += '<tr>';
     groups.forEach((g, gi) => {
-        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}" data-g="${gi}" ondblclick="startTxGroupTitleEdit(this)">${escapeHtml(g.title)}</th>`;
+        thead += `<th class="tx-grp-h tx-grp-${txCls(g.key)}" colspan="${g.cols.length}" data-g="${gi}" ondblclick="startTxGroupTitleEdit(this)">`
+            + `<span class="tx-grp-title">${escapeHtml(g.title)}</span>`
+            + `<span class="tx-grp-del" title="删除整个分组" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();txDeleteGroup(${gi})">×</span>`
+            + `</th>`;
     });
     thead += '</tr>';
     thead += '<tr>';
